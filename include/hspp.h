@@ -1717,12 +1717,16 @@ public:
     template <typename Ret>
     constexpr static auto pure(Ret ret)
     {
-        return function([=](InnerArg){ return ret; });
+        return function([ret=std::move(ret)](InnerArg){ return ret; });
     }
     template <typename Func1, typename Func2>
-    constexpr static auto app(Func1 const& func, Func2 const& in)
+    constexpr static auto app(Func1 func, Func2 in)
     {
-        return function([=](InnerArg arg) {return func(arg)(in(arg)); });
+        return function(
+            [func=std::move(func), in=std::move(in)](InnerArg arg)
+            {
+                return func(arg)(in(arg));
+            });
     }
 };
 
