@@ -567,13 +567,13 @@ TEST(Monad, GenericFunction)
     EXPECT_EQ(y(3U), false);
 }
 
-// TEST(Monad, Function2)
-// {
-//     constexpr auto f = function([](std::string const& str, size_t i) { return str.size() == i; });
-//     constexpr auto y = function<std::string, size_t>(show) >>= f;
-//     EXPECT_EQ(y(1U), true);
-//     EXPECT_EQ(y(3U), false);
-// }
+TEST(Monad, Function2)
+{
+    constexpr auto f = function([](std::string const& str, size_t i) { return str.size() == i; });
+    constexpr auto y = function<std::string, size_t>(show) >>= f;
+    EXPECT_EQ(y(1U), true);
+    EXPECT_EQ(y(3U), false);
+}
 
 TEST(Monad, return_)
 {
