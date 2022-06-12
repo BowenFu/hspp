@@ -1128,8 +1128,8 @@ public:
 
     constexpr static auto mappend = function([](Type<Args...> const& lhs, Type<Args...> const& rhs)
     {
-        Type<Args...> result;
         auto const r = ChainView{RefView{lhs}, RefView{rhs}};
+        Type<Args...> result;
         for (auto e : r)
         {
             result.insert(result.end(), e);
