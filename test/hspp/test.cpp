@@ -155,6 +155,18 @@ TEST(DropView, 1)
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
+TEST(splitAt, 1)
+{
+    auto [p1, p2] = splitAt | IotaView<int>{3, 7} | 2U;
+    auto const result1 = toVector(p1);
+    auto const result2 = toVector(p2);
+    auto const expected1 = {3, 4};
+    auto const expected2 = {5, 6, 7};
+
+    EXPECT_TRUE(std::equal(result1.begin(), result1.end(), expected1.begin()));
+    EXPECT_TRUE(std::equal(result2.begin(), result2.end(), expected2.begin()));
+}
+
 TEST(ChainView, 1)
 {
     auto const a = std::vector{1, 2};

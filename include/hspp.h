@@ -2117,4 +2117,19 @@ constexpr inline auto length = genericFunction<1>([](auto r)
     return foldl | inc | 0 | r;
 });
 
+constexpr inline auto take = genericFunction<2>([](auto r, size_t num)
+{
+    return ownedRange(TakeView{r, num});
+});
+
+constexpr inline auto drop = genericFunction<2>([](auto r, size_t num)
+{
+    return ownedRange(DropView{r, num});
+});
+
+constexpr inline auto splitAt = genericFunction<2>([](auto r, size_t num)
+{
+    return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
+});
+
 #endif // HSPP_H
