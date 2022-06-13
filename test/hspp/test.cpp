@@ -761,6 +761,14 @@ TEST(equalTo, x)
     EXPECT_FALSE(equalTo | 3 | 2);
 }
 
+TEST(equalTo, 2)
+{
+    constexpr auto f = length <o> (filter || equalTo | 'a');
+    using namespace std::literals;
+
+    EXPECT_EQ(f | "abracadabra"sv, 5);
+}
+
 TEST(Monoid, vector)
 {
     auto const l = std::vector{1, 2, 3};

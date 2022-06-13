@@ -2045,4 +2045,10 @@ constexpr inline auto replicate = genericFunction<2>([](auto data, size_t times)
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
 });
 
+constexpr inline auto length = genericFunction<1>([](auto r)
+{
+    constexpr auto inc = genericFunction<2>([](auto sum, auto){ return sum + 1; });
+    return foldl | inc | 0 | r;
+});
+
 #endif // HSPP_H
