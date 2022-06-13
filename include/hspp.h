@@ -731,6 +731,65 @@ private:
 };
 
 template <typename Base>
+class DropView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(DropView const& dropView)
+        : mView{dropView}
+        , mBaseIter{mView.get().mBase.begin()}
+        {
+            for (size_t i = 0; i < mView.get().mNum; ++i)
+            {
+                if (!hasValue())
+                {
+                    break;
+                }
+                ++mBaseIter;
+            }
+        }
+        auto operator++()
+        {
+            ++mBaseIter;
+        }
+        auto operator*() const
+        {
+            return *mBaseIter;
+        }
+        bool hasValue() const
+        {
+            return mBaseIter != mView.get().mBase.end();
+        }
+    private:
+        std::reference_wrapper<DropView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr DropView(Base base, size_t number)
+    : mBase{std::move(base)}
+    , mNum{number}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Base mBase;
+    size_t mNum;
+};
+
+template <typename Base>
 class JoinView
 {
 public:
@@ -2045,6 +2104,11 @@ constexpr inline auto repeat = genericFunction<1>([](auto data)
 constexpr inline auto replicate = genericFunction<2>([](auto data, size_t times)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
+});
+
+constexpr inline auto enumFrom = genericFunction<1>([](auto start)
+{
+    return ownedRange(IotaView{start});
 });
 
 constexpr inline auto length = genericFunction<1>([](auto r)

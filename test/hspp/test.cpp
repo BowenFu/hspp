@@ -141,9 +141,17 @@ TEST(IotaView, 1)
 
 TEST(TakeView, 2)
 {
-    auto v = TakeView{IotaView<int>{3}, 4U};
+    auto v = TakeView{IotaView<int>{3, 4}, 4U};
     auto const result = toVector(v);
-    auto const expected = {3, 4, 5, 6};
+    auto const expected = {3, 4};
+    EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
+}
+
+TEST(DropView, 1)
+{
+    auto v = DropView{IotaView<int>{3, 6}, 2};
+    auto const result = toVector(v);
+    auto const expected = {5, 6};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
