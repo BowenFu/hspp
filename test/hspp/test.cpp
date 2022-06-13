@@ -847,63 +847,18 @@ TEST(Monoid, Ordering)
 
 TEST(Monoid, GenericFunction)
 {
-    auto const f = genericFunction<1>([](auto u){ return u+1; });
-    auto const result = mconcat | std::tuple{f};
-    EXPECT_EQ(result(24), 25);
-}
-
-TEST(Monoid, GenericFunction2)
-{
-    auto const f = genericFunction<1>([](auto u){ return u+1; });
-    auto const g = genericFunction<1>([](auto u){ return u*2; });
-    auto const result = mconcat | std::tuple{f, g};
-    EXPECT_EQ(result(24), 49);
-}
-
-TEST(Monoid, GenericFunction3)
-{
-    auto const f = genericFunction<1>([](auto u){ return u+1; });
-    auto const g = genericFunction<1>([](auto u){ return u*2; });
+    auto const f = genericFunction<1>([](auto u){ return product | (u+1); });
+    auto const g = genericFunction<1>([](auto u){ return product | (u*2); });
     auto const result = mappend | f | g;
-    EXPECT_EQ(result(24), 49);
-}
-
-TEST(Monoid, GenericFunction4)
-{
-    auto const f = genericFunction<1>([](auto u){ return u+1; });
-    auto const g = genericFunction<1>([](auto u){ return u*2; });
-    auto const result = mappend | f | g;
-    EXPECT_EQ(result(24), 49);
-}
-
-TEST(Monoid, GenericFunction5)
-{
-    constexpr auto f = genericFunction<2>([](std::string const& str, size_t i) { return str.size() == i; });
-    constexpr auto g = show;
-    auto const y = mappend | f | g;
-    EXPECT_EQ(y | 1U | 1U, true);
-    EXPECT_EQ(y | 2U | 2U, false);
+    EXPECT_EQ(result(24).get(), 1200);
 }
 
 TEST(Monoid, Function)
 {
-    auto const f = function([](int u){ return u+1; });
-    auto const g = function([](int u){ return u*2; });
+    auto const f = function([](int u){ return product | (u+1); });
+    auto const g = function([](int u){ return product | (u*2); });
     auto const result = mappend | f | g;
-    EXPECT_EQ(result(24), 49);
-}
-
-TEST(Monoid, Function2)
-{
-    constexpr auto f = function([](std::string const& str, size_t i) { return str.size() == i; });
-    constexpr auto g = function<std::string, size_t>(show);
-    auto const y = mappend | f | g;
-    EXPECT_EQ(y | 1U | 1U, true);
-    EXPECT_EQ(y | 2U | 2U, false);
-
-    auto const z = mconcat | y;
-    EXPECT_EQ(z | 1U, true);
-    EXPECT_EQ(z | 2U, false);
+    EXPECT_EQ(result(24).get(), 1200);
 }
 
 TEST(Monoid, Tuple)

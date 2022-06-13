@@ -1083,9 +1083,28 @@ struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
     using Type = TypeClassT<DummyTemplateClass, GenericFunctionTag>;
 };
 
+namespace impl
+{
+    template <size_t nbArgs, typename Repr>
+    constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
+    {
+        return genericFunction<2>([f=std::move(f)](auto x, auto y){ return f | y |x; });
+    }
+    template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
+    constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
+    {
+        return function([f=std::move(f)](Arg1 x, Arg2 y){ return f | y |x; });
+    }
+    template <typename Repr1, typename Repr2, typename Ret, typename Arg1, typename Arg2, typename... Rest>
+    constexpr auto flipImpl(Function<Repr1, Function<Repr2, Ret, Arg2, Rest...>, Arg1> f)
+    {
+        return function([f=std::move(f)](Arg2 x, Arg1 y){ return f | y |x; });
+    }
+}; // namespace impl
+
 constexpr auto flip = genericFunction<1>([](auto func)
 {
-    return genericFunction<2>([=](auto x, auto y){ return func | y |x; });
+    return impl::flipImpl(std::move(func));
 });
 
 template <typename Iter1, typename Iter2, typename Init, typename Func>
@@ -1263,62 +1282,42 @@ public:
     });
 };
 
-template <>
-class Monoid<DummyTemplateClass, GenericFunctionTag>
+template <typename GFunc>
+class MonoidBase<DummyTemplateClass, GenericFunctionTag, GFunc>
 {
-private:
-    constexpr static auto mconcatTupleImpl()
-    {
-        return id;
-    }
-    template <typename Arg, typename... Rest>
-    constexpr static auto mconcatTupleImpl(Arg&& arg, Rest&&... rest)
-    {
-        return arg <o> mconcatTupleImpl(rest...);
-    }
-    template <typename... Funcs>
-    constexpr static auto mconcatImpl(std::tuple<Funcs...> const& nested)
-    {
-        return std::apply([](auto&&... funcs)
-        {
-            return mconcatTupleImpl(funcs...);
-        }, nested);
-    }
-    template <typename Func>
-    constexpr static auto mconcatImpl(Func&& nested)
-    {
-        return genericFunction<1>([nested=std::move(nested)](auto arg)
-        {
-            return nested | arg | arg;
-        });
-    }
 public:
-    constexpr static auto mempty = id;
-
-    constexpr static auto mappend = o;
-
-    constexpr static auto mconcat = genericFunction<1>([](auto&& nested)
+    constexpr static auto mempty = genericFunction<1>([](auto x)
     {
-        return mconcatImpl(nested);
+        using RetType = std::invoke_result_t<GFunc, decltype(x)>;
+        return MonoidType<RetType>::mempty;
+    });
+
+    constexpr static auto mappend = genericFunction<2>([](auto f, auto g)
+    {
+        return genericFunction<1>([f=std::move(f), g=std::move(g)](auto arg)
+        {
+            using RetType = std::invoke_result_t<GFunc, decltype(arg)>;
+            using MType = MonoidType<RetType>;
+            return (f | arg) <MType::mappend> (g | arg);
+        });
     });
 };
 
-template <typename InArg>
-class Monoid<Function, InArg>
+template <typename InArg, typename RetType>
+class MonoidBase<Function, InArg, RetType>
 {
 public:
-    constexpr static auto mempty = function([](InArg data)
+    constexpr static auto mempty = function([](InArg)
     {
-        return std::move(data);
+        return MonoidType<RetType>::mempty;
     });
 
-    constexpr static auto mappend = o;
-
-    constexpr static auto mconcat = genericFunction<1>([](auto&& nested)
+    constexpr static auto mappend = genericFunction<2>([](auto f, auto g)
     {
-        return function([nested=std::move(nested)](InArg arg)
+        return function([f=std::move(f), g=std::move(g)](InArg arg)
         {
-            return nested | arg | arg;
+            using MType = MonoidType<RetType>;
+            return (f | arg) <MType::mappend> (g | arg);
         });
     });
 };
@@ -1439,13 +1438,14 @@ struct MonoidTrait<_O_>
 template <size_t nbArgs, typename Repr>
 struct MonoidTrait<GenericFunction<nbArgs, Repr>>
 {
-    using Type = Monoid<DummyTemplateClass, GenericFunctionTag>;
+    using Type = Monoid<DummyTemplateClass, GenericFunctionTag, GenericFunction<nbArgs, Repr>>;
 };
 
 template <typename Repr, typename Ret, typename InnerArg, typename... Rest>
 struct MonoidTrait<Function<Repr, Ret, InnerArg, Rest...>>
 {
-    using Type = Monoid<Function, InnerArg>;
+    using RetT = std::invoke_result_t<Function<Repr, Ret, InnerArg, Rest...>, InnerArg>;
+    using Type = Monoid<Function, InnerArg, RetT>;
 };
 
 class Mappend
@@ -1881,9 +1881,22 @@ class MonadBase<DummyTemplateClass, GenericFunctionTag>
 {
 public:
     template <size_t nbArgs, typename Repr, typename Func>
-    constexpr static auto bind(GenericFunction<nbArgs, Repr> const& arg, Func func)
+    constexpr static auto bind(GenericFunction<nbArgs, Repr> const& m, Func k)
     {
-        return mconcat || fmap | func | arg;
+        // return genericFunction<1>([f, g=std::move(g)](auto x) { return (f | x) || (g | x); });
+        return (flip | std::move(k)) <app> m;
+    }
+};
+
+template <typename InnerArg>
+class MonadBase<Function, InnerArg>
+{
+public:
+    template <typename Repr, typename Ret, typename... Rest, typename Func>
+    constexpr static auto bind(Function<Repr, Ret, InnerArg, Rest...> const& m, Func k)
+    {
+        // return Function([f, g=std::move(g)](InnerArg x) { return f | x || g | x; });
+        return (flip | std::move(k)) <app> m;
     }
 };
 
