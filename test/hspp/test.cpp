@@ -1061,4 +1061,7 @@ TEST(MonadPlus, guard)
 TEST(const_, x)
 {
     EXPECT_EQ(const_ | 1 | 2, 1);
+    auto const v = std::vector{1, 2};
+    EXPECT_EQ(foldl | const_ | 0 | v, 0);
+    EXPECT_EQ(foldr | const_ | 0 | v, 1);
 }
