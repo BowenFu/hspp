@@ -2142,4 +2142,9 @@ constexpr inline auto splitAt = genericFunction<2>([](auto r, size_t num)
     return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
 });
 
+constexpr inline auto const_ = genericFunction<2>([](auto r, auto)
+{
+    return r;
+});
+
 #endif // HSPP_H

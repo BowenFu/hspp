@@ -1057,3 +1057,8 @@ TEST(MonadPlus, guard)
     auto const expected = std::vector{7,17,27,37,47};
     EXPECT_EQ(result8, expected);
 }
+
+TEST(const_, x)
+{
+    EXPECT_EQ(const_ | 1 | 2, 1);
+}
