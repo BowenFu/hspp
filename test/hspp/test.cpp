@@ -749,6 +749,18 @@ TEST(foldr, 1)
     EXPECT_EQ(result, "123");
 }
 
+TEST(flip, x)
+{
+    constexpr auto gt = flip | genericFunction<2>(std::less<>{});
+    EXPECT_TRUE(gt | 3 | 2);
+}
+
+TEST(equalTo, x)
+{
+    EXPECT_TRUE(equalTo | 2 | 2);
+    EXPECT_FALSE(equalTo | 3 | 2);
+}
+
 TEST(Monoid, vector)
 {
     auto const l = std::vector{1, 2, 3};
