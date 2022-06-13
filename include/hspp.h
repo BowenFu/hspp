@@ -1821,7 +1821,6 @@ public:
     });
 };
 
-// Works for Function as well.
 template <template<typename...> class Type, typename... Ts>
 class Monad : public Applicative<Type, Ts...>, public MonadBase<Type, Ts...>, public MonadRShift<MonadBase<Type, Ts...>>
 {
@@ -1883,7 +1882,6 @@ public:
     template <size_t nbArgs, typename Repr, typename Func>
     constexpr static auto bind(GenericFunction<nbArgs, Repr> const& m, Func k)
     {
-        // return genericFunction<1>([f, g=std::move(g)](auto x) { return (f | x) || (g | x); });
         return (flip | std::move(k)) <app> m;
     }
 };
@@ -1895,7 +1893,6 @@ public:
     template <typename Repr, typename Ret, typename... Rest, typename Func>
     constexpr static auto bind(Function<Repr, Ret, InnerArg, Rest...> const& m, Func k)
     {
-        // return Function([f, g=std::move(g)](InnerArg x) { return f | x || g | x; });
         return (flip | std::move(k)) <app> m;
     }
 };
@@ -2046,6 +2043,3 @@ constexpr inline auto replicate = genericFunction<2>([](auto data, size_t times)
 });
 
 #endif // HSPP_H
-
-// =======
-// tuple as Monad?
