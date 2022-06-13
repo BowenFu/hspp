@@ -108,7 +108,7 @@ TEST(ZipView, 1)
 {
     std::list<int> a = {1, 2};
     std::list<int> b = {3, 4, 5};
-    auto v = ZipView{RefView{a}, RefView{b}};
+    auto v = zip | RefView{a} | RefView{b};
     std::vector<std::tuple<int, int>> result = toVector(v);
     std::vector<std::tuple<int, int>> expected = {{1, 3,}, {2, 4}};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
