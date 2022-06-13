@@ -1953,6 +1953,8 @@ constexpr auto show = genericFunction<1>([](auto&& d)
     return os.str();
 });
 
+constexpr auto print = putStrLn <o> show;
+
 template <typename MType, typename T>
 constexpr auto evalDeferredImpl(T&& t)
 {

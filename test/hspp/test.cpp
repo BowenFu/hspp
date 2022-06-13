@@ -769,6 +769,15 @@ TEST(equalTo, 2)
     EXPECT_EQ(f | "abracadabra"sv, 5);
 }
 
+TEST(print, 1)
+{
+    auto const io = print | 3;
+    testing::internal::CaptureStdout();
+    io.run();
+    std::string output1 = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output1, "3\n");
+}
+
 TEST(Monoid, vector)
 {
     auto const l = std::vector{1, 2, 3};
