@@ -1030,6 +1030,7 @@ private:
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
+// Known limitation: does not support multiple types of Bases well.
 template <typename... Bases>
 class ChainView
 {
@@ -1103,6 +1104,15 @@ template <typename Data, typename Repr>
 class Range : public Repr
 {
 };
+
+template <typename... Ts>
+class IsRange : public std::false_type
+{};
+template <typename... Ts>
+class IsRange<Range<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
 
 template <typename Repr>
 constexpr auto ownedRange(Repr&& repr)
@@ -2149,7 +2159,16 @@ constexpr inline auto const_ = genericFunction<2>([](auto r, auto)
 
 constexpr inline auto cons = genericFunction<2>([](auto e, auto l)
 {
-    return ownedRange(ChainView{SingleView{e}, l});
+    // if constexpr(isRangeV<decltype(l)>)
+    // {
+    //      ChainView does not work for different views.
+    //     return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
+    // }
+    // else
+    {
+        l.insert(l.begin(), e);
+        return l;
+    }
 });
 
 #endif // HSPP_H
