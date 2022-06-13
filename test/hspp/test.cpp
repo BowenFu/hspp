@@ -114,6 +114,16 @@ TEST(ZipView, 1)
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
+TEST(zipWith, 1)
+{
+    std::vector<int> a = {1, 2};
+    std::list<int> b = {3, 4, 5};
+    auto v = zipWith | genericFunction<2>(std::plus<>{}) | RefView{a} | RefView{b};
+    std::vector<int> result = toVector(v);
+    std::vector<int> expected = {4, 6};
+    EXPECT_EQ(result, expected);
+}
+
 TEST(RepeatView, 1)
 {
     std::list<int> b = {3, 4, 5};

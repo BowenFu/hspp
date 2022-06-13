@@ -2101,6 +2101,11 @@ constexpr inline auto zip = genericFunction<2>([](auto lhs, auto rhs)
     return ownedRange(ZipView{std::move(lhs), std::move(rhs)});
 });
 
+constexpr inline auto zipWith = genericFunction<3>([](auto func, auto lhs, auto rhs)
+{
+    return ownedRange(MapView{ZipView{std::move(lhs), std::move(rhs)}, [func=std::move(func)](auto tu) { return func | std::get<0>(tu) | std::get<1>(tu);}});
+});
+
 constexpr inline auto repeat = genericFunction<1>([](auto data)
 {
     return ownedRange(RepeatView{std::move(data)});
