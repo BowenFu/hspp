@@ -1088,17 +1088,17 @@ namespace impl
     template <size_t nbArgs, typename Repr>
     constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
     {
-        return genericFunction<2>([f=std::move(f)](auto x, auto y){ return f | y |x; });
+        return genericFunction<2>([f=std::move(f)](auto x, auto y){ return f | y | x; });
     }
     template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
     {
-        return function([f=std::move(f)](Arg1 x, Arg2 y){ return f | y |x; });
+        return function([f=std::move(f)](Arg1 x, Arg2 y){ return f | y | x; });
     }
     template <typename Repr1, typename Repr2, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr1, Function<Repr2, Ret, Arg2, Rest...>, Arg1> f)
     {
-        return function([f=std::move(f)](Arg2 x, Arg1 y){ return f | y |x; });
+        return function([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
     }
 }; // namespace impl
 
@@ -1107,6 +1107,7 @@ constexpr auto flip = genericFunction<1>([](auto func)
     return impl::flipImpl(std::move(func));
 });
 
+// Note different iterator types for begin and end.
 template <typename Iter1, typename Iter2, typename Init, typename Func>
 constexpr auto accumulate(Iter1 begin, Iter2 end, Init init, Func func)
 {
@@ -1126,6 +1127,8 @@ constexpr auto foldl = genericFunction<3>([](auto func, auto init, auto const& l
 {
     return accumulate(list.begin(), list.end(), init, unCurry | func);
 });
+
+constexpr auto equalTo = genericFunction<2>(std::equal_to<>{});
 
 /////////// Monoid ///////////
 

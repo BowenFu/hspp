@@ -561,7 +561,7 @@ TEST(Monad, Function)
 
 TEST(Monad, GenericFunction)
 {
-    constexpr auto f = genericFunction<2>([](std::string const& str, size_t i) { return str.size() == i; });
+    constexpr auto f = genericFunction<2>([](std::string const& str, size_t i) { return equalTo | str.size() | i; });
     constexpr auto y = show >>= f;
     EXPECT_EQ(y(1U), true);
     EXPECT_EQ(y(3U), false);
