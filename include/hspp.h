@@ -2147,4 +2147,9 @@ constexpr inline auto const_ = genericFunction<2>([](auto r, auto)
     return r;
 });
 
+constexpr inline auto cons = genericFunction<2>([](auto e, auto l)
+{
+    return ownedRange(ChainView{SingleView{e}, l});
+});
+
 #endif // HSPP_H

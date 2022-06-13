@@ -779,6 +779,15 @@ TEST(foldr, 1)
     EXPECT_EQ(result, "123");
 }
 
+TEST(fold, 1)
+{
+    constexpr auto pow = genericFunction<2>([](auto x, auto y) { return std::pow(x, y); });
+    auto const r1 = foldr | pow | 2.f | std::vector{1.f, 4.f};
+    EXPECT_EQ(r1, 1);
+    auto const r2 = foldl | pow | 2.f | IotaView{1.f, 4.f};
+    EXPECT_EQ(r2, 64);
+}
+
 TEST(flip, x)
 {
     constexpr auto gt = flip | genericFunction<2>(std::less<>{});
