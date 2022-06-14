@@ -227,7 +227,7 @@ template <typename T>
 constexpr static auto isFunctionV = IsFunction<std::decay_t<T>>::value;
 
 template <typename...Args, typename Func>
-constexpr auto function(Func const& func)
+constexpr auto toFunc(Func const& func)
 {
     if constexpr(sizeof...(Args) == 0)
     {
@@ -331,7 +331,7 @@ public:
     template <typename Func, typename Repr, typename Ret, typename FirstArg, typename... Args>
     constexpr auto operator()(Func&& f, Function<Repr, Ret, FirstArg, Args...> const& g) const
     {
-        return function([=](FirstArg x){ return f(g(x));});
+        return toFunc([=](FirstArg x){ return f(g(x));});
     }
     template <typename F, typename G>
     constexpr auto operator()(F&& f, G&&g) const
@@ -376,7 +376,7 @@ auto ioData(Data data)
     return io([data=std::move(data)] { return data; });
 }
 
-constexpr auto putStrLn = function([](std::string str)
+constexpr auto putStrLn = toFunc([](std::string str)
 {
     return io(
         [str=std::move(str)]
@@ -1284,12 +1284,12 @@ namespace impl
     template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
     {
-        return function([f=std::move(f)](Arg1 x, Arg2 y){ return f | y | x; });
+        return toFunc([f=std::move(f)](Arg1 x, Arg2 y){ return f | y | x; });
     }
     template <typename Repr1, typename Repr2, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr1, Function<Repr2, Ret, Arg2, Rest...>, Arg1> f)
     {
-        return function([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
+        return toFunc([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
     }
 }; // namespace impl
 
@@ -1357,7 +1357,7 @@ class MonoidBase
 public:
     const static Type<Args...> mempty;
 
-    constexpr static auto mappend = function([](Type<Args...> const& lhs, Type<Args...> const& rhs)
+    constexpr static auto mappend = toFunc([](Type<Args...> const& lhs, Type<Args...> const& rhs)
     {
         auto const r = ChainView{RefView{lhs}, RefView{rhs}};
         Type<Args...> result;
@@ -1408,7 +1408,7 @@ class MonoidBase<Product, Data>
 public:
     constexpr static auto mempty = Product<Data>{1};
 
-    constexpr static auto mappend = function([](Product<Data> const& lhs, Product<Data> const& rhs)
+    constexpr static auto mappend = toFunc([](Product<Data> const& lhs, Product<Data> const& rhs)
     {
         return Product<Data>{lhs.get() * rhs.get()};
     });
@@ -1446,7 +1446,7 @@ class MonoidBase<DummyTemplateClass, Ordering>
 public:
     constexpr static auto mempty = Ordering::kEQ;
 
-    constexpr static auto mappend = function([](Ordering lhs, Ordering rhs)
+    constexpr static auto mappend = toFunc([](Ordering lhs, Ordering rhs)
     {
         switch (lhs)
         {
@@ -1467,7 +1467,7 @@ class MonoidBase<DummyTemplateClass, _O_>
 public:
     constexpr static auto mempty = _o_;
 
-    constexpr static auto mappend = function([](_O_, _O_)
+    constexpr static auto mappend = toFunc([](_O_, _O_)
     {
         return _o_;
     });
@@ -1519,14 +1519,14 @@ template <typename InArg, typename RetType>
 class MonoidBase<Function, InArg, RetType>
 {
 public:
-    constexpr static auto mempty = function([](InArg)
+    constexpr static auto mempty = toFunc([](InArg)
     {
         return MonoidType<RetType>::mempty;
     });
 
     constexpr static auto mappend = toGFunc<2>([](auto f, auto g)
     {
-        return function([f=std::move(f), g=std::move(g)](InArg arg)
+        return toFunc([f=std::move(f), g=std::move(g)](InArg arg)
         {
             using MType = MonoidType<RetType>;
             return (f | arg) <MType::mappend> (g | arg);
@@ -1561,7 +1561,7 @@ class MonoidBase<Maybe, Data>
 public:
     const static Maybe<Data> mempty;
 
-    constexpr static auto mappend = function([](Maybe<Data> const& lhs, Maybe<Data> const& rhs)
+    constexpr static auto mappend = toFunc([](Maybe<Data> const& lhs, Maybe<Data> const& rhs)
     {
         return std::visit(overload(
             [](Just<Data> const& l, Just<Data> const& r) -> Maybe<Data>
@@ -1892,12 +1892,12 @@ public:
     template <typename Ret>
     constexpr static auto pure(Ret ret)
     {
-        return function([ret=std::move(ret)](FirstArg){ return ret; });
+        return toFunc([ret=std::move(ret)](FirstArg){ return ret; });
     }
     template <typename Func1, typename Func2>
     constexpr static auto app(Func1 func, Func2 in)
     {
-        return function(
+        return toFunc(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return func(arg)(in(arg));
@@ -2113,7 +2113,7 @@ constexpr auto guardImpl<Range>(bool b)
 }
 
 template <template <typename...> class ClassT>
-constexpr auto guard = function([](bool b)
+constexpr auto guard = toFunc([](bool b)
 {
     return guardImpl<ClassT>(b);
 });
@@ -2181,7 +2181,7 @@ constexpr inline auto elem = toGFunc<2>([](auto t, auto const& c)
 template <typename Repr1, typename Ret1, typename Arg1, typename... Rest1, typename Repr2, typename Ret2, typename Arg2, typename... Rest2>
 constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, Ret2, Arg2, Rest2...> g)
 {
-    return function<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
+    return toFunc<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
 }
 
 constexpr inline auto on = toGFunc<2>([](auto f, auto g)
