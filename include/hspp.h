@@ -47,12 +47,6 @@ class Maybe;
 
 class Nothing final
 {
-public:
-    template <typename Data>
-    constexpr operator Maybe<Data>() const
-    {
-        return Maybe<Data>(*this);
-    }
 };
 
 constexpr inline Nothing nothing;
@@ -64,10 +58,6 @@ public:
     constexpr Just(Data d)
     : data{std::move(d)}
     {}
-    constexpr operator Maybe<Data>() const
-    {
-        return Maybe<Data>(*this);
-    }
     Data data;
 };
 
