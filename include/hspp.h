@@ -21,6 +21,8 @@
 #include <forward_list>
 #include <vector>
 
+namespace hspp
+{
 namespace impl
 {
     template <typename T>
@@ -1372,35 +1374,46 @@ public:
 template <template<typename...> typename Type, typename... Args>
 const Type<Args...> MonoidBase<Type, Args...>::mempty{};
 
-template <typename Data>
-class Product
-{
-    Data mData;
-public:
-    constexpr Product(Data data)
-    : mData{data}
-    {}
-    auto get() const
-    {
-        return mData;
-    }
-};
-
-template <typename T>
-constexpr auto operator==(Product<T> l, Product<T> r) 
-{
-    return l.get() == r.get();
-}
-
-constexpr auto product = toGFunc<1>([](auto data)
-{
-    return Product{data};
+#define DEFINE_UNARY_CLASS(ClassName, className, getClassName)  \
+template <typename Data>                                        \
+class ClassName                                                 \
+{                                                               \
+    Data mData;                                                 \
+public:                                                         \
+    constexpr ClassName(Data data)                              \
+    : mData{data}                                               \
+    {}                                                          \
+    auto get() const                                            \
+    {                                                           \
+        return mData;                                           \
+    }                                                           \
+};                                                              \
+                                                                \
+template <typename T>                                           \
+constexpr auto operator==(ClassName<T> l, ClassName<T> r)       \
+{                                                               \
+    return l.get() == r.get();                                  \
+}                                                               \
+                                                                \
+constexpr auto className = toGFunc<1>([](auto data)             \
+{                                                               \
+    return ClassName{data};                                     \
+});                                                             \
+                                                                \
+constexpr auto getClassName = toGFunc<1>([](auto data)          \
+{                                                               \
+    return data.get();                                          \
 });
 
-constexpr auto getProduct = toGFunc<1>([](auto data)
-{
-    return data.get();
-});
+DEFINE_UNARY_CLASS(Product, product, getProduct)
+DEFINE_UNARY_CLASS(Sum, sum, getSum)
+DEFINE_UNARY_CLASS(AllImpl, all, getAll)
+DEFINE_UNARY_CLASS(AnyImpl, any, getAny)
+
+#undef DEFINE_UNARY_CLASS
+
+using All = AllImpl<bool>;
+using Any = AnyImpl<bool>;
 
 template <typename Data>
 class MonoidBase<Product, Data>
@@ -1411,6 +1424,42 @@ public:
     constexpr static auto mappend = toFunc([](Product<Data> const& lhs, Product<Data> const& rhs)
     {
         return Product<Data>{lhs.get() * rhs.get()};
+    });
+};
+
+template <typename Data>
+class MonoidBase<Sum, Data>
+{
+public:
+    constexpr static auto mempty = Sum<Data>{0};
+
+    constexpr static auto mappend = toFunc([](Sum<Data> const& lhs, Sum<Data> const& rhs)
+    {
+        return Sum<Data>{lhs.get() + rhs.get()};
+    });
+};
+
+template <>
+class MonoidBase<DummyTemplateClass, Any>
+{
+public:
+    constexpr static auto mempty = Any{false};
+
+    constexpr static auto mappend = toFunc([](Any lhs, Any rhs)
+    {
+        return Any{lhs.get() || rhs.get()};
+    });
+};
+
+template <>
+class MonoidBase<DummyTemplateClass, All>
+{
+public:
+    constexpr static auto mempty = All{true};
+
+    constexpr static auto mappend = toFunc([](All lhs, All rhs)
+    {
+        return Any{lhs.get() && rhs.get()};
     });
 };
 
@@ -1596,6 +1645,18 @@ template <typename... Args>
 struct MonoidTrait<std::tuple<Args...>>
 {
     using Type = Monoid<std::tuple>;
+};
+
+template <>
+struct MonoidTrait<Any>
+{
+    using Type = Monoid<DummyTemplateClass, Any>;
+};
+
+template <>
+struct MonoidTrait<All>
+{
+    using Type = Monoid<DummyTemplateClass, All>;
 };
 
 template <>
@@ -2272,5 +2333,6 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
         return l;
     }
 });
+} // namespace hspp
 
 #endif // HSPP_H

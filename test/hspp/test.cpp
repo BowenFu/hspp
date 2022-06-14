@@ -3,6 +3,8 @@
 #include <list>
 #include <gtest/gtest.h>
 
+using namespace hspp;
+
 TEST(Range, 1)
 {
     auto vv = MapView{ProductView{SingleView{42}},
