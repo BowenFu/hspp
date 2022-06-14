@@ -2,6 +2,7 @@
 #include <vector>
 #include <list>
 #include <gtest/gtest.h>
+#include <cmath>
 
 using namespace hspp;
 
