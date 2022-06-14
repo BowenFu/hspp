@@ -534,7 +534,7 @@ TEST(Monad, Maybe)
         const auto y = return_(4);
         const auto z = x >>= filterEven;
         const auto u = y >>= filterEven;
-        EXPECT_EQ(z, Nothing{});
+        EXPECT_EQ(z, nothing);
         EXPECT_EQ(u, Just{4});
     };
     auto const filterEven = [](int x)-> Maybe<int> { return x%2==0 ? Maybe<int>{x} : Maybe<int>{}; };
@@ -547,7 +547,7 @@ TEST(Monad, Maybe)
 TEST(Monad, Maybe2)
 {
     auto const result = Maybe<int>{} >> Maybe<int>{3};
-    EXPECT_EQ(result, Nothing{});
+    EXPECT_EQ(result, nothing);
 }
 
 TEST(Monad, IO)
@@ -938,6 +938,18 @@ TEST(Monoid, any)
     EXPECT_EQ(result, true);
 }
 
+TEST(Monoid, first)
+{
+    auto const result = getFirst <o> mconcat <o> (map | first) || std::list{First<int>{nothing}, First<int>{Maybe{2}}};
+    EXPECT_EQ(result, Maybe{2});
+}
+
+TEST(Monoid, last)
+{
+    auto const result = getLast <o> mconcat <o> (map | last) || std::list{Last<int>{nothing}, Last<int>{Maybe{2}}};
+    EXPECT_EQ(result, Maybe{2});
+}
+
 TEST(Monoid, Ordering)
 {
     constexpr auto length = toFunc([](std::string const& x)
@@ -988,7 +1000,7 @@ TEST(Maybe, 1)
     result = Maybe<std::string>{"andy"} <mappend> Maybe<std::string>{"123"};
     EXPECT_EQ(result, Just<std::string>{"andy123"});
     result = Maybe<std::string>{} <mappend> Maybe<std::string>{};
-    EXPECT_EQ(result, Nothing{});
+    EXPECT_EQ(result, nothing);
 
     result = mconcat | std::vector{Maybe<std::string>{"123"}, Maybe<std::string>{"xxx"}};
     EXPECT_EQ(result, Just<std::string>{"123xxx"});
@@ -1020,14 +1032,14 @@ TEST(Monad, WalkTheLine)
     EXPECT_EQ(result, Just(Pole(2, 4)));
 
     auto const result2 = ((((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= (landRight | 4)) >>= (landLeft | -1)) >>= (landRight | -2);
-    EXPECT_EQ(result2, Nothing{});
+    EXPECT_EQ(result2, nothing);
 
     constexpr auto banana = toFunc([](Pole)
     {
         return Maybe<Pole>{};
     });
     auto const result3 = (((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= banana) >>= (landRight | 1);
-    EXPECT_EQ(result3, Nothing{});
+    EXPECT_EQ(result3, nothing);
 }
 
 TEST(Monad, vec)
@@ -1082,7 +1094,7 @@ TEST(MonadPlus, guard)
     EXPECT_EQ(result, Maybe{_o_});
 
     auto const result1 = guard<Maybe>(1 > 2);
-    EXPECT_EQ(result1, Nothing{});
+    EXPECT_EQ(result1, nothing);
 
     auto const result3 = guard<std::vector>(5 > 2);
     EXPECT_EQ(result3, std::vector{_o_});

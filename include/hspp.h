@@ -45,11 +45,13 @@ namespace impl
 class Nothing final
 {};
 
+constexpr inline Nothing nothing;
+
 template <typename Data>
 class Just final
 {
 public:
-    Just(Data d)
+    constexpr Just(Data d)
     : data{std::move(d)}
     {}
     Data data;
@@ -64,7 +66,7 @@ class Maybe : public MaybeBase<Data>
 public:
     using std::variant<Nothing, Just<Data>>::variant;
 
-    Maybe(Data data)
+    constexpr Maybe(Data data)
     : std::variant<Nothing, Just<Data>>{Just{std::move(data)}}
     {
     }
@@ -1409,11 +1411,17 @@ DEFINE_UNARY_CLASS(Product, product, getProduct)
 DEFINE_UNARY_CLASS(Sum, sum, getSum)
 DEFINE_UNARY_CLASS(AllImpl, all, getAll)
 DEFINE_UNARY_CLASS(AnyImpl, any, getAny)
+DEFINE_UNARY_CLASS(FirstImpl, first, getFirst)
+DEFINE_UNARY_CLASS(LastImpl, last, getLast)
 
 #undef DEFINE_UNARY_CLASS
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
+template <typename Data>
+using First = FirstImpl<Maybe<Data>>;
+template <typename Data>
+using Last = LastImpl<Maybe<Data>>;
 
 template <typename Data>
 class MonoidBase<Product, Data>
@@ -1460,6 +1468,30 @@ public:
     constexpr static auto mappend = toFunc([](All lhs, All rhs)
     {
         return All{lhs.get() && rhs.get()};
+    });
+};
+
+template <typename Data>
+class MonoidBase<FirstImpl, Maybe<Data>>
+{
+public:
+    constexpr static auto mempty = First<Data>{nothing};
+
+    constexpr static auto mappend = toFunc([](First<Data> lhs, First<Data> rhs)
+    {
+        return (getFirst | lhs) == nothing ? rhs : lhs;
+    });
+};
+
+template <typename Data>
+class MonoidBase<LastImpl, Maybe<Data>>
+{
+public:
+    constexpr static auto mempty = Last<Data>{nothing};
+
+    constexpr static auto mappend = toFunc([](Last<Data> lhs, Last<Data> rhs)
+    {
+        return (getLast | rhs) == nothing ? lhs : rhs;
     });
 };
 
@@ -1633,7 +1665,7 @@ public:
 };
 
 template <typename Data>
-const Maybe<Data> MonoidBase<Maybe, Data>::mempty = Nothing{};
+const Maybe<Data> MonoidBase<Maybe, Data>::mempty = nothing;
 
 template <template <typename...> class C, typename Data, typename... Rest>
 struct MonoidTrait<C<Data, Rest...>, std::enable_if_t<!impl::isTupleLikeV<C<Data, Rest...>> && !isFunctionV<C<Data, Rest...>>, void>>
@@ -1774,7 +1806,7 @@ public:
         return std::visit(overload(
             [](Nothing) -> Maybe<R>
             {
-                return Nothing{};
+                return nothing;
             },
             [func](Just<Arg> const& j) -> Maybe<R>
             {
@@ -1921,7 +1953,7 @@ public:
             },
             [](auto, auto) -> Maybe<R>
             {
-                return Nothing{};
+                return nothing;
             }
         ),
         static_cast<MaybeBase<Func>const &>(func),
@@ -2090,7 +2122,7 @@ public:
         return std::visit(overload(
             [](Nothing) -> R
             {
-                return Nothing{};
+                return nothing;
             },
             [func](Just<Arg> const& j) -> R
             {
