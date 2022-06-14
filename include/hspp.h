@@ -876,6 +876,19 @@ private:
     Base mBase;
 };
 
+namespace impl
+{
+template <typename... Bases>
+auto getBegins(std::tuple<Bases...> const& bases)
+{
+    auto result = std::apply([](auto&&... views)
+    {
+        return std::make_tuple((views.begin())...);
+    }, bases);
+    return result;
+}
+}
+
 template <typename... Bases>
 class ProductView
 {
@@ -885,7 +898,7 @@ public:
     public:
         constexpr Iter(ProductView const& view)
         : mView{view}
-        , mIters{getBegins(mView.get())}
+        , mIters{impl::getBegins(mView.get().mBases)}
         {
         }
         auto operator++()
@@ -904,17 +917,9 @@ public:
             return std::get<0>(mIters) != std::get<0>(mView.get().mBases).end();
         }
     private:
-        static auto getBegins(ProductView const& view)
-        {
-            auto result = std::apply([](auto&&... views)
-            {
-                return std::make_tuple((views.begin())...);
-            }, view.mBases);
-            return result;
-        }
 
         std::reference_wrapper<ProductView const> mView;
-        std::decay_t<decltype(getBegins(mView.get()))> mIters;
+        std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
 
         template <size_t I = std::tuple_size_v<std::decay_t<decltype(mIters)>> - 1>
         void next()
@@ -962,7 +967,7 @@ public:
     public:
         constexpr Iter(ZipView const& view)
         : mView{view}
-        , mIters{getBegins(mView.get())}
+        , mIters{impl::getBegins(mView.get().mBases)}
         {
         }
         auto operator++()
@@ -984,15 +989,6 @@ public:
             return hasValueImpl();
         }
     private:
-        static auto getBegins(ZipView const& view)
-        {
-            auto result = std::apply([](auto&&... views)
-            {
-                return std::make_tuple((views.begin())...);
-            }, view.mBases);
-            return result;
-        }
-
         template <size_t I = 0>
         bool hasValueImpl() const
         {
@@ -1007,7 +1003,7 @@ public:
         }
 
         std::reference_wrapper<ZipView const> mView;
-        std::decay_t<decltype(getBegins(mView.get()))> mIters;
+        std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
     };
     class Sentinel
     {};
@@ -1040,43 +1036,71 @@ public:
     public:
         constexpr Iter(ChainView const& view)
         : mView{view}
-        , mIter{std::get<0>(mView.get().mBases).begin()}
+        , mIters{impl::getBegins(mView.get().mBases)}
         {
-            fixIter();
         }
         auto operator++()
         {
-            ++mIter;
-            fixIter();
+            next();
         }
         auto operator*() const
         {
-            return *mIter;
+            return deref();
         }
         bool hasValue() const
         {
-            return mIter != std::get<sizeof...(Bases) - 1>(mView.get().mBases).end();
+            return hasValueImpl();
         }
     private:
-        template <size_t I=0>
-        void fixIter()
+        std::reference_wrapper<ChainView const> mView;
+        std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
+
+        template <size_t I = 0>
+        auto deref() const
         {
-            if constexpr (I >= sizeof...(Bases) - 1)
+            auto& iter = std::get<I>(mIters);
+            auto const view = std::get<I>(mView.get().mBases);
+            if (iter != view.end())
             {
-                return;
+                return *iter;
+            }
+            constexpr auto nbIters = std::tuple_size_v<std::decay_t<decltype(mIters)>>;
+            if constexpr (I < nbIters-1)
+            {
+                return deref<I+1>();
+            }
+            throw std::runtime_error{"Never reach here!"};
+        }
+
+        template <size_t I = 0>
+        bool hasValueImpl() const
+        {
+            if constexpr (I == sizeof...(Bases))
+            {
+                return false;
             }
             else
             {
-                if (mIter == std::get<I>(mView.get().mBases).end())
-                {
-                    mIter = std::get<I+1>(mView.get().mBases).begin();
-                    fixIter<I+1>();
-                }
+                return std::get<I>(mIters) != std::get<I>(mView.get().mBases).end() || hasValueImpl<I+1>();
             }
         }
 
-        std::reference_wrapper<ChainView const> mView;
-        std::decay_t<decltype(std::get<0>(mView.get().mBases).begin())> mIter;
+        template <size_t I = 0>
+        void next()
+        {
+            auto& iter = std::get<I>(mIters);
+            auto const view = std::get<I>(mView.get().mBases);
+            if (iter != view.end())
+            {
+                ++iter;
+                return;
+            }
+            constexpr auto nbIters = std::tuple_size_v<std::decay_t<decltype(mIters)>>;
+            if constexpr (I < nbIters-1)
+            {
+                next<I+1>();
+            }
+        }
     };
     class Sentinel
     {};
