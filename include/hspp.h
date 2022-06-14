@@ -1295,7 +1295,7 @@ namespace impl
     {
         return toFunc([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
     }
-}; // namespace impl
+} // namespace impl
 
 constexpr auto flip = toGFunc<1>([](auto func)
 {
