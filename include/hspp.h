@@ -18,6 +18,8 @@
 #include <numeric>
 #include <limits>
 #include <memory>
+#include <forward_list>
+#include <vector>
 
 namespace impl
 {
@@ -1166,6 +1168,9 @@ class IsRange<Range<Ts...>> : public std::true_type
 template <typename T>
 constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
 
+static_assert(!isRangeV<SingleView<int32_t>>);
+static_assert(isRangeV<Range<int32_t, SingleView<int32_t>>>);
+
 template <typename Repr>
 constexpr auto ownedRange(Repr&& repr)
 {
@@ -1516,6 +1521,25 @@ namespace impl
     constexpr auto isContainerV = IsContainer<std::decay_t<Cont>>::value;
 
     static_assert(!isContainerV<std::pair<int32_t, char>>);
+    static_assert(isContainerV<std::vector<int32_t>>);
+
+    template <typename Value, typename = std::void_t<>>
+    struct HasReverseIterators : std::false_type
+    {
+    };
+
+    template <typename Value>
+    struct HasReverseIterators<Value, std::void_t<decltype(std::rbegin(std::declval<Value>())),
+                                        decltype(std::rend(std::declval<Value>()))>>
+        : std::true_type
+    {
+    };
+
+    template <typename Cont>
+    constexpr auto hasReverseIteratorsV = HasReverseIterators<std::decay_t<Cont>>::value;
+
+    static_assert(hasReverseIteratorsV<std::vector<int32_t>>);
+    static_assert(!hasReverseIteratorsV<std::forward_list<int32_t>>);
 
     template <typename Value, typename = std::void_t<>>
     struct IsTupleLike : std::false_type
