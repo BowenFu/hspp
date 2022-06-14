@@ -42,8 +42,18 @@ namespace impl
     using StoreT = AddConstToPointerT<std::decay_t<Data>>;
 } // namespace impl
 
+template <typename Data>
+class Maybe;
+
 class Nothing final
-{};
+{
+public:
+    template <typename Data>
+    constexpr operator Maybe<Data>() const
+    {
+        return Maybe<Data>(*this);
+    }
+};
 
 constexpr inline Nothing nothing;
 
@@ -54,6 +64,10 @@ public:
     constexpr Just(Data d)
     : data{std::move(d)}
     {}
+    constexpr operator Maybe<Data>() const
+    {
+        return Maybe<Data>(*this);
+    }
     Data data;
 };
 
@@ -1376,52 +1390,103 @@ public:
 template <template<typename...> typename Type, typename... Args>
 const Type<Args...> MonoidBase<Type, Args...>::mempty{};
 
-#define DEFINE_UNARY_CLASS(ClassName, className, getClassName)  \
-template <typename Data>                                        \
-class ClassName                                                 \
-{                                                               \
-    Data mData;                                                 \
-public:                                                         \
-    constexpr ClassName(Data data)                              \
-    : mData{data}                                               \
-    {}                                                          \
-    auto get() const                                            \
-    {                                                           \
-        return mData;                                           \
-    }                                                           \
-};                                                              \
-                                                                \
-template <typename T>                                           \
-constexpr auto operator==(ClassName<T> l, ClassName<T> r)       \
-{                                                               \
-    return l.get() == r.get();                                  \
-}                                                               \
-                                                                \
-constexpr auto className = toGFunc<1>([](auto data)             \
-{                                                               \
-    return ClassName{data};                                     \
-});                                                             \
-                                                                \
-constexpr auto getClassName = toGFunc<1>([](auto data)          \
-{                                                               \
-    return data.get();                                          \
+template <typename Data>                                        
+class DataHolder                                                 
+{                                                               
+    Data mData;                                                 
+public:                                                         
+    constexpr DataHolder(Data data)                              
+    : mData{std::move(data)}                                               
+    {}                                                          
+    auto const& get() const                                            
+    {                                                           
+        return mData;                                           
+    }                                                           
+};                                                              
+                                                                
+template <typename T>                                           
+constexpr auto operator==(DataHolder<T> const& l, DataHolder<T> const& r)       
+{                                                               
+    return l.get() == r.get();                                  
+}                                                               
+
+template <template <typename...> typename Type>
+constexpr auto toType = toGFunc<1>([](auto data)             
+{                                                               
+    return Type<decltype(data)>{data};                                     
+});                                                             
+                                                                
+constexpr auto from = toGFunc<1>([](auto data)          
+{                                                               
+    return data.get();                                          
 });
 
-DEFINE_UNARY_CLASS(Product, product, getProduct)
-DEFINE_UNARY_CLASS(Sum, sum, getSum)
-DEFINE_UNARY_CLASS(AllImpl, all, getAll)
-DEFINE_UNARY_CLASS(AnyImpl, any, getAny)
-DEFINE_UNARY_CLASS(FirstImpl, first, getFirst)
-DEFINE_UNARY_CLASS(LastImpl, last, getLast)
+template <typename Data>
+class Product : public DataHolder<Data>
+{
+public:
+    using DataHolder<Data>::DataHolder;
+};
 
-#undef DEFINE_UNARY_CLASS
+template <typename Data>
+class Sum : public DataHolder<Data>
+{
+public:
+    using DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class AllImpl : public DataHolder<Data>
+{
+public:
+    using DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class AnyImpl : public DataHolder<Data>
+{
+public:
+    using DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class First : public DataHolder<Maybe<Data>>
+{
+public:
+    using DataHolder<Maybe<Data>>::DataHolder;
+};
+
+template <typename Data>
+class Last : public DataHolder<Maybe<Data>>
+{
+public:
+    using DataHolder<Maybe<Data>>::DataHolder;
+};
+
+constexpr auto product = toType<Product>;
+constexpr auto sum = toType<Sum>;
+constexpr auto all = toType<AllImpl>;
+constexpr auto any = toType<AnyImpl>;
+constexpr auto first = toGFunc<1>([](auto data)             
+{                                                               
+    using Type = std::decay_t<decltype(data.value())>;
+    return First<Type>{data};                                     
+});                                                             
+constexpr auto last = toGFunc<1>([](auto data)             
+{                                                               
+    using Type = std::decay_t<decltype(data.value())>;
+    return Last<Type>{data};                                     
+});                                                             
+
+constexpr auto getProduct = from;
+constexpr auto getSum = from;
+constexpr auto getAll = from;
+constexpr auto getAny = from;
+constexpr auto getFirst = from;
+constexpr auto getLast = from;
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
-template <typename Data>
-using First = FirstImpl<Maybe<Data>>;
-template <typename Data>
-using Last = LastImpl<Maybe<Data>>;
 
 template <typename Data>
 class MonoidBase<Product, Data>
@@ -1472,7 +1537,7 @@ public:
 };
 
 template <typename Data>
-class MonoidBase<FirstImpl, Maybe<Data>>
+class MonoidBase<First, Data>
 {
 public:
     constexpr static auto mempty = First<Data>{nothing};
@@ -1484,7 +1549,7 @@ public:
 };
 
 template <typename Data>
-class MonoidBase<LastImpl, Maybe<Data>>
+class MonoidBase<Last, Data>
 {
 public:
     constexpr static auto mempty = Last<Data>{nothing};

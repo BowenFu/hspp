@@ -892,16 +892,16 @@ TEST(Monoid, range2)
 
 TEST(Monoid, maybe)
 {
-    auto const nested = std::list{Maybe{Product{2}}, Maybe<Product<int>>{}, Maybe{Product{3}}};
+    auto const nested = std::list{Maybe{product(2)}, Maybe<Product<int>>{}, Maybe{product(3)}};
     auto const result = mconcat | nested;
-    auto const expected = Maybe{Product{6}};
+    auto const expected = Maybe{product(6)};
     EXPECT_EQ(result, expected);
 }
 
 TEST(Monoid, product)
 {
-    auto const a = Product{1.5};
-    auto const b = Product{2.0};
+    auto const a = product | 1.5;
+    auto const b = product | 2.0;
     auto nested = std::vector{a, b};
     auto v = mconcat | nested;
     auto const result = v;
@@ -911,7 +911,7 @@ TEST(Monoid, product)
     auto const result2 = getProduct || (product | 3) <mappend> (product | 4) <mappend> (product | 2);
     EXPECT_EQ(result2, 24);
 
-    auto const result3 = getProduct <o> mconcat | std::vector{Product{3}, Product{4}, Product{2}};
+    auto const result3 = getProduct <o> mconcat || fmap | product | std::vector{3, 4, 2};
     EXPECT_EQ(result3, 24);
 }
 
@@ -941,13 +941,13 @@ TEST(Monoid, any)
 
 TEST(Monoid, first)
 {
-    auto const result = getFirst <o> mconcat <o> (map | first) || std::list{First<int>{nothing}, First<int>{Maybe{2}}};
+    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, Maybe{2}};
     EXPECT_EQ(result, Maybe{2});
 }
 
 TEST(Monoid, last)
 {
-    auto const result = getLast <o> mconcat <o> (map | last) || std::list{Last<int>{nothing}, Last<int>{Maybe{2}}};
+    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, Maybe{2}};
     EXPECT_EQ(result, Maybe{2});
 }
 
