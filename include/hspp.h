@@ -278,12 +278,12 @@ private:
 };
 
 template <size_t nbArgs, typename Func>
-constexpr auto genericFunction(Func const& func)
+constexpr auto toGFunc(Func const& func)
 {
     return GenericFunction<nbArgs, Func>{func};
 }
 
-constexpr inline auto id = genericFunction<1>([](auto data)
+constexpr inline auto id = toGFunc<1>([](auto data)
 {
     return std::move(data);
 });
@@ -297,7 +297,7 @@ class IsGenericFunction<GenericFunction<I, T>> : public std::true_type
 template <typename T>
 constexpr static auto isGenericFunctionV = IsGenericFunction<std::decay_t<T>>::value;
 
-constexpr auto unCurry = genericFunction<1>([](auto func)
+constexpr auto unCurry = toGFunc<1>([](auto func)
 {
     return [func=std::move(func)](auto&&... args)
     {
@@ -336,11 +336,11 @@ public:
     template <typename F, typename G>
     constexpr auto operator()(F&& f, G&&g) const
     {
-        return genericFunction<1>([=](auto x){ return f(g(x));});
+        return toGFunc<1>([=](auto x){ return f(g(x));});
     }
 };
 
-constexpr inline auto o = genericFunction<2>(Compose{});
+constexpr inline auto o = toGFunc<2>(Compose{});
 
 using _O_ = std::tuple<>;
 constexpr inline _O_ _o_;
@@ -1279,7 +1279,7 @@ namespace impl
     template <size_t nbArgs, typename Repr>
     constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
     {
-        return genericFunction<2>([f=std::move(f)](auto x, auto y){ return f | y | x; });
+        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f | y | x; });
     }
     template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
@@ -1293,7 +1293,7 @@ namespace impl
     }
 }; // namespace impl
 
-constexpr auto flip = genericFunction<1>([](auto func)
+constexpr auto flip = toGFunc<1>([](auto func)
 {
     return impl::flipImpl(std::move(func));
 });
@@ -1320,7 +1320,7 @@ constexpr auto foldrRecur(Iter1 begin, Iter2 end, Init init, Func func) -> Init
     return init;
 }
 
-constexpr auto foldr = genericFunction<3>([](auto func, auto init, auto const& list)
+constexpr auto foldr = toGFunc<3>([](auto func, auto init, auto const& list)
 {
     if constexpr (impl::hasReverseIteratorsV<decltype(list)>)
     {
@@ -1332,12 +1332,12 @@ constexpr auto foldr = genericFunction<3>([](auto func, auto init, auto const& l
     }
 });
 
-constexpr auto foldl = genericFunction<3>([](auto func, auto init, auto const& list)
+constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 {
     return accumulate(list.begin(), list.end(), init, unCurry | func);
 });
 
-constexpr auto equalTo = genericFunction<2>(std::equal_to<>{});
+constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
 
 /////////// Monoid ///////////
 
@@ -1348,7 +1348,7 @@ template <typename MType>
 class MonoidConcat
 {
 public:
-    constexpr static auto mconcat = genericFunction<1>([](auto v) { return foldl | MType::mappend | MType::mempty | v; });
+    constexpr static auto mconcat = toGFunc<1>([](auto v) { return foldl | MType::mappend | MType::mempty | v; });
 };
 
 template <template<typename...> typename Type, typename... Args>
@@ -1392,12 +1392,12 @@ constexpr auto operator==(Product<T> l, Product<T> r)
     return l.get() == r.get();
 }
 
-constexpr auto product = genericFunction<1>([](auto data)
+constexpr auto product = toGFunc<1>([](auto data)
 {
     return Product{data};
 });
 
-constexpr auto getProduct = genericFunction<1>([](auto data)
+constexpr auto getProduct = toGFunc<1>([](auto data)
 {
     return data.get();
 });
@@ -1421,7 +1421,7 @@ enum class Ordering
     kGT
 };
 
-constexpr auto compare = genericFunction<2>([](auto lhs, auto rhs)
+constexpr auto compare = toGFunc<2>([](auto lhs, auto rhs)
 {
     if (lhs < rhs)
     {
@@ -1483,12 +1483,12 @@ class Monoid<Range, Data>
 public:
     constexpr static auto mempty = ownedRange(EmptyView<Data>{});
 
-    constexpr static auto mappend = genericFunction<2>([](auto lhs, auto rhs)
+    constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
     {
         return ownedRange(ChainView{lhs, rhs});
     });
 
-    constexpr static auto mconcat = genericFunction<1>([](auto const& nested)
+    constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
     {
         return ownedRange(JoinView{nested});
     });
@@ -1498,15 +1498,15 @@ template <typename GFunc>
 class MonoidBase<DummyTemplateClass, GenericFunctionTag, GFunc>
 {
 public:
-    constexpr static auto mempty = genericFunction<1>([](auto x)
+    constexpr static auto mempty = toGFunc<1>([](auto x)
     {
         using RetType = std::invoke_result_t<GFunc, decltype(x)>;
         return MonoidType<RetType>::mempty;
     });
 
-    constexpr static auto mappend = genericFunction<2>([](auto f, auto g)
+    constexpr static auto mappend = toGFunc<2>([](auto f, auto g)
     {
-        return genericFunction<1>([f=std::move(f), g=std::move(g)](auto arg)
+        return toGFunc<1>([f=std::move(f), g=std::move(g)](auto arg)
         {
             using RetType = std::invoke_result_t<GFunc, decltype(arg)>;
             using MType = MonoidType<RetType>;
@@ -1524,7 +1524,7 @@ public:
         return MonoidType<RetType>::mempty;
     });
 
-    constexpr static auto mappend = genericFunction<2>([](auto f, auto g)
+    constexpr static auto mappend = toGFunc<2>([](auto f, auto g)
     {
         return function([f=std::move(f), g=std::move(g)](InArg arg)
         {
@@ -1540,12 +1540,12 @@ class Monoid<std::tuple>
 public:
     constexpr static auto mempty = _o_;
 
-    constexpr static auto mappend = genericFunction<2>([](auto&& lhs, auto&& rhs)
+    constexpr static auto mappend = toGFunc<2>([](auto&& lhs, auto&& rhs)
     {
         return std::tuple_cat(lhs, rhs);
     });
 
-    constexpr static auto mconcat = genericFunction<1>([](auto const& nested)
+    constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
     {
         return std::apply([](auto&&... funcs)
         {
@@ -1634,7 +1634,7 @@ public:
     }
 };
 
-constexpr inline auto mappend = genericFunction<2>(Mappend{});
+constexpr inline auto mappend = toGFunc<2>(Mappend{});
 
 class Mconcat
 {
@@ -1653,7 +1653,7 @@ public:
     }
 };
 
-constexpr inline auto mconcat = genericFunction<1>(Mconcat{});
+constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
 
 /////////// Foldable ///////////
 
@@ -1770,7 +1770,7 @@ public:
     }
 };
 
-constexpr inline auto fmap = genericFunction<2>(Fmap{});
+constexpr inline auto fmap = toGFunc<2>(Fmap{});
 
 template <template<typename...> class Type, typename... Ts>
 class Applicative : public Functor<Type, Ts...>
@@ -1912,12 +1912,12 @@ public:
     template <typename Ret>
     constexpr static auto pure(Ret ret)
     {
-        return genericFunction<1>([=](auto){ return ret; });
+        return toGFunc<1>([=](auto){ return ret; });
     }
     template <typename Func1, typename Func2>
     constexpr static auto app(Func1 func, Func2 in)
     {
-        return genericFunction<1>([f=std::move(func), g=std::move(in)](auto arg) {return f(arg)(g(arg)); });
+        return toGFunc<1>([f=std::move(func), g=std::move(in)](auto arg) {return f(arg)(g(arg)); });
     }
 };
 
@@ -1937,7 +1937,7 @@ constexpr auto pureImpl(Data const& data)
     return DeferredPure<impl::StoreT<Data>>{data};
 }
 
-constexpr auto pure = genericFunction<1>([](auto const& data)
+constexpr auto pure = toGFunc<1>([](auto const& data)
 {
     return pureImpl(data);
 }
@@ -1979,7 +1979,7 @@ public:
     }
 };
 
-constexpr inline auto app = genericFunction<2>(App{});
+constexpr inline auto app = toGFunc<2>(App{});
 
 /////////// Monad ///////////
 
@@ -1990,7 +1990,7 @@ template <typename MonadB>
 class MonadRShift
 {
 public:
-    constexpr static auto rshift = genericFunction<2>
+    constexpr static auto rshift = toGFunc<2>
     ([](auto x, auto y){
         return MonadB::bind(x, [y](auto) { return y; });
     });
@@ -2118,7 +2118,7 @@ constexpr auto guard = function([](bool b)
     return guardImpl<ClassT>(b);
 });
 
-constexpr auto show = genericFunction<1>([](auto&& d)
+constexpr auto show = toGFunc<1>([](auto&& d)
 {
     std::stringstream os;
     os << std::boolalpha << d;
@@ -2140,7 +2140,7 @@ constexpr auto evalDeferredImpl(DeferredPure<T> t)
 }
 
 template <typename MType>
-constexpr auto evalDeferred = genericFunction<1>([](auto&& d)
+constexpr auto evalDeferred = toGFunc<1>([](auto&& d)
 {
     return evalDeferredImpl<MType>(d);
 });
@@ -2173,7 +2173,7 @@ constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
     return MType::rshift | lhs || evalDeferred<MType> | rhs;
 }
 
-constexpr inline auto elem = genericFunction<2>([](auto t, auto const& c)
+constexpr inline auto elem = toGFunc<2>([](auto t, auto const& c)
 {
     return std::any_of(c.begin(), c.end(), [t=std::move(t)](auto const& e){return e == t;});
 });
@@ -2184,12 +2184,12 @@ constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, R
     return function<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
 }
 
-constexpr inline auto on = genericFunction<2>([](auto f, auto g)
+constexpr inline auto on = toGFunc<2>([](auto f, auto g)
 {
     return onImpl(std::move(f), std::move(g));
 });
 
-constexpr auto toVector = genericFunction<1>([](auto view)
+constexpr auto toVector = toGFunc<1>([](auto view)
 {
     std::vector<std::decay_t<decltype(*view.begin())>> result;
     for (auto e: view)
@@ -2199,68 +2199,68 @@ constexpr auto toVector = genericFunction<1>([](auto view)
     return result;
 });
 
-constexpr inline auto filter = genericFunction<2>([](auto pred, auto data)
+constexpr inline auto filter = toGFunc<2>([](auto pred, auto data)
 {
     return ownedRange(FilterView{std::move(data), std::move(pred)});
 });
 
-constexpr inline auto map = genericFunction<2>([](auto func, auto data)
+constexpr inline auto map = toGFunc<2>([](auto func, auto data)
 {
     return ownedRange(MapView{std::move(data), std::move(func)});
 });
 
-constexpr inline auto zip = genericFunction<2>([](auto lhs, auto rhs)
+constexpr inline auto zip = toGFunc<2>([](auto lhs, auto rhs)
 {
     return ownedRange(ZipView{std::move(lhs), std::move(rhs)});
 });
 
-constexpr inline auto zipWith = genericFunction<3>([](auto func, auto lhs, auto rhs)
+constexpr inline auto zipWith = toGFunc<3>([](auto func, auto lhs, auto rhs)
 {
     return ownedRange(MapView{ZipView{std::move(lhs), std::move(rhs)}, [func=std::move(func)](auto tu) { return func | std::get<0>(tu) | std::get<1>(tu);}});
 });
 
-constexpr inline auto repeat = genericFunction<1>([](auto data)
+constexpr inline auto repeat = toGFunc<1>([](auto data)
 {
     return ownedRange(RepeatView{std::move(data)});
 });
 
-constexpr inline auto replicate = genericFunction<2>([](auto data, size_t times)
+constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
 });
 
-constexpr inline auto enumFrom = genericFunction<1>([](auto start)
+constexpr inline auto enumFrom = toGFunc<1>([](auto start)
 {
     return ownedRange(IotaView{start});
 });
 
-constexpr inline auto length = genericFunction<1>([](auto r)
+constexpr inline auto length = toGFunc<1>([](auto r)
 {
-    constexpr auto inc = genericFunction<2>([](auto sum, auto){ return sum + 1; });
+    constexpr auto inc = toGFunc<2>([](auto sum, auto){ return sum + 1; });
     return foldl | inc | 0 | r;
 });
 
-constexpr inline auto take = genericFunction<2>([](auto r, size_t num)
+constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
 {
     return ownedRange(TakeView{r, num});
 });
 
-constexpr inline auto drop = genericFunction<2>([](auto r, size_t num)
+constexpr inline auto drop = toGFunc<2>([](auto r, size_t num)
 {
     return ownedRange(DropView{r, num});
 });
 
-constexpr inline auto splitAt = genericFunction<2>([](auto r, size_t num)
+constexpr inline auto splitAt = toGFunc<2>([](auto r, size_t num)
 {
     return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
 });
 
-constexpr inline auto const_ = genericFunction<2>([](auto r, auto)
+constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {
     return r;
 });
 
-constexpr inline auto cons = genericFunction<2>([](auto e, auto l)
+constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
 {
     if constexpr(isRangeV<decltype(l)>)
     {

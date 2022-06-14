@@ -118,7 +118,7 @@ TEST(zipWith, 1)
 {
     std::vector<int> a = {1, 2};
     std::list<int> b = {3, 4, 5};
-    auto v = zipWith | genericFunction<2>(std::plus<>{}) | RefView{a} | RefView{b};
+    auto v = zipWith | toGFunc<2>(std::plus<>{}) | RefView{a} | RefView{b};
     std::vector<int> result = toVector(v);
     std::vector<int> expected = {4, 6};
     EXPECT_EQ(result, expected);
@@ -224,7 +224,7 @@ TEST(Function, 3)
 
 TEST(GenericFunction, 3)
 {
-    const auto f = genericFunction<3>([](auto x, auto y, auto z){ return x + y + z;});
+    const auto f = toGFunc<3>([](auto x, auto y, auto z){ return x + y + z;});
     auto x = f(1);
     auto y = x(2);
     auto z = y(3);
@@ -303,7 +303,7 @@ TEST(Functor, TEFunction)
 
 TEST(Functor, GenericFunction)
 {
-    constexpr auto g = genericFunction<1>([](auto e) { return -e; });
+    constexpr auto g = toGFunc<1>([](auto e) { return -e; });
     const auto y = show <fmap> g;
     EXPECT_EQ(y(12), "-12");
 }
@@ -443,8 +443,8 @@ TEST(Applicative, TEFunction)
 
 TEST(Applicative, GenericFunction)
 {
-    const auto u = genericFunction<1>([](std::string const& str) { return str.size(); });
-    const auto f = genericFunction<1>([](auto x) { return x ? "true" : "false"; });
+    const auto u = toGFunc<1>([](std::string const& str) { return str.size(); });
+    const auto f = toGFunc<1>([](auto x) { return x ? "true" : "false"; });
     const auto y = pure(u) <app> f;
     EXPECT_EQ(y(true), 4);
     EXPECT_EQ(y(false), 5);
@@ -591,7 +591,7 @@ TEST(Monad, Function)
 
 TEST(Monad, GenericFunction)
 {
-    constexpr auto f = genericFunction<2>([](std::string const& str, size_t i) { return equalTo | str.size() | i; });
+    constexpr auto f = toGFunc<2>([](std::string const& str, size_t i) { return equalTo | str.size() | i; });
     constexpr auto y = show >>= f;
     EXPECT_EQ(y(1U), true);
     EXPECT_EQ(y(3U), false);
@@ -781,7 +781,7 @@ TEST(foldr, 1)
 
 TEST(fold, 1)
 {
-    constexpr auto pow = genericFunction<2>([](auto x, auto y) { return std::pow(x, y); });
+    constexpr auto pow = toGFunc<2>([](auto x, auto y) { return std::pow(x, y); });
     auto const r1 = foldr | pow | 2.f | IotaView{1.f, 4.f};
     EXPECT_EQ(r1, 1);
     auto const r2 = foldl | pow | 2.f | IotaView{1.f, 4.f};
@@ -795,7 +795,7 @@ TEST(fold, 2)
     auto const r1 = foldr | cons | std::vector<float>{} || toVector | IotaView{1.f, 4.f};
     auto const e1 = std::vector{1.f, 2.f, 3.f};
     EXPECT_EQ(r1, e1);
-    
+
     auto const r2 = foldl | (flip | cons) | std::vector<float>{} || toVector | IotaView{1.f, 4.f};
     auto const e2 = std::vector{3.f, 2.f, 1.f};
     EXPECT_EQ(r2, e2);
@@ -811,7 +811,7 @@ TEST(cons, range)
 
 TEST(flip, x)
 {
-    constexpr auto gt = flip | genericFunction<2>(std::less<>{});
+    constexpr auto gt = flip | toGFunc<2>(std::less<>{});
     EXPECT_TRUE(gt | 3 | 2);
 }
 
@@ -936,8 +936,8 @@ TEST(Monoid, Ordering)
 
 TEST(Monoid, GenericFunction)
 {
-    auto const f = genericFunction<1>([](auto u){ return product | (u+1); });
-    auto const g = genericFunction<1>([](auto u){ return product | (u*2); });
+    auto const f = toGFunc<1>([](auto u){ return product | (u+1); });
+    auto const g = toGFunc<1>([](auto u){ return product | (u*2); });
     auto const result = mappend | f | g;
     EXPECT_EQ(result(24).get(), 1200);
 }
@@ -1076,7 +1076,7 @@ TEST(MonadPlus, guard)
     auto const result6 = guard<Range> | ('7' <elem> (show | 567 ));
     EXPECT_EQ(toVector(result6).at(0), _o_);
 
-    auto const func = genericFunction<1>([](auto x) { return (guard<Range> | ('7' <elem> (show | x))) >> (return_ | x); });
+    auto const func = toGFunc<1>([](auto x) { return (guard<Range> | ('7' <elem> (show | x))) >> (return_ | x); });
     auto const l = std::vector{7, 9, 17, 22};
     auto const result7 = func <fmap> nonOwnedRange(l);
     auto const expected7 = std::vector{7, 17};
