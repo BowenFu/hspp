@@ -77,7 +77,7 @@ TEST(JoinMapView, 2)
         EXPECT_TRUE(std::equal(result.begin(), result.end(), u.begin()));
     };
     auto f = [](int x)-> std::list<int> { return x%2==0 ? std::list<int>{x} : std::list<int>{}; };
-    const TEFunction<std::list<int>, int> filterEven1 = f;
+    const auto filterEven1 = toTEFunc(f);
     test(filterEven1);
     const auto filterEven2 = toFunc(f);
     test(filterEven2);

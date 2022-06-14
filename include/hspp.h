@@ -240,13 +240,13 @@ constexpr auto toFunc(Func const& func)
 }
 
 template <typename Func>
-constexpr auto teFunction(Func const& func)
+constexpr auto toTEFunc(Func const& func)
 {
     return ToFunction<true, decltype(&Func::operator())>::run(func);
 }
 
 template <typename Ret, typename... Args, typename Func>
-constexpr auto teFunction(Func const& func)
+constexpr auto toTEFunc(Func const& func)
 {
     return TEFunction<Ret, Args...>{func};
 }
