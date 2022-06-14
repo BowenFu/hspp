@@ -941,14 +941,14 @@ TEST(Monoid, any)
 
 TEST(Monoid, first)
 {
-    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, Maybe{2}};
+    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, Just{2}, Just{3}};
     EXPECT_EQ(result, Maybe{2});
 }
 
 TEST(Monoid, last)
 {
-    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, Maybe{2}};
-    EXPECT_EQ(result, Maybe{2});
+    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, Just{2}, Just{3}};
+    EXPECT_EQ(result, Maybe{3});
 }
 
 TEST(Monoid, Ordering)
