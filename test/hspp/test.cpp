@@ -33,8 +33,8 @@ TEST(SingleView, 2)
 
 TEST(RefView, 1)
 {
-    auto single = SingleView{42};
-    auto v = RefView{single};
+    auto single = toVector | SingleView{42};
+    auto v = toVector | RefView{single};
     EXPECT_TRUE(std::equal(v.begin(), v.end(), single.begin()));
 }
 
@@ -802,13 +802,13 @@ TEST(fold, 2)
     EXPECT_EQ(r2, e2);
 }
 
-// TEST(cons, range)
-// {
-//     // foldr does not support Range, thus converting to Vector.
-//     auto const r1 = toVector || cons | 2.f | ownedRange(IotaView{1.f, 4.f});
-//     auto const e1 = std::vector{2.f, 1.f, 2.f, 3.f};
-//     EXPECT_EQ(r1, e1);
-// }
+TEST(cons, range)
+{
+    // foldr does not support Range, thus converting to Vector.
+    auto const r1 = toVector || cons | 2.f | ownedRange(IotaView{1.f, 4.f});
+    auto const e1 = std::vector{2.f, 1.f, 2.f, 3.f};
+    EXPECT_EQ(r1, e1);
+}
 
 TEST(flip, x)
 {

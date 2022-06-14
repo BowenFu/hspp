@@ -433,16 +433,45 @@ template <typename Base>
 class SingleView
 {
 public:
+    class Iter
+    {
+    public:
+        constexpr Iter(SingleView const& singleView)
+        : mView{singleView}
+        , mHasValue{true}
+        {}
+        auto operator++()
+        {
+            mHasValue = false;
+        }
+        auto operator*() const
+        {
+            return mView.get().mBase;
+        }
+        bool hasValue() const
+        {
+            return mHasValue;
+        }
+    private:
+        std::reference_wrapper<SingleView const> mView;
+        bool mHasValue;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
     constexpr SingleView(Base base)
     : mBase{std::move(base)}
     {}
     auto begin() const
     {
-        return &mBase;
+        return Iter{*this};
     }
     auto end() const
     {
-        return begin() + 1;
+        return Sentinel{};
     }
 private:
     Base mBase;
@@ -1026,7 +1055,6 @@ private:
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
-// Known limitation: does not support multiple types of Bases well.
 template <typename... Bases>
 class ChainView
 {
@@ -1059,7 +1087,7 @@ public:
         auto deref() const
         {
             auto& iter = std::get<I>(mIters);
-            auto const view = std::get<I>(mView.get().mBases);
+            auto const& view = std::get<I>(mView.get().mBases);
             if (iter != view.end())
             {
                 return *iter;
@@ -2183,12 +2211,11 @@ constexpr inline auto const_ = genericFunction<2>([](auto r, auto)
 
 constexpr inline auto cons = genericFunction<2>([](auto e, auto l)
 {
-    // if constexpr(isRangeV<decltype(l)>)
-    // {
-    //      ChainView does not work for different views.
-    //     return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
-    // }
-    // else
+    if constexpr(isRangeV<decltype(l)>)
+    {
+        return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
+    }
+    else
     {
         l.insert(l.begin(), e);
         return l;
