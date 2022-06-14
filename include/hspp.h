@@ -328,10 +328,10 @@ constexpr auto operator>(LeftClosedFunc<Func, Left> const& lcFunc, Right&& right
 class Compose
 {
 public:
-    template <typename Func, typename Repr, typename Ret, typename InnerArg, typename... Args>
-    constexpr auto operator()(Func&& f, Function<Repr, Ret, InnerArg, Args...> const& g) const
+    template <typename Func, typename Repr, typename Ret, typename FirstArg, typename... Args>
+    constexpr auto operator()(Func&& f, Function<Repr, Ret, FirstArg, Args...> const& g) const
     {
-        return function([=](InnerArg x){ return f(g(x));});
+        return function([=](FirstArg x){ return f(g(x));});
     }
     template <typename F, typename G>
     constexpr auto operator()(F&& f, G&&g) const
@@ -1616,11 +1616,11 @@ struct MonoidTrait<GenericFunction<nbArgs, Repr>>
     using Type = Monoid<DummyTemplateClass, GenericFunctionTag, GenericFunction<nbArgs, Repr>>;
 };
 
-template <typename Repr, typename Ret, typename InnerArg, typename... Rest>
-struct MonoidTrait<Function<Repr, Ret, InnerArg, Rest...>>
+template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
+struct MonoidTrait<Function<Repr, Ret, FirstArg, Rest...>>
 {
-    using RetT = std::invoke_result_t<Function<Repr, Ret, InnerArg, Rest...>, InnerArg>;
-    using Type = Monoid<Function, InnerArg, RetT>;
+    using RetT = std::invoke_result_t<Function<Repr, Ret, FirstArg, Rest...>, FirstArg>;
+    using Type = Monoid<Function, FirstArg, RetT>;
 };
 
 class Mappend
@@ -1645,10 +1645,10 @@ public:
         using MType = MonoidType<MData>;
         return MType::mconcat | data;
     }
-    template <typename Repr, typename Ret, typename InnerArg, typename... Rest>
-    constexpr auto operator()(Function<Repr, Ret, InnerArg, Rest...> const& func) const
+    template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
+    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
     {
-        using MType = MonoidType<Function<Repr, Ret, InnerArg, Rest...>>;
+        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
         return MType::mconcat | func;
     }
 };
@@ -1723,12 +1723,12 @@ public:
     }
 };
 
-template <typename InnerArg>
-class Functor<Function, InnerArg>
+template <typename FirstArg>
+class Functor<Function, FirstArg>
 {
 public:
     template <typename Func, typename Repr, typename Ret, typename... Args>
-    constexpr static auto fmap(Func&& func, Function<Repr, Ret, InnerArg, Args...> const& in)
+    constexpr static auto fmap(Func&& func, Function<Repr, Ret, FirstArg, Args...> const& in)
     {
         return o | func | in;
     }
@@ -1885,20 +1885,20 @@ public:
     }
 };
 
-template <typename InnerArg>
-class Applicative<Function, InnerArg> : public Functor<Function, InnerArg>
+template <typename FirstArg>
+class Applicative<Function, FirstArg> : public Functor<Function, FirstArg>
 {
 public:
     template <typename Ret>
     constexpr static auto pure(Ret ret)
     {
-        return function([ret=std::move(ret)](InnerArg){ return ret; });
+        return function([ret=std::move(ret)](FirstArg){ return ret; });
     }
     template <typename Func1, typename Func2>
     constexpr static auto app(Func1 func, Func2 in)
     {
         return function(
-            [func=std::move(func), in=std::move(in)](InnerArg arg)
+            [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return func(arg)(in(arg));
             });
@@ -2061,12 +2061,12 @@ public:
     }
 };
 
-template <typename InnerArg>
-class MonadBase<Function, InnerArg>
+template <typename FirstArg>
+class MonadBase<Function, FirstArg>
 {
 public:
     template <typename Repr, typename Ret, typename... Rest, typename Func>
-    constexpr static auto bind(Function<Repr, Ret, InnerArg, Rest...> const& m, Func k)
+    constexpr static auto bind(Function<Repr, Ret, FirstArg, Rest...> const& m, Func k)
     {
         return (flip | std::move(k)) <app> m;
     }
