@@ -920,6 +920,24 @@ TEST(Monoid, product2)
     EXPECT_EQ(result, 24);
 }
 
+TEST(Monoid, sum)
+{
+    auto const result = getSum <o> mconcat <o> (map | sum) || std::vector{3, 4, 2};
+    EXPECT_EQ(result, 9);
+}
+
+TEST(Monoid, all)
+{
+    auto const result = getAll <o> mconcat <o> (map | all) || std::list{true, false, true};
+    EXPECT_EQ(result, false);
+}
+
+TEST(Monoid, any)
+{
+    auto const result = getAny <o> mconcat <o> (map | any) || std::list{true, false, true};
+    EXPECT_EQ(result, true);
+}
+
 TEST(Monoid, Ordering)
 {
     constexpr auto length = toFunc([](std::string const& x)

@@ -1459,7 +1459,7 @@ public:
 
     constexpr static auto mappend = toFunc([](All lhs, All rhs)
     {
-        return Any{lhs.get() && rhs.get()};
+        return All{lhs.get() && rhs.get()};
     });
 };
 
