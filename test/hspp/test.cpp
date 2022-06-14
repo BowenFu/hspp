@@ -782,8 +782,7 @@ TEST(foldr, 1)
 TEST(fold, 1)
 {
     constexpr auto pow = genericFunction<2>([](auto x, auto y) { return std::pow(x, y); });
-    // foldr does not support Range, thus converting to Vector.
-    auto const r1 = foldr | pow | 2.f || toVector | IotaView{1.f, 4.f};
+    auto const r1 = foldr | pow | 2.f | IotaView{1.f, 4.f};
     EXPECT_EQ(r1, 1);
     auto const r2 = foldl | pow | 2.f | IotaView{1.f, 4.f};
     EXPECT_EQ(r2, 64);
@@ -791,12 +790,12 @@ TEST(fold, 1)
 
 TEST(fold, 2)
 {
-    // foldr does not support Range, thus converting to Vector.
+    // cons results are of different types, so cannot reassign to init.
+    // Use vector instead.
     auto const r1 = foldr | cons | std::vector<float>{} || toVector | IotaView{1.f, 4.f};
     auto const e1 = std::vector{1.f, 2.f, 3.f};
     EXPECT_EQ(r1, e1);
-    // cons results are of different types, so cannot reassign to init.
-    // Use vector instead.
+    
     auto const r2 = foldl | (flip | cons) | std::vector<float>{} || toVector | IotaView{1.f, 4.f};
     auto const e2 = std::vector{3.f, 2.f, 1.f};
     EXPECT_EQ(r2, e2);

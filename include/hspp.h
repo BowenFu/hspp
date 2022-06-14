@@ -402,8 +402,9 @@ public:
     class Iter
     {
     public:
-        auto operator++()
+        auto& operator++()
         {
+            return *this;
         }
         Data operator*() const
         {
@@ -442,9 +443,10 @@ public:
         : mView{singleView}
         , mHasValue{true}
         {}
-        auto operator++()
+        auto& operator++()
         {
             mHasValue = false;
+            return *this;
         }
         auto operator*() const
         {
@@ -489,8 +491,9 @@ public:
         constexpr Iter(RepeatView const& repeatView)
         : mView{repeatView}
         {}
-        auto operator++()
+        auto& operator++()
         {
+            return *this;
         }
         auto operator*() const
         {
@@ -535,9 +538,10 @@ public:
         : mNum{start}
         , mBound{end}
         {}
-        auto operator++()
+        auto& operator++()
         {
             ++mNum;
+            return *this;
         }
         auto operator*() const
         {
@@ -607,9 +611,10 @@ public:
         : mView{mapView}
         , mBaseIter{mView.get().mBase.begin()}
         {}
-        auto operator++()
+        auto& operator++()
         {
             ++mBaseIter;
+            return *this;
         }
         auto operator*() const
         {
@@ -667,10 +672,11 @@ public:
         {
             fixIter();
         }
-        auto operator++()
+        auto& operator++()
         {
             ++mBaseIter;
             fixIter();
+            return *this;
         }
         auto operator*() const
         {
@@ -720,10 +726,11 @@ public:
         , mCount{}
         {
         }
-        auto operator++()
+        auto& operator++()
         {
             ++mBaseIter;
             ++mCount;
+            return *this;
         }
         auto operator*() const
         {
@@ -781,9 +788,10 @@ public:
                 ++mBaseIter;
             }
         }
-        auto operator++()
+        auto& operator++()
         {
             ++mBaseIter;
+            return *this;
         }
         auto operator*() const
         {
@@ -864,10 +872,11 @@ public:
         {
             fixIter();
         }
-        auto operator++()
+        auto& operator++()
         {
             ++mInnerIter;
             fixIter();
+            return *this;
         }
         auto operator*() const
         {
@@ -932,9 +941,10 @@ public:
         , mIters{impl::getBegins(mView.get().mBases)}
         {
         }
-        auto operator++()
+        auto& operator++()
         {
             next();
+            return *this;
         }
         auto operator*() const
         {
@@ -1001,12 +1011,13 @@ public:
         , mIters{impl::getBegins(mView.get().mBases)}
         {
         }
-        auto operator++()
+        auto& operator++()
         {
             std::apply([](auto&&... iters)
             {
                 ((++iters), ...);
             }, mIters);
+            return *this;
         }
         auto operator*() const
         {
@@ -1069,9 +1080,10 @@ public:
         , mIters{impl::getBegins(mView.get().mBases)}
         {
         }
-        auto operator++()
+        auto& operator++()
         {
             next();
+            return *this;
         }
         auto operator*() const
         {
@@ -1211,6 +1223,59 @@ struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
 
 namespace impl
 {
+    template <typename Value, typename = std::void_t<>>
+    struct IsContainer : std::false_type
+    {
+    };
+
+    template <typename Value>
+    struct IsContainer<Value, std::void_t<decltype(std::begin(std::declval<Value>())),
+                                        decltype(std::end(std::declval<Value>()))>>
+        : std::true_type
+    {
+    };
+
+    template <typename Cont>
+    constexpr auto isContainerV = IsContainer<std::decay_t<Cont>>::value;
+
+    static_assert(!isContainerV<std::pair<int32_t, char>>);
+    static_assert(isContainerV<std::vector<int32_t>>);
+
+    template <typename Value, typename = std::void_t<>>
+    struct HasReverseIterators : std::false_type
+    {
+    };
+
+    template <typename Value>
+    struct HasReverseIterators<Value, std::void_t<decltype(std::rbegin(std::declval<Value>())),
+                                        decltype(std::rend(std::declval<Value>()))>>
+        : std::true_type
+    {
+    };
+
+    template <typename Cont>
+    constexpr auto hasReverseIteratorsV = HasReverseIterators<std::decay_t<Cont>>::value;
+
+    static_assert(hasReverseIteratorsV<std::vector<int32_t>>);
+    static_assert(!hasReverseIteratorsV<std::forward_list<int32_t>>);
+
+    template <typename Value, typename = std::void_t<>>
+    struct IsTupleLike : std::false_type
+    {
+    };
+
+    template <typename Value>
+    struct IsTupleLike<Value, std::void_t<decltype(std::tuple_size<Value>::value)>>
+        : std::true_type
+    {
+    };
+
+    template <typename ValueTuple>
+    constexpr auto isTupleLikeV = IsTupleLike<std::decay_t<ValueTuple>>::value;
+
+    static_assert(isTupleLikeV<std::pair<int32_t, char>>);
+    static_assert(!isTupleLikeV<bool>);
+
     template <size_t nbArgs, typename Repr>
     constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
     {
@@ -1244,9 +1309,27 @@ constexpr auto accumulate(Iter1 begin, Iter2 end, Init init, Func func)
     return init;
 }
 
+template <typename Iter1, typename Iter2, typename Init, typename Func>
+constexpr auto foldrRecur(Iter1 begin, Iter2 end, Init init, Func func) -> Init
+{
+    if (begin != end)
+    {
+        auto iter = begin;
+        return func | *begin | foldrRecur(++iter, end, std::move(init), std::move(func));
+    }
+    return init;
+}
+
 constexpr auto foldr = genericFunction<3>([](auto func, auto init, auto const& list)
 {
-    return accumulate(list.rbegin(), list.rend(), init, unCurry <o> flip | func);
+    if constexpr (impl::hasReverseIteratorsV<decltype(list)>)
+    {
+        return accumulate(list.rbegin(), list.rend(), init, unCurry <o> flip | func);
+    }
+    else
+    {
+        return foldrRecur(list.begin(), list.end(), init, func);
+    }
 });
 
 constexpr auto foldl = genericFunction<3>([](auto func, auto init, auto const& list)
@@ -1502,62 +1585,6 @@ public:
 
 template <typename Data>
 const Maybe<Data> MonoidBase<Maybe, Data>::mempty = Nothing{};
-
-namespace impl
-{
-    template <typename Value, typename = std::void_t<>>
-    struct IsContainer : std::false_type
-    {
-    };
-
-    template <typename Value>
-    struct IsContainer<Value, std::void_t<decltype(std::begin(std::declval<Value>())),
-                                        decltype(std::end(std::declval<Value>()))>>
-        : std::true_type
-    {
-    };
-
-    template <typename Cont>
-    constexpr auto isContainerV = IsContainer<std::decay_t<Cont>>::value;
-
-    static_assert(!isContainerV<std::pair<int32_t, char>>);
-    static_assert(isContainerV<std::vector<int32_t>>);
-
-    template <typename Value, typename = std::void_t<>>
-    struct HasReverseIterators : std::false_type
-    {
-    };
-
-    template <typename Value>
-    struct HasReverseIterators<Value, std::void_t<decltype(std::rbegin(std::declval<Value>())),
-                                        decltype(std::rend(std::declval<Value>()))>>
-        : std::true_type
-    {
-    };
-
-    template <typename Cont>
-    constexpr auto hasReverseIteratorsV = HasReverseIterators<std::decay_t<Cont>>::value;
-
-    static_assert(hasReverseIteratorsV<std::vector<int32_t>>);
-    static_assert(!hasReverseIteratorsV<std::forward_list<int32_t>>);
-
-    template <typename Value, typename = std::void_t<>>
-    struct IsTupleLike : std::false_type
-    {
-    };
-
-    template <typename Value>
-    struct IsTupleLike<Value, std::void_t<decltype(std::tuple_size<Value>::value)>>
-        : std::true_type
-    {
-    };
-
-    template <typename ValueTuple>
-    constexpr auto isTupleLikeV = IsTupleLike<std::decay_t<ValueTuple>>::value;
-
-    static_assert(isTupleLikeV<std::pair<int32_t, char>>);
-    static_assert(!isTupleLikeV<bool>);
-} // namespace impl
 
 template <template <typename...> class C, typename Data, typename... Rest>
 struct MonoidTrait<C<Data, Rest...>, std::enable_if_t<!impl::isTupleLikeV<C<Data, Rest...>> && !isFunctionV<C<Data, Rest...>>, void>>
