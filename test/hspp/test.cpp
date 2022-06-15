@@ -272,9 +272,9 @@ TEST(Functor, Maybe)
 {
     auto const test = [=](auto f)
     {
-        const Maybe<int> x = Just{1};
+        const Maybe<int> x = just(1);
         const auto y = f <fmap> x;
-        EXPECT_EQ(Just{-1}, y);
+        EXPECT_EQ(just(-1), y);
     };
     const TEFunction<int, int> g = std::negate<>{};
     test(g);
@@ -301,7 +301,7 @@ TEST(Functor, TEFunction)
     const TEFunction<Maybe<double>, double> f = Applicative<Maybe>::pure<double>;
     const TEFunction<double, int> g = [](auto e) { return -e; };
     const auto y = f <fmap> g;
-    EXPECT_EQ(y(1), Just{-1.});
+    EXPECT_EQ(y(1), just(-1.));
 }
 
 TEST(Functor, GenericFunction)
@@ -413,7 +413,7 @@ TEST(Applicative, Maybe)
     {
         const Maybe<int> x = {1};
         const auto y = pure(f) <app> x;
-        EXPECT_EQ(Just{-1}, y);
+        EXPECT_EQ(just(-1), y);
     };
     const TEFunction<int, int> g = std::negate<>{};
     test(g);
@@ -536,7 +536,7 @@ TEST(Monad, Maybe)
         const auto z = x >>= filterEven;
         const auto u = y >>= filterEven;
         EXPECT_EQ(z, nothing);
-        EXPECT_EQ(u, Just{4});
+        EXPECT_EQ(u, just(4));
     };
     auto const filterEven = [](int x)-> Maybe<int> { return x%2==0 ? Maybe<int>{x} : Maybe<int>{}; };
     const TEFunction<Maybe<int>, int> filterEven1 = filterEven;
@@ -892,9 +892,9 @@ TEST(Monoid, range2)
 
 TEST(Monoid, maybe)
 {
-    auto const nested = std::list{Maybe{product(2)}, Maybe<Product<int>>{}, Maybe{product(3)}};
+    auto const nested = std::list{just(product(2)), Maybe<Product<int>>{}, just(product(3))};
     auto const result = mconcat | nested;
-    auto const expected = Maybe{product(6)};
+    auto const expected = just(product(6));
     EXPECT_EQ(result, expected);
 }
 
@@ -941,14 +941,14 @@ TEST(Monoid, any)
 
 TEST(Monoid, first)
 {
-    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, Just{2}, Just{3}};
-    EXPECT_EQ(result, Maybe{2});
+    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    EXPECT_EQ(result, just(2));
 }
 
 TEST(Monoid, last)
 {
-    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, Just{2}, Just{3}};
-    EXPECT_EQ(result, Maybe{3});
+    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    EXPECT_EQ(result, just(3));
 }
 
 TEST(Monoid, Ordering)
@@ -996,15 +996,16 @@ TEST(Monoid, Tuple)
 
 TEST(Maybe, 1)
 {
-    auto result = Maybe<std::string>{"andy"} <mappend> Maybe<std::string>{};
-    EXPECT_EQ(result, Just<std::string>{"andy"});
-    result = Maybe<std::string>{"andy"} <mappend> Maybe<std::string>{"123"};
-    EXPECT_EQ(result, Just<std::string>{"andy123"});
-    result = Maybe<std::string>{} <mappend> Maybe<std::string>{};
+    using namespace std::literals;
+    auto result = just("andy"s) <mappend> nothing;
+    EXPECT_EQ(result, just("andy"s));
+    result = just("andy"s) <mappend> just("123"s);
+    EXPECT_EQ(result, just("andy123"s));
+    result = Maybe<std::string>{nothing} <mappend> Maybe<std::string>{nothing};
     EXPECT_EQ(result, nothing);
 
-    result = mconcat | std::vector{Maybe<std::string>{"123"}, Maybe<std::string>{"xxx"}};
-    EXPECT_EQ(result, Just<std::string>{"123xxx"});
+    result = mconcat | std::vector{just("123"s), just("xxx"s)};
+    EXPECT_EQ(result, just("123xxx"s));
 }
 
 TEST(Monad, WalkTheLine)
@@ -1030,7 +1031,7 @@ TEST(Monad, WalkTheLine)
         return Maybe<Pole>{};
     });
     auto const result = (((return_ | Pole{0,0}) >>= (landRight | 2)) >>= (landLeft | 2)) >>= (landRight | 2);
-    EXPECT_EQ(result, Just(Pole(2, 4)));
+    EXPECT_EQ(result, just(Pole(2, 4)));
 
     auto const result2 = ((((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= (landRight | 4)) >>= (landLeft | -1)) >>= (landRight | -2);
     EXPECT_EQ(result2, nothing);
@@ -1092,7 +1093,7 @@ TEST(Copy, View)
 TEST(MonadPlus, guard)
 {
     auto const result = guard<Maybe>(5 > 2);
-    EXPECT_EQ(result, Maybe{_o_});
+    EXPECT_EQ(result, just(_o_));
 
     auto const result1 = guard<Maybe>(1 > 2);
     EXPECT_EQ(result1, nothing);

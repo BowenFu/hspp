@@ -70,11 +70,6 @@ class Maybe : public MaybeBase<Data>
 public:
     using std::variant<Nothing, Just<Data>>::variant;
 
-    constexpr Maybe(Data data)
-    : std::variant<Nothing, Just<Data>>{Just{std::move(data)}}
-    {
-    }
-
     bool hasValue() const
     {
         return std::visit(overload(
@@ -294,6 +289,11 @@ constexpr auto toGFunc(Func const& func)
 constexpr inline auto id = toGFunc<1>([](auto data)
 {
     return std::move(data);
+});
+
+constexpr auto just = toGFunc<1>([](auto d)
+{
+    return Maybe<decltype(d)>{Just{std::move(d)}};
 });
 
 template <typename T>
