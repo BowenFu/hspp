@@ -47,7 +47,7 @@ namespace detail
     template <std::size_t start, class Tuple, std::size_t... I>
     constexpr decltype(auto) subtupleImpl(Tuple &&t, std::index_sequence<I...>)
     {
-        return std::forward_as_tuple(get<start + I>(std::forward<Tuple>(t))...);
+        return std::make_tuple(get<start + I>(std::forward<Tuple>(t))...);
     }
 } // namespace detail
 
