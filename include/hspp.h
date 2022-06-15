@@ -42,6 +42,38 @@ namespace impl
     using StoreT = AddConstToPointerT<std::decay_t<Data>>;
 } // namespace impl
 
+namespace detail
+{
+    template <std::size_t start, class Tuple, std::size_t... I>
+    constexpr decltype(auto) subtupleImpl(Tuple &&t, std::index_sequence<I...>)
+    {
+        return std::forward_as_tuple(get<start + I>(std::forward<Tuple>(t))...);
+    }
+} // namespace detail
+
+// [start, end)
+template <std::size_t start, std::size_t end, class Tuple>
+constexpr decltype(auto) subtuple(Tuple &&t)
+{
+    constexpr auto tupleSize = std::tuple_size_v<std::remove_reference_t<Tuple>>;
+    static_assert(start <= end);
+    static_assert(end <= tupleSize);
+    return detail::subtupleImpl<start>(std::forward<Tuple>(t),
+                                        std::make_index_sequence<end - start>{});
+}
+
+template <std::size_t len, class Tuple>
+constexpr decltype(auto) takeTuple(Tuple &&t)
+{
+    constexpr auto tupleSize = std::tuple_size_v<std::remove_reference_t<Tuple>>;
+    static_assert(len <= tupleSize);
+    return subtuple<0, len>(std::forward<Tuple>(t));
+}
+
+template <std::size_t len, class Tuple>
+using TakeTupleType = std::decay_t<decltype(takeTuple<len>(std::declval<Tuple>()))>;
+
+
 template <typename Data>
 class Maybe;
 
@@ -1231,6 +1263,24 @@ struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
 
 namespace impl
 {
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename>
+struct TupleTypeClassTrait;
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Init>
+struct TupleTypeClassTrait<TypeClassT, std::tuple<Init...>>
+{
+    using Type = TypeClassT<std::tuple, std::decay_t<Init>...>;
+};
+} // namespace impl
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, std::tuple<Args...>>
+{
+    using Type = typename impl::TupleTypeClassTrait<TypeClassT, TakeTupleType<sizeof...(Args)-1, std::tuple<Args...>>>::Type;
+};
+
+namespace impl
+{
     template <typename Value, typename = std::void_t<>>
     struct IsContainer : std::false_type
     {
@@ -1351,6 +1401,44 @@ constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
 
 template <template<typename...> typename Type, typename... Args>
 class Monoid;
+
+template <typename T, typename Enable=void>
+struct MonoidTrait;
+
+template <typename T>
+using MonoidType = typename MonoidTrait<std::decay_t<T>>::Type;
+
+class Mappend
+{
+public:
+    template <typename MData1, typename MData2>
+    constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
+    {
+        using MType = MonoidType<MData1>;
+        return MType::mappend | lhs | rhs;
+    }
+};
+
+constexpr inline auto mappend = toGFunc<2>(Mappend{});
+
+class Mconcat
+{
+public:
+    template <template <typename...> class C, typename MData, typename... Rest>
+    constexpr auto operator()(C<MData, Rest...> const& data) const
+    {
+        using MType = MonoidType<MData>;
+        return MType::mconcat | data;
+    }
+    template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
+    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
+    {
+        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
+        return MType::mconcat | func;
+    }
+};
+
+constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
 
 template <typename MType>
 class MonoidConcat
@@ -1570,12 +1658,6 @@ constexpr auto compare = toGFunc<2>([](auto lhs, auto rhs)
     return Ordering::kGT;
 });
 
-template <typename T, typename Enable=void>
-struct MonoidTrait;
-
-template <typename T>
-using MonoidType = typename MonoidTrait<T>::Type;
-
 template <>
 class MonoidBase<DummyTemplateClass, Ordering>
 {
@@ -1670,26 +1752,39 @@ public:
     });
 };
 
-template <>
-class Monoid<std::tuple>
+namespace impl
+{
+template <size_t... I, typename Func, typename Tuple1, typename Tuple2>
+constexpr static auto zipTupleWithImpl(Func func, Tuple1&& lhs, Tuple2&& rhs, std::index_sequence<I...>)
+{
+    static_assert(std::tuple_size_v<std::decay_t<Tuple1>> == sizeof...(I));
+    static_assert(std::tuple_size_v<std::decay_t<Tuple2>> == sizeof...(I));
+    return std::make_tuple((func | std::get<I>(std::forward<Tuple1>(lhs)) | std::get<I>(std::forward<Tuple2>(rhs)))...);
+}
+}
+
+template <typename Func, typename Tuple1, typename Tuple2>
+constexpr static auto zipTupleWith(Func func, Tuple1&& lhs, Tuple2&& rhs)
+{
+    return impl::zipTupleWithImpl(func, std::forward<Tuple1>(lhs), std::forward<Tuple2>(rhs), std::make_index_sequence<std::tuple_size_v<std::decay_t<Tuple1>>>{});
+}
+
+
+template <typename... Ts>
+class MonoidBase<std::tuple, Ts...>
 {
 public:
-    constexpr static auto mempty = _o_;
+    const static decltype(std::make_tuple(MonoidType<Ts>::mempty...)) mempty;
 
-    constexpr static auto mappend = toGFunc<2>([](auto&& lhs, auto&& rhs)
+    constexpr static auto mappend = toFunc([](std::tuple<Ts...> lhs, std::tuple<Ts...> rhs)
     {
-        return std::tuple_cat(lhs, rhs);
-    });
-
-    constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
-    {
-        return std::apply([](auto&&... funcs)
-        {
-            return std::tuple_cat(funcs...);
-        }
-        , nested);
+        constexpr auto mapp = toGFunc<2>(Mappend{});
+        return zipTupleWith(mapp, lhs, rhs);
     });
 };
+
+template <typename... Ts>
+const decltype(std::make_tuple(MonoidType<Ts>::mempty...)) MonoidBase<std::tuple, Ts...>::mempty = std::make_tuple(MonoidType<Ts>::mempty...);
 
 template <typename Data>
 class MonoidBase<Maybe, Data>
@@ -1731,7 +1826,7 @@ struct MonoidTrait<C<Data, Rest...>, std::enable_if_t<!impl::isTupleLikeV<C<Data
 template <typename... Args>
 struct MonoidTrait<std::tuple<Args...>>
 {
-    using Type = Monoid<std::tuple>;
+    using Type = Monoid<std::tuple, std::decay_t<Args>...>;
 };
 
 template <>
@@ -1771,38 +1866,6 @@ struct MonoidTrait<Function<Repr, Ret, FirstArg, Rest...>>
     using Type = Monoid<Function, FirstArg, RetT>;
 };
 
-class Mappend
-{
-public:
-    template <typename MData1, typename MData2>
-    constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
-    {
-        using MType = MonoidType<MData1>;
-        return MType::mappend | lhs | rhs;
-    }
-};
-
-constexpr inline auto mappend = toGFunc<2>(Mappend{});
-
-class Mconcat
-{
-public:
-    template <template <typename...> class C, typename MData, typename... Rest>
-    constexpr auto operator()(C<MData, Rest...> const& data) const
-    {
-        using MType = MonoidType<MData>;
-        return MType::mconcat | data;
-    }
-    template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
-    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
-    {
-        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
-        return MType::mconcat | func;
-    }
-};
-
-constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
-
 /////////// Foldable ///////////
 
 template <template<typename...> typename Type, typename... Args>
@@ -1836,17 +1899,16 @@ public:
     }
 };
 
-template <>
-class Functor<std::tuple>
+template <typename... Init>
+class Functor<std::tuple, Init...>
 {
 public:
-    template <typename Func, typename... Args>
-    constexpr static auto fmap(Func const& func, std::tuple<Args...> const& in)
+    template <typename Func, typename Last>
+    constexpr static auto fmap(Func const& func, std::tuple<Init..., Last> in)
     {
-        return std::apply([&](auto&&... args)
-        {
-            return std::make_tuple(func(args)...);
-        }, in);
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const last = std::get<sizeMinusOne>(in);
+        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(func(std::move(last))));
     }
 };
 
@@ -1962,29 +2024,23 @@ public:
     }
 };
 
-template <>
-class Applicative<std::tuple> : public Functor<std::tuple>
+template <typename... Init>
+class Applicative<std::tuple, Init...> : public Functor<std::tuple, Init...>
 {
 public:
-    template <typename In>
-    constexpr static auto pure(In&& in)
+    template <typename Last>
+    constexpr static auto pure(Last in)
     {
-        return std::make_tuple(std::forward<In>(in));
+        return std::make_tuple(MonoidType<Init>::mempty..., std::move(in));
     }
-    template <typename... Funcs, typename... Args>
-    constexpr static auto app(std::tuple<Funcs...> const& funcs, std::tuple<Args...> const& args)
+    template <typename Func, typename Last>
+    constexpr static auto app(std::tuple<Init..., Func> const& funcs, std::tuple<Init..., Last> const& args)
     {
-        return std::apply([&](auto&&... funcs_)
-        {
-            auto const f = [&](auto&& func)
-            {
-                return std::apply([&](auto&&... args_)
-                {
-                    return std::make_tuple(func(args_)...);
-                }, args);
-            };
-            return std::tuple_cat(f(funcs_)...);
-        }, funcs);
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const func = std::get<sizeMinusOne>(funcs);
+        auto const last = std::get<sizeMinusOne>(args);
+        auto const init = mappend | takeTuple<sizeMinusOne>(funcs) | takeTuple<sizeMinusOne>(args);
+        return std::tuple_cat(init, std::make_tuple(func(last)));
     }
 };
 

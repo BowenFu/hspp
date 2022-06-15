@@ -262,9 +262,9 @@ TEST(Functor, Range)
 
 TEST(Functor, tuple)
 {
-    auto const tu = std::make_tuple(1, 5.6, "2", true);
+    auto const tu = std::make_tuple(_o_, std::list{5.6}, "2", true);
     auto const result = show <fmap> tu;
-    auto const expected = std::make_tuple("1", "5.6", "2", "true");
+    auto const expected = std::make_tuple(_o_, std::list{5.6}, "2", "true");
     EXPECT_EQ(result, expected);
 }
 
@@ -362,9 +362,9 @@ TEST(Applicative, range)
 
 TEST(Applicative, tuple)
 {
-    const auto x = std::make_tuple(3, "4");
+    const auto x = std::make_tuple(all | true, 4);
     const auto result = pure(show) <app> x;
-    const auto expected = std::make_tuple("3", "4");
+    const auto expected = std::make_tuple(all | true, "4");
     EXPECT_EQ(result, expected);
 }
 
@@ -518,14 +518,14 @@ TEST(Monad, Range)
     test(thisAndNeg2);
 }
 
-TEST(Monad, tuple)
-{
-    auto const thisAndRepr = [](auto x) { return std::make_tuple(x, show | x); };
-    auto const x = std::make_tuple(3, true);
-    auto const result = x >>= thisAndRepr;
-    const auto expected = std::make_tuple(3, "3", true, "true");
-    EXPECT_EQ(result, expected);
-}
+// TEST(Monad, tuple)
+// {
+//     auto const thisAndRepr = [](auto x) { return std::make_tuple(all | true, show | x); };
+//     auto const x = std::make_tuple(all | false, true);
+//     auto const result = x >>= thisAndRepr;
+//     const auto expected = std::make_tuple(all | true, "true");
+//     EXPECT_EQ(result, expected);
+// }
 
 TEST(Monad, Maybe)
 {
@@ -985,13 +985,13 @@ TEST(Monoid, Function)
 
 TEST(Monoid, Tuple)
 {
-    auto const x = std::make_tuple(1, std::string{"123"});
-    auto const y = std::make_tuple(true);
-    auto const z = x <mappend> y <mappend> _o_;
-    EXPECT_EQ(z, std::make_tuple(1, std::string("123"), true));
+    auto const x = std::make_tuple(sum | 1, std::string{"123"});
+    auto const y = std::make_tuple(sum | 0, std::string{"23"});
+    auto const z = x <mappend> y;
+    EXPECT_EQ(z, std::make_tuple(sum | 1, std::string("12323")));
 
-    auto const result = mconcat | std::tuple{y, std::make_tuple(_o_), x};
-    EXPECT_EQ(result, std::make_tuple(true, _o_, 1, std::string("123")));
+    auto const result = mconcat | std::list{x, y};
+    EXPECT_EQ(result, std::make_tuple(sum | 1, std::string("12323")));
 }
 
 TEST(Maybe, 1)
