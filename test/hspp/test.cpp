@@ -297,14 +297,6 @@ TEST(Functor, IO)
     test(h);
 }
 
-TEST(Functor, TEFunction)
-{
-    const TEFunction<Maybe<double>, double> f = Applicative<Maybe>::pure<double>;
-    const TEFunction<double, int> g = [](auto e) { return -e; };
-    const auto y = f <fmap> g;
-    EXPECT_EQ(y(1), just(-1.));
-}
-
 TEST(Functor, GenericFunction)
 {
     constexpr auto g = toGFunc<1>([](auto e) { return -e; });

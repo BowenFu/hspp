@@ -2048,11 +2048,7 @@ template <>
 class Applicative<Maybe> : public Functor<Maybe>
 {
 public:
-    template <typename In>
-    constexpr static auto pure(In in)
-    {
-        return Maybe<std::decay_t<In>>{Just{in}};
-    }
+    constexpr static auto pure = just;
     template <typename Func, typename Arg>
     constexpr static auto ap(Maybe<Func> const& func, Maybe<Arg> const& in)
     {
