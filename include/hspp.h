@@ -1992,7 +1992,7 @@ public:
         return Type<std::decay_t<In>>{in};
     }
     template <typename Func, typename Arg>
-    constexpr static auto app(Type<Func> const& func, Type<Arg> const& in)
+    constexpr static auto ap(Type<Func> const& func, Type<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         Type<R> result;
@@ -2017,7 +2017,7 @@ public:
         return ownedRange(SingleView{std::forward<In>(in)});
     }
     template <typename Func, typename Arg, typename Repr1, typename Repr2>
-    constexpr static auto app(Range<Func, Repr1> const& func, Range<Arg, Repr2> const& in)
+    constexpr static auto ap(Range<Func, Repr1> const& func, Range<Arg, Repr2> const& in)
     {
         auto view = MapView{ProductView{func, in}, [](auto&& tuple) { return std::get<0>(tuple)(std::get<1>(tuple)); }};
         return ownedRange(view);
@@ -2034,7 +2034,7 @@ public:
         return std::make_tuple(MonoidType<Init>::mempty..., std::move(in));
     }
     template <typename Func, typename Last>
-    constexpr static auto app(std::tuple<Init..., Func> const& funcs, std::tuple<Init..., Last> const& args)
+    constexpr static auto ap(std::tuple<Init..., Func> const& funcs, std::tuple<Init..., Last> const& args)
     {
         constexpr auto sizeMinusOne = sizeof...(Init);
         auto const func = std::get<sizeMinusOne>(funcs);
@@ -2054,7 +2054,7 @@ public:
         return Maybe<std::decay_t<In>>{Just{in}};
     }
     template <typename Func, typename Arg>
-    constexpr static auto app(Maybe<Func> const& func, Maybe<Arg> const& in)
+    constexpr static auto ap(Maybe<Func> const& func, Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
@@ -2083,7 +2083,7 @@ public:
         return ioData(std::move(in));
     }
     template <typename Func, typename Arg, typename Func1, typename Func2>
-    constexpr static auto app(IO<Func, Func1> const& func, IO<Arg, Func2> const& in)
+    constexpr static auto ap(IO<Func, Func1> const& func, IO<Arg, Func2> const& in)
     {
         return io([=]{ return func.run()(in.run()); });
     }
@@ -2099,7 +2099,7 @@ public:
         return toFunc([ret=std::move(ret)](FirstArg){ return ret; });
     }
     template <typename Func1, typename Func2>
-    constexpr static auto app(Func1 func, Func2 in)
+    constexpr static auto ap(Func1 func, Func2 in)
     {
         return toFunc(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
@@ -2119,7 +2119,7 @@ public:
         return toGFunc<1>([=](auto){ return ret; });
     }
     template <typename Func1, typename Func2>
-    constexpr static auto app(Func1 func, Func2 in)
+    constexpr static auto ap(Func1 func, Func2 in)
     {
         return toGFunc<1>([f=std::move(func), g=std::move(in)](auto arg) {return f(arg)(g(arg)); });
     }
@@ -2158,32 +2158,32 @@ class IsDeferredPure<DeferredPure<T>> : public std::true_type
 template <typename T>
 constexpr static auto isDeferredPureV = IsDeferredPure<T>::value;
 
-class App
+class Ap
 {
 public:
     template <typename Func, typename Data>
     constexpr auto operator()(DeferredPure<Func> const& func, Data const& data) const
     {
-        using AppType = ApplicativeType<Data>;
-        return AppType::app(AppType::pure(func.mData), data);
+        using ApType = ApplicativeType<Data>;
+        return ApType::ap(ApType::pure(func.mData), data);
     }
     template <typename Func, typename Data>
     constexpr auto operator()(Func const& func, DeferredPure<Data> const& in) const
     {
-        using AppType = ApplicativeType<Func>;
-        return AppType::app(func, AppType::pure(in.mData));
+        using ApType = ApplicativeType<Func>;
+        return ApType::ap(func, ApType::pure(in.mData));
     }
     template <typename Func, typename Data>
     constexpr auto operator()(Func const& func, Data const& in) const
     {
-        using AppType1 = ApplicativeType<Func>;
-        using AppType2 = ApplicativeType<Data>;
-        static_assert(std::is_same_v<AppType1, AppType2>);
-        return AppType1::app(func, in);
+        using ApType1 = ApplicativeType<Func>;
+        using ApType2 = ApplicativeType<Data>;
+        static_assert(std::is_same_v<ApType1, ApType2>);
+        return ApType1::ap(func, in);
     }
 };
 
-constexpr inline auto app = toGFunc<2>(App{});
+constexpr inline auto ap = toGFunc<2>(Ap{});
 
 /////////// Monad ///////////
 
@@ -2276,7 +2276,7 @@ public:
     template <size_t nbArgs, typename Repr, typename Func>
     constexpr static auto bind(GenericFunction<nbArgs, Repr> const& m, Func k)
     {
-        return (flip | std::move(k)) <app> m;
+        return (flip | std::move(k)) <ap> m;
     }
 };
 
@@ -2287,7 +2287,7 @@ public:
     template <typename Repr, typename Ret, typename... Rest, typename Func>
     constexpr static auto bind(Function<Repr, Ret, FirstArg, Rest...> const& m, Func k)
     {
-        return (flip | std::move(k)) <app> m;
+        return (flip | std::move(k)) <ap> m;
     }
 };
 

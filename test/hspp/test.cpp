@@ -317,7 +317,7 @@ TEST(Applicative, vector)
     auto const test = [=](auto f)
     {
         const std::vector<int> x = {3};
-        const auto y = pure(f) <app> x;
+        const auto y = pure(f) <ap> x;
         EXPECT_EQ(y.size(), 1);
         EXPECT_EQ(y.front(), -3);
     };
@@ -333,7 +333,7 @@ TEST(Applicative, list)
     {
         const std::list<int> x = {3, 4};
         const int y = 5;
-        const auto z = pure(f) <app> x <app> pure(y);
+        const auto z = pure(f) <ap> x <ap> pure(y);
         EXPECT_EQ(z.size(), 2);
         const auto u = {15, 20};
         EXPECT_TRUE(std::equal(z.begin(), z.end(), u.begin()));
@@ -349,7 +349,7 @@ TEST(Applicative, range)
     auto const test = [=](auto f)
     {
         const std::list<int> x = {3, 4};
-        const auto z = pure(f) <app> nonOwnedRange(x);
+        const auto z = pure(f) <ap> nonOwnedRange(x);
         std::vector<int> zz = toVector(z);
         const auto u = {-3, -4};
         EXPECT_EQ(zz.size(), u.size());
@@ -364,7 +364,7 @@ TEST(Applicative, range)
 TEST(Applicative, tuple)
 {
     const auto x = std::make_tuple(all | true, 4);
-    const auto result = pure(show) <app> x;
+    const auto result = pure(show) <ap> x;
     const auto expected = std::make_tuple(all | true, "4");
     EXPECT_EQ(result, expected);
 }
@@ -375,10 +375,10 @@ TEST(Applicative, range1)
     {
         const std::list<int> x = {3, 4};
         const std::list<int> y = {5, 6};
-        const auto z0 = pure(f) <app> nonOwnedRange(x);
+        const auto z0 = pure(f) <ap> nonOwnedRange(x);
         auto result0 = toVector(z0);
         EXPECT_EQ(result0.size(), 2);
-        const auto z = z0 <app> nonOwnedRange(y);
+        const auto z = z0 <ap> nonOwnedRange(y);
         auto result = toVector(z);
         EXPECT_EQ(result.size(), 4);
         const auto u = {15, 18, 20, 24};
@@ -396,10 +396,10 @@ TEST(Applicative, range2)
     {
         const std::list<int> x = {3, 4};
         const std::list<size_t> y = {1U, 2U};
-        const auto z0 = pure(f) <app> nonOwnedRange(x);
+        const auto z0 = pure(f) <ap> nonOwnedRange(x);
         auto result0 = toVector(z0);
         EXPECT_EQ(result0.size(), 2);
-        const auto z = z0 <app> nonOwnedRange(y);
+        const auto z = z0 <ap> nonOwnedRange(y);
         auto result = toVector(toVector <fmap> z);
         EXPECT_EQ(result.size(), 4);
         const std::vector<std::vector<int>> u = {{3}, {3, 3}, {4}, {4, 4}};
@@ -413,7 +413,7 @@ TEST(Applicative, Maybe)
     auto const test = [=](auto f)
     {
         const Maybe<int> x = {1};
-        const auto y = pure(f) <app> x;
+        const auto y = pure(f) <ap> x;
         EXPECT_EQ(just(-1), y);
     };
     const TEFunction<int, int> g = std::negate<>{};
@@ -427,7 +427,7 @@ TEST(Applicative, IO)
     auto const test = [=](auto f)
     {
         const auto x = ioData(42);
-        const auto y = pure(f) <app> x;
+        const auto y = pure(f) <ap> x;
         EXPECT_EQ(-42, y.run());
     };
     const TEFunction<int, int> g = std::negate<>{};
@@ -440,7 +440,7 @@ TEST(Applicative, TEFunction)
 {
     const TEFunction<int, std::string> u = [](std::string const& str) { return str.size(); };
     const TEFunction<std::string, bool> f = [](bool x) { return x ? "true" : "false"; };
-    const auto y = pure(u) <app> f;
+    const auto y = pure(u) <ap> f;
     EXPECT_EQ(y(true), 4);
     EXPECT_EQ(y(false), 5);
 }
@@ -449,7 +449,7 @@ TEST(Applicative, GenericFunction)
 {
     const auto u = toGFunc<1>([](std::string const& str) { return str.size(); });
     const auto f = toGFunc<1>([](auto x) { return x ? "true" : "false"; });
-    const auto y = pure(u) <app> f;
+    const auto y = pure(u) <ap> f;
     EXPECT_EQ(y(true), 4);
     EXPECT_EQ(y(false), 5);
 }
@@ -654,7 +654,7 @@ TEST(IO, myAction)
             return l + r;
         }
     );
-    auto const myAction = f <fmap> getLine <app> getLine;
+    auto const myAction = f <fmap> getLine <ap> getLine;
     (void)myAction;
 }
 
@@ -662,7 +662,7 @@ TEST(Function, myFunc)
 {
     constexpr auto myFunc = toFunc(std::plus<int>{})
                      <fmap> toFunc([](int x) { return x + 3;})
-                      <app> toFunc([](int x) { return x * 100; });
+                      <ap> toFunc([](int x) { return x * 100; });
     EXPECT_EQ(myFunc(5), 508);
 }
 
@@ -670,8 +670,8 @@ TEST(Function, myFunc2)
 {
     constexpr auto myFunc = toFunc([](float x, float y, float z) { return std::vector{x, y, z}; })
                      <fmap> toFunc([](float x) { return x + 3;})
-                      <app> toFunc([](float x) { return x * 2; })
-                      <app> toFunc([](float x) { return x / 2; });
+                      <ap> toFunc([](float x) { return x * 2; })
+                      <ap> toFunc([](float x) { return x / 2; });
     auto const result = myFunc(5);
     auto const expected = {8.0,10.0,2.5};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
@@ -1073,7 +1073,7 @@ TEST(Applicative, vec)
         return std::make_pair(n,ch);
     })
     <fmap> std::vector{1,2}
-    <app> std::vector{'a','b'};
+    <ap> std::vector{'a','b'};
 
     auto const expected = std::vector<std::pair<int, char>>{
         std::make_pair(1,'a'),
