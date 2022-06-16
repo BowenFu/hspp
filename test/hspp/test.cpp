@@ -5,6 +5,7 @@
 #include <cmath>
 
 using namespace hspp;
+using namespace std::literals;
 
 TEST(Range, 1)
 {
@@ -518,14 +519,14 @@ TEST(Monad, Range)
     test(thisAndNeg2);
 }
 
-// TEST(Monad, tuple)
-// {
-//     auto const thisAndRepr = [](auto x) { return std::make_tuple(all | true, show | x); };
-//     auto const x = std::make_tuple(all | false, true);
-//     auto const result = x >>= thisAndRepr;
-//     const auto expected = std::make_tuple(all | true, "true");
-//     EXPECT_EQ(result, expected);
-// }
+TEST(Monad, tuple)
+{
+    auto const thisAndRepr = [](auto x) { return std::make_tuple(all | true, show | x); };
+    auto const x = std::make_tuple(all | false, true);
+    auto const result = x >>= thisAndRepr;
+    const auto expected = std::make_tuple(all | false, "true"s);
+    EXPECT_EQ(result, expected);
+}
 
 TEST(Monad, Maybe)
 {
@@ -555,7 +556,6 @@ TEST(Monad, IO)
 {
     testing::internal::CaptureStdout();
 
-    using namespace std::literals;
     const auto x = return_("3");
     const auto y = return_("4");
 
@@ -715,7 +715,6 @@ TEST(map, 1)
 
 TEST(replicate, 1)
 {
-    using namespace std::literals;
     auto const str = "3";
     auto const x = replicate | str | 4U;
     auto const z = toVector(x);
@@ -827,7 +826,6 @@ TEST(equalTo, x)
 TEST(equalTo, 2)
 {
     constexpr auto f = length <o> (filter || equalTo | 'a');
-    using namespace std::literals;
 
     EXPECT_EQ(f | "abracadabra"sv, 5);
 }
@@ -996,7 +994,6 @@ TEST(Monoid, Tuple)
 
 TEST(Maybe, 1)
 {
-    using namespace std::literals;
     auto result = just("andy"s) <mappend> nothing;
     EXPECT_EQ(result, just("andy"s));
     result = just("andy"s) <mappend> just("123"s);

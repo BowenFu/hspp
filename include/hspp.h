@@ -2243,6 +2243,21 @@ public:
     }
 };
 
+template <typename... Init>
+class MonadBase<std::tuple, Init...>
+{
+public:
+    template <typename Last, typename Func>
+    constexpr static auto bind(std::tuple<Init..., Last> const& args, Func&& func)
+    {
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const last = std::get<sizeMinusOne>(args);
+        auto const lastResult = func | last;
+        auto const init = mappend | takeTuple<sizeMinusOne>(args) | takeTuple<sizeMinusOne>(lastResult);
+        return std::tuple_cat(init, std::make_tuple(std::get<sizeMinusOne>(lastResult)));
+    }
+};
+
 template <>
 class MonadBase<IO>
 {
