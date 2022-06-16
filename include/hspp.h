@@ -19,6 +19,7 @@
 #include <limits>
 #include <memory>
 #include <forward_list>
+#include <list>
 #include <vector>
 
 namespace hspp
@@ -41,6 +42,38 @@ namespace impl
     template <typename Data>
     using StoreT = AddConstToPointerT<std::decay_t<Data>>;
 } // namespace impl
+
+namespace detail
+{
+    template <std::size_t start, class Tuple, std::size_t... I>
+    constexpr decltype(auto) subtupleImpl(Tuple &&t, std::index_sequence<I...>)
+    {
+        return std::make_tuple(std::get<start + I>(std::forward<Tuple>(t))...);
+    }
+} // namespace detail
+
+// [start, end)
+template <std::size_t start, std::size_t end, class Tuple>
+constexpr decltype(auto) subtuple(Tuple &&t)
+{
+    constexpr auto tupleSize = std::tuple_size_v<std::remove_reference_t<Tuple>>;
+    static_assert(start <= end);
+    static_assert(end <= tupleSize);
+    return detail::subtupleImpl<start>(std::forward<Tuple>(t),
+                                        std::make_index_sequence<end - start>{});
+}
+
+template <std::size_t len, class Tuple>
+constexpr decltype(auto) takeTuple(Tuple &&t)
+{
+    constexpr auto tupleSize = std::tuple_size_v<std::remove_reference_t<Tuple>>;
+    static_assert(len <= tupleSize);
+    return subtuple<0, len>(std::forward<Tuple>(t));
+}
+
+template <std::size_t len, class Tuple>
+using TakeTupleType = std::decay_t<decltype(takeTuple<len>(std::declval<Tuple>()))>;
+
 
 template <typename Data>
 class Maybe;
@@ -69,11 +102,6 @@ class Maybe : public MaybeBase<Data>
 {
 public:
     using std::variant<Nothing, Just<Data>>::variant;
-
-    constexpr Maybe(Data data)
-    : std::variant<Nothing, Just<Data>>{Just{std::move(data)}}
-    {
-    }
 
     bool hasValue() const
     {
@@ -294,6 +322,11 @@ constexpr auto toGFunc(Func const& func)
 constexpr inline auto id = toGFunc<1>([](auto data)
 {
     return std::move(data);
+});
+
+constexpr auto just = toGFunc<1>([](auto d)
+{
+    return Maybe<decltype(d)>{Just{std::move(d)}};
 });
 
 template <typename T>
@@ -1203,32 +1236,6 @@ constexpr auto nonOwnedRange(Repr const& repr)
     return ownedRange(RefView(repr));
 }
 
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT,  typename T>
-struct TypeClassTrait;
-
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, template <typename...> class C, typename... Args>
-struct TypeClassTrait<TypeClassT, C<Args...>>
-{
-    using Type = TypeClassT<C>;
-};
-
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Repr, typename Ret, typename Arg, typename... Rest>
-struct TypeClassTrait<TypeClassT, Function<Repr, Ret, Arg, Rest...>>
-{
-    using Type = TypeClassT<Function, Arg>;
-};
-
-template <typename>
-class DummyTemplateClass{};
-
-struct GenericFunctionTag{};
-
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, size_t nbArgs, typename Repr>
-struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
-{
-    using Type = TypeClassT<DummyTemplateClass, GenericFunctionTag>;
-};
-
 namespace impl
 {
     template <typename Value, typename = std::void_t<>>
@@ -1342,15 +1349,206 @@ constexpr auto foldr = toGFunc<3>([](auto func, auto init, auto const& list)
 
 constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 {
-    return accumulate(list.begin(), list.end(), init, unCurry | func);
+    return hspp::accumulate(list.begin(), list.end(), init, unCurry | func);
 });
 
 constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
+
+constexpr inline auto elem = toGFunc<2>([](auto t, auto const& c)
+{
+    return std::any_of(c.begin(), c.end(), [t=std::move(t)](auto const& e){return e == t;});
+});
+
+template <typename Repr1, typename Ret1, typename Arg1, typename... Rest1, typename Repr2, typename Ret2, typename Arg2, typename... Rest2>
+constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, Ret2, Arg2, Rest2...> g)
+{
+    return toFunc<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
+}
+
+constexpr inline auto on = toGFunc<2>([](auto f, auto g)
+{
+    return onImpl(std::move(f), std::move(g));
+});
+
+template <template <typename...> class Class>
+constexpr auto to = toGFunc<1>([](auto view)
+{
+    Class<std::decay_t<decltype(*view.begin())>> result;
+    for (auto e: view)
+    {
+        result.push_back(std::move(e));
+    }
+    return result;
+});
+
+constexpr inline auto filter = toGFunc<2>([](auto pred, auto data)
+{
+    return ownedRange(FilterView{std::move(data), std::move(pred)});
+});
+
+constexpr inline auto map = toGFunc<2>([](auto func, auto data)
+{
+    return ownedRange(MapView{std::move(data), std::move(func)});
+});
+
+constexpr inline auto zip = toGFunc<2>([](auto lhs, auto rhs)
+{
+    return ownedRange(ZipView{std::move(lhs), std::move(rhs)});
+});
+
+constexpr inline auto zipWith = toGFunc<3>([](auto func, auto lhs, auto rhs)
+{
+    return ownedRange(MapView{ZipView{std::move(lhs), std::move(rhs)}, [func=std::move(func)](auto tu) { return func | std::get<0>(tu) | std::get<1>(tu);}});
+});
+
+constexpr inline auto repeat = toGFunc<1>([](auto data)
+{
+    return ownedRange(RepeatView{std::move(data)});
+});
+
+constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
+{
+    return ownedRange(TakeView{RepeatView{std::move(data)}, times});
+});
+
+constexpr inline auto enumFrom = toGFunc<1>([](auto start)
+{
+    return ownedRange(IotaView{start});
+});
+
+constexpr inline auto length = toGFunc<1>([](auto r)
+{
+    constexpr auto inc = toGFunc<2>([](auto sum, auto){ return sum + 1; });
+    return foldl | inc | 0 | r;
+});
+
+constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
+{
+    return ownedRange(TakeView{r, num});
+});
+
+constexpr inline auto drop = toGFunc<2>([](auto r, size_t num)
+{
+    return ownedRange(DropView{r, num});
+});
+
+constexpr inline auto splitAt = toGFunc<2>([](auto r, size_t num)
+{
+    return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
+});
+
+constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
+{
+    return r;
+});
+
+constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
+{
+    if constexpr(isRangeV<decltype(l)>)
+    {
+        return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
+    }
+    else
+    {
+        l.insert(l.begin(), e);
+        return l;
+    }
+});
+
+template <size_t N=2>
+constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
+{
+    return std::make_tuple(std::move(e), std::move(l)...);
+});
+
+/////////////// TypeClass //////////////////
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT,  typename T>
+struct TypeClassTrait;
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, template <typename...> class C, typename... Args>
+struct TypeClassTrait<TypeClassT, C<Args...>>
+{
+    using Type = TypeClassT<C>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Repr, typename Ret, typename Arg, typename... Rest>
+struct TypeClassTrait<TypeClassT, Function<Repr, Ret, Arg, Rest...>>
+{
+    using Type = TypeClassT<Function, Arg>;
+};
+
+template <typename>
+class DummyTemplateClass{};
+
+struct GenericFunctionTag{};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, size_t nbArgs, typename Repr>
+struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
+{
+    using Type = TypeClassT<DummyTemplateClass, GenericFunctionTag>;
+};
+
+namespace impl
+{
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename>
+struct TupleTypeClassTrait;
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Init>
+struct TupleTypeClassTrait<TypeClassT, std::tuple<Init...>>
+{
+    using Type = TypeClassT<std::tuple, std::decay_t<Init>...>;
+};
+} // namespace impl
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, std::tuple<Args...>>
+{
+    using Type = typename impl::TupleTypeClassTrait<TypeClassT, TakeTupleType<sizeof...(Args)-1, std::tuple<Args...>>>::Type;
+};
 
 /////////// Monoid ///////////
 
 template <template<typename...> typename Type, typename... Args>
 class Monoid;
+
+template <typename T, typename Enable=void>
+struct MonoidTrait;
+
+template <typename T>
+using MonoidType = typename MonoidTrait<std::decay_t<T>>::Type;
+
+class Mappend
+{
+public:
+    template <typename MData1, typename MData2>
+    constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
+    {
+        using MType = MonoidType<MData1>;
+        return MType::mappend | lhs | rhs;
+    }
+};
+
+constexpr inline auto mappend = toGFunc<2>(Mappend{});
+
+class Mconcat
+{
+public:
+    template <template <typename...> class C, typename MData, typename... Rest>
+    constexpr auto operator()(C<MData, Rest...> const& data) const
+    {
+        using MType = MonoidType<MData>;
+        return MType::mconcat | data;
+    }
+    template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
+    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
+    {
+        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
+        return MType::mconcat | func;
+    }
+};
+
+constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
 
 template <typename MType>
 class MonoidConcat
@@ -1382,9 +1580,9 @@ const Type<Args...> MonoidBase<Type, Args...>::mempty{};
 
 template <typename Data>                                        
 class DataHolder                                                 
-{                                                               
+{
     Data mData;                                                 
-public:                                                         
+public:
     constexpr DataHolder(Data data)                              
     : mData{std::move(data)}                                               
     {}                                                          
@@ -1453,6 +1651,78 @@ public:
     using DataHolder<Maybe<Data>>::DataHolder;
 };
 
+template <typename Data>
+class ZipList
+{
+    std::variant<Data, std::list<Data>> mData;
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(ZipList const& zipList)
+        : mZipList{zipList}
+        , mBaseIter{}
+        {
+            std::visit(overload(
+                [](Data) {},
+                [this](std::list<Data> const& data)
+                {
+                    mBaseIter = data.begin();
+                }
+            ), mZipList.get().mData);
+        }
+        auto& operator++()
+        {
+            if (mBaseIter)
+            {
+                ++mBaseIter.value();
+            }
+            return *this;
+        }
+        auto operator*() const
+        {
+            if (mBaseIter)
+            {
+                return *mBaseIter.value();
+            }
+            return std::get<Data>(mZipList.get().mData);
+        }
+        bool hasValue() const
+        {
+            return std::visit(overload(
+                [](Data const&) { return true; },
+                [this](std::list<Data> const& data)
+                {
+                    return mBaseIter.value() != data.end();
+                }
+            ), mZipList.get().mData);
+        }
+    private:
+        std::reference_wrapper<ZipList const> mZipList;
+        std::optional<std::decay_t<decltype(std::get<1>(mZipList.get().mData).begin())>> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    ZipList(Data data)
+    : mData{std::move(data)}
+    {}
+    ZipList(std::list<Data> data)
+    : mData{std::move(data)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+};
+
 constexpr auto product = toType<Product>;
 constexpr auto sum = toType<Sum>;
 constexpr auto all = toType<AllImpl>;
@@ -1462,11 +1732,15 @@ constexpr auto first = toGFunc<1>([](auto data)
     using Type = std::decay_t<decltype(data.value())>;
     return First<Type>{data};                                     
 });                                                             
-constexpr auto last = toGFunc<1>([](auto data)             
-{                                                               
+constexpr auto last = toGFunc<1>([](auto data)
+{
     using Type = std::decay_t<decltype(data.value())>;
     return Last<Type>{data};                                     
-});                                                             
+});
+constexpr auto zipList = toGFunc<1>([](auto data)
+{
+    return ZipList{data};                                     
+});
 
 constexpr auto getProduct = from;
 constexpr auto getSum = from;
@@ -1474,6 +1748,7 @@ constexpr auto getAll = from;
 constexpr auto getAny = from;
 constexpr auto getFirst = from;
 constexpr auto getLast = from;
+constexpr auto getZipList = from;
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
@@ -1550,6 +1825,24 @@ public:
     });
 };
 
+template <typename Data>
+class MonoidBase<ZipList, Data>
+{
+    using DataMType = MonoidType<Data>;
+public:
+    const static ZipList<Data> mempty;
+
+    constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
+    {
+        return zipList <o> to<std::list> || zipWith | DataMType::mappend | nonOwnedRange(lhs) | nonOwnedRange(rhs);
+    });
+};
+
+template <typename Data>
+const ZipList<Data> MonoidBase<ZipList, Data>::mempty = ZipList{MonoidType<Data>::mempty};
+
+
+
 enum class Ordering
 {
     kLT,
@@ -1569,12 +1862,6 @@ constexpr auto compare = toGFunc<2>([](auto lhs, auto rhs)
     }
     return Ordering::kGT;
 });
-
-template <typename T, typename Enable=void>
-struct MonoidTrait;
-
-template <typename T>
-using MonoidType = typename MonoidTrait<T>::Type;
 
 template <>
 class MonoidBase<DummyTemplateClass, Ordering>
@@ -1670,26 +1957,38 @@ public:
     });
 };
 
-template <>
-class Monoid<std::tuple>
+namespace impl
+{
+template <size_t... I, typename Func, typename Tuple1, typename Tuple2>
+constexpr static auto zipTupleWithImpl(Func func, Tuple1&& lhs, Tuple2&& rhs, std::index_sequence<I...>)
+{
+    static_assert(std::tuple_size_v<std::decay_t<Tuple1>> == sizeof...(I));
+    static_assert(std::tuple_size_v<std::decay_t<Tuple2>> == sizeof...(I));
+    return std::make_tuple((func | std::get<I>(std::forward<Tuple1>(lhs)) | std::get<I>(std::forward<Tuple2>(rhs)))...);
+}
+}
+
+template <typename Func, typename Tuple1, typename Tuple2>
+constexpr static auto zipTupleWith(Func func, Tuple1&& lhs, Tuple2&& rhs)
+{
+    return impl::zipTupleWithImpl(func, std::forward<Tuple1>(lhs), std::forward<Tuple2>(rhs), std::make_index_sequence<std::tuple_size_v<std::decay_t<Tuple1>>>{});
+}
+
+template <typename... Ts>
+class MonoidBase<std::tuple, Ts...>
 {
 public:
-    constexpr static auto mempty = _o_;
+    const static decltype(std::make_tuple(MonoidType<Ts>::mempty...)) mempty;
 
-    constexpr static auto mappend = toGFunc<2>([](auto&& lhs, auto&& rhs)
+    constexpr static auto mappend = toFunc([](std::tuple<Ts...> lhs, std::tuple<Ts...> rhs)
     {
-        return std::tuple_cat(lhs, rhs);
-    });
-
-    constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
-    {
-        return std::apply([](auto&&... funcs)
-        {
-            return std::tuple_cat(funcs...);
-        }
-        , nested);
+        constexpr auto mapp = toGFunc<2>(Mappend{});
+        return zipTupleWith(mapp, lhs, rhs);
     });
 };
+
+template <typename... Ts>
+const decltype(std::make_tuple(MonoidType<Ts>::mempty...)) MonoidBase<std::tuple, Ts...>::mempty = std::make_tuple(MonoidType<Ts>::mempty...);
 
 template <typename Data>
 class MonoidBase<Maybe, Data>
@@ -1731,7 +2030,7 @@ struct MonoidTrait<C<Data, Rest...>, std::enable_if_t<!impl::isTupleLikeV<C<Data
 template <typename... Args>
 struct MonoidTrait<std::tuple<Args...>>
 {
-    using Type = Monoid<std::tuple>;
+    using Type = Monoid<std::tuple, std::decay_t<Args>...>;
 };
 
 template <>
@@ -1771,38 +2070,6 @@ struct MonoidTrait<Function<Repr, Ret, FirstArg, Rest...>>
     using Type = Monoid<Function, FirstArg, RetT>;
 };
 
-class Mappend
-{
-public:
-    template <typename MData1, typename MData2>
-    constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
-    {
-        using MType = MonoidType<MData1>;
-        return MType::mappend | lhs | rhs;
-    }
-};
-
-constexpr inline auto mappend = toGFunc<2>(Mappend{});
-
-class Mconcat
-{
-public:
-    template <template <typename...> class C, typename MData, typename... Rest>
-    constexpr auto operator()(C<MData, Rest...> const& data) const
-    {
-        using MType = MonoidType<MData>;
-        return MType::mconcat | data;
-    }
-    template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
-    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
-    {
-        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
-        return MType::mconcat | func;
-    }
-};
-
-constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
-
 /////////// Foldable ///////////
 
 template <template<typename...> typename Type, typename... Args>
@@ -1836,17 +2103,16 @@ public:
     }
 };
 
-template <>
-class Functor<std::tuple>
+template <typename... Init>
+class Functor<std::tuple, Init...>
 {
 public:
-    template <typename Func, typename... Args>
-    constexpr static auto fmap(Func const& func, std::tuple<Args...> const& in)
+    template <typename Func, typename Last>
+    constexpr static auto fmap(Func const& func, std::tuple<Init..., Last> in)
     {
-        return std::apply([&](auto&&... args)
-        {
-            return std::make_tuple(func(args)...);
-        }, in);
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const last = std::get<sizeMinusOne>(in);
+        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(func(std::move(last))));
     }
 };
 
@@ -1930,7 +2196,7 @@ public:
         return Type<std::decay_t<In>>{in};
     }
     template <typename Func, typename Arg>
-    constexpr static auto app(Type<Func> const& func, Type<Arg> const& in)
+    constexpr static auto ap(Type<Func> const& func, Type<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         Type<R> result;
@@ -1955,36 +2221,30 @@ public:
         return ownedRange(SingleView{std::forward<In>(in)});
     }
     template <typename Func, typename Arg, typename Repr1, typename Repr2>
-    constexpr static auto app(Range<Func, Repr1> const& func, Range<Arg, Repr2> const& in)
+    constexpr static auto ap(Range<Func, Repr1> const& func, Range<Arg, Repr2> const& in)
     {
         auto view = MapView{ProductView{func, in}, [](auto&& tuple) { return std::get<0>(tuple)(std::get<1>(tuple)); }};
         return ownedRange(view);
     }
 };
 
-template <>
-class Applicative<std::tuple> : public Functor<std::tuple>
+template <typename... Init>
+class Applicative<std::tuple, Init...> : public Functor<std::tuple, Init...>
 {
 public:
-    template <typename In>
-    constexpr static auto pure(In&& in)
+    template <typename Last>
+    constexpr static auto pure(Last in)
     {
-        return std::make_tuple(std::forward<In>(in));
+        return std::make_tuple(MonoidType<Init>::mempty..., std::move(in));
     }
-    template <typename... Funcs, typename... Args>
-    constexpr static auto app(std::tuple<Funcs...> const& funcs, std::tuple<Args...> const& args)
+    template <typename Func, typename Last>
+    constexpr static auto ap(std::tuple<Init..., Func> const& funcs, std::tuple<Init..., Last> const& args)
     {
-        return std::apply([&](auto&&... funcs_)
-        {
-            auto const f = [&](auto&& func)
-            {
-                return std::apply([&](auto&&... args_)
-                {
-                    return std::make_tuple(func(args_)...);
-                }, args);
-            };
-            return std::tuple_cat(f(funcs_)...);
-        }, funcs);
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const func = std::get<sizeMinusOne>(funcs);
+        auto const last = std::get<sizeMinusOne>(args);
+        auto const init = mappend | takeTuple<sizeMinusOne>(funcs) | takeTuple<sizeMinusOne>(args);
+        return std::tuple_cat(init, std::make_tuple(func(last)));
     }
 };
 
@@ -1992,13 +2252,9 @@ template <>
 class Applicative<Maybe> : public Functor<Maybe>
 {
 public:
-    template <typename In>
-    constexpr static auto pure(In in)
-    {
-        return Maybe<std::decay_t<In>>{Just{in}};
-    }
+    constexpr static auto pure = just;
     template <typename Func, typename Arg>
-    constexpr static auto app(Maybe<Func> const& func, Maybe<Arg> const& in)
+    constexpr static auto ap(Maybe<Func> const& func, Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
@@ -2027,7 +2283,7 @@ public:
         return ioData(std::move(in));
     }
     template <typename Func, typename Arg, typename Func1, typename Func2>
-    constexpr static auto app(IO<Func, Func1> const& func, IO<Arg, Func2> const& in)
+    constexpr static auto ap(IO<Func, Func1> const& func, IO<Arg, Func2> const& in)
     {
         return io([=]{ return func.run()(in.run()); });
     }
@@ -2043,7 +2299,7 @@ public:
         return toFunc([ret=std::move(ret)](FirstArg){ return ret; });
     }
     template <typename Func1, typename Func2>
-    constexpr static auto app(Func1 func, Func2 in)
+    constexpr static auto ap(Func1 func, Func2 in)
     {
         return toFunc(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
@@ -2063,7 +2319,7 @@ public:
         return toGFunc<1>([=](auto){ return ret; });
     }
     template <typename Func1, typename Func2>
-    constexpr static auto app(Func1 func, Func2 in)
+    constexpr static auto ap(Func1 func, Func2 in)
     {
         return toGFunc<1>([f=std::move(func), g=std::move(in)](auto arg) {return f(arg)(g(arg)); });
     }
@@ -2102,32 +2358,32 @@ class IsDeferredPure<DeferredPure<T>> : public std::true_type
 template <typename T>
 constexpr static auto isDeferredPureV = IsDeferredPure<T>::value;
 
-class App
+class Ap
 {
 public:
     template <typename Func, typename Data>
     constexpr auto operator()(DeferredPure<Func> const& func, Data const& data) const
     {
-        using AppType = ApplicativeType<Data>;
-        return AppType::app(AppType::pure(func.mData), data);
+        using ApType = ApplicativeType<Data>;
+        return ApType::ap(ApType::pure(func.mData), data);
     }
     template <typename Func, typename Data>
     constexpr auto operator()(Func const& func, DeferredPure<Data> const& in) const
     {
-        using AppType = ApplicativeType<Func>;
-        return AppType::app(func, AppType::pure(in.mData));
+        using ApType = ApplicativeType<Func>;
+        return ApType::ap(func, ApType::pure(in.mData));
     }
     template <typename Func, typename Data>
     constexpr auto operator()(Func const& func, Data const& in) const
     {
-        using AppType1 = ApplicativeType<Func>;
-        using AppType2 = ApplicativeType<Data>;
-        static_assert(std::is_same_v<AppType1, AppType2>);
-        return AppType1::app(func, in);
+        using ApType1 = ApplicativeType<Func>;
+        using ApType2 = ApplicativeType<Data>;
+        static_assert(std::is_same_v<ApType1, ApType2>);
+        return ApType1::ap(func, in);
     }
 };
 
-constexpr inline auto app = toGFunc<2>(App{});
+constexpr inline auto ap = toGFunc<2>(Ap{});
 
 /////////// Monad ///////////
 
@@ -2187,6 +2443,21 @@ public:
     }
 };
 
+template <typename... Init>
+class MonadBase<std::tuple, Init...>
+{
+public:
+    template <typename Last, typename Func>
+    constexpr static auto bind(std::tuple<Init..., Last> const& args, Func&& func)
+    {
+        constexpr auto sizeMinusOne = sizeof...(Init);
+        auto const last = std::get<sizeMinusOne>(args);
+        auto const lastResult = func | last;
+        auto const init = mappend | takeTuple<sizeMinusOne>(args) | takeTuple<sizeMinusOne>(lastResult);
+        return std::tuple_cat(init, std::make_tuple(std::get<sizeMinusOne>(lastResult)));
+    }
+};
+
 template <>
 class MonadBase<IO>
 {
@@ -2205,7 +2476,7 @@ public:
     template <size_t nbArgs, typename Repr, typename Func>
     constexpr static auto bind(GenericFunction<nbArgs, Repr> const& m, Func k)
     {
-        return (flip | std::move(k)) <app> m;
+        return (flip | std::move(k)) <ap> m;
     }
 };
 
@@ -2216,12 +2487,12 @@ public:
     template <typename Repr, typename Ret, typename... Rest, typename Func>
     constexpr static auto bind(Function<Repr, Ret, FirstArg, Rest...> const& m, Func k)
     {
-        return (flip | std::move(k)) <app> m;
+        return (flip | std::move(k)) <ap> m;
     }
 };
 
 template <typename T>
-using MonadType = typename TypeClassTrait<Monad, T>::Type;
+using MonadType = typename TypeClassTrait<Monad, std::decay_t<T>>::Type;
 
 /////////// MonadPlus //////////
 
@@ -2273,9 +2544,18 @@ constexpr auto show = toGFunc<1>([](auto&& d)
     return os.str();
 });
 
+template <typename T>
+constexpr auto read = toFunc([](std::string const& d)
+{
+    std::stringstream is{d};
+    T t;
+    is >> t;
+    return t;
+});
+
 constexpr auto print = putStrLn <o> show;
 
-template <typename MType, typename T>
+template <typename MType, typename T, typename = std::enable_if_t<std::is_same_v<MType, MonadType<T>>, void>>
 constexpr auto evalDeferredImpl(T&& t)
 {
     return std::forward<T>(t);
@@ -2315,111 +2595,12 @@ constexpr auto operator>>(DeferredPure<Arg> const& arg, MonadData const& data)
     return MType::rshift(evalDeferred<MType> | arg, data);
 }
 
-template <typename MonadData1, typename MonadData2, typename MType = MonadType<MonadData1>>
+template <typename MonadData1, typename MonadData2, typename MType = MonadType<MonadData1>,
+    typename = std::enable_if_t<std::is_same_v<MType, MonadType<MonadData2>> || isDeferredPureV<MonadData2>, bool>>
 constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     return MType::rshift | lhs || evalDeferred<MType> | rhs;
 }
-
-constexpr inline auto elem = toGFunc<2>([](auto t, auto const& c)
-{
-    return std::any_of(c.begin(), c.end(), [t=std::move(t)](auto const& e){return e == t;});
-});
-
-template <typename Repr1, typename Ret1, typename Arg1, typename... Rest1, typename Repr2, typename Ret2, typename Arg2, typename... Rest2>
-constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, Ret2, Arg2, Rest2...> g)
-{
-    return toFunc<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
-}
-
-constexpr inline auto on = toGFunc<2>([](auto f, auto g)
-{
-    return onImpl(std::move(f), std::move(g));
-});
-
-constexpr auto toVector = toGFunc<1>([](auto view)
-{
-    std::vector<std::decay_t<decltype(*view.begin())>> result;
-    for (auto e: view)
-    {
-        result.push_back(std::move(e));
-    }
-    return result;
-});
-
-constexpr inline auto filter = toGFunc<2>([](auto pred, auto data)
-{
-    return ownedRange(FilterView{std::move(data), std::move(pred)});
-});
-
-constexpr inline auto map = toGFunc<2>([](auto func, auto data)
-{
-    return ownedRange(MapView{std::move(data), std::move(func)});
-});
-
-constexpr inline auto zip = toGFunc<2>([](auto lhs, auto rhs)
-{
-    return ownedRange(ZipView{std::move(lhs), std::move(rhs)});
-});
-
-constexpr inline auto zipWith = toGFunc<3>([](auto func, auto lhs, auto rhs)
-{
-    return ownedRange(MapView{ZipView{std::move(lhs), std::move(rhs)}, [func=std::move(func)](auto tu) { return func | std::get<0>(tu) | std::get<1>(tu);}});
-});
-
-constexpr inline auto repeat = toGFunc<1>([](auto data)
-{
-    return ownedRange(RepeatView{std::move(data)});
-});
-
-constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
-{
-    return ownedRange(TakeView{RepeatView{std::move(data)}, times});
-});
-
-constexpr inline auto enumFrom = toGFunc<1>([](auto start)
-{
-    return ownedRange(IotaView{start});
-});
-
-constexpr inline auto length = toGFunc<1>([](auto r)
-{
-    constexpr auto inc = toGFunc<2>([](auto sum, auto){ return sum + 1; });
-    return foldl | inc | 0 | r;
-});
-
-constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
-{
-    return ownedRange(TakeView{r, num});
-});
-
-constexpr inline auto drop = toGFunc<2>([](auto r, size_t num)
-{
-    return ownedRange(DropView{r, num});
-});
-
-constexpr inline auto splitAt = toGFunc<2>([](auto r, size_t num)
-{
-    return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
-});
-
-constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
-{
-    return r;
-});
-
-constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
-{
-    if constexpr(isRangeV<decltype(l)>)
-    {
-        return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
-    }
-    else
-    {
-        l.insert(l.begin(), e);
-        return l;
-    }
-});
 } // namespace hspp
 
 #endif // HSPP_H

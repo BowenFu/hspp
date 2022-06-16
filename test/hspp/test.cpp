@@ -5,6 +5,9 @@
 #include <cmath>
 
 using namespace hspp;
+using namespace std::literals;
+
+constexpr auto toVector = to<std::vector>;
 
 TEST(Range, 1)
 {
@@ -122,7 +125,7 @@ TEST(zipWith, 1)
     std::vector<int> a = {1, 2};
     std::list<int> b = {3, 4, 5};
     auto v = zipWith | toGFunc<2>(std::plus<>{}) | RefView{a} | RefView{b};
-    std::vector<int> result = toVector(v);
+    std::vector<int> result = toVector | v;
     std::vector<int> expected = {4, 6};
     EXPECT_EQ(result, expected);
 }
@@ -262,9 +265,9 @@ TEST(Functor, Range)
 
 TEST(Functor, tuple)
 {
-    auto const tu = std::make_tuple(1, 5.6, "2", true);
+    auto const tu = std::make_tuple(_o_, std::list{5.6}, "2", true);
     auto const result = show <fmap> tu;
-    auto const expected = std::make_tuple("1", "5.6", "2", "true");
+    auto const expected = std::make_tuple(_o_, std::list{5.6}, "2", "true");
     EXPECT_EQ(result, expected);
 }
 
@@ -272,9 +275,9 @@ TEST(Functor, Maybe)
 {
     auto const test = [=](auto f)
     {
-        const Maybe<int> x = Just{1};
+        const Maybe<int> x = just(1);
         const auto y = f <fmap> x;
-        EXPECT_EQ(Just{-1}, y);
+        EXPECT_EQ(just(-1), y);
     };
     const TEFunction<int, int> g = std::negate<>{};
     test(g);
@@ -296,14 +299,6 @@ TEST(Functor, IO)
     test(h);
 }
 
-TEST(Functor, TEFunction)
-{
-    const TEFunction<Maybe<double>, double> f = Applicative<Maybe>::pure<double>;
-    const TEFunction<double, int> g = [](auto e) { return -e; };
-    const auto y = f <fmap> g;
-    EXPECT_EQ(y(1), Just{-1.});
-}
-
 TEST(Functor, GenericFunction)
 {
     constexpr auto g = toGFunc<1>([](auto e) { return -e; });
@@ -316,7 +311,7 @@ TEST(Applicative, vector)
     auto const test = [=](auto f)
     {
         const std::vector<int> x = {3};
-        const auto y = pure(f) <app> x;
+        const auto y = pure(f) <ap> x;
         EXPECT_EQ(y.size(), 1);
         EXPECT_EQ(y.front(), -3);
     };
@@ -332,7 +327,7 @@ TEST(Applicative, list)
     {
         const std::list<int> x = {3, 4};
         const int y = 5;
-        const auto z = pure(f) <app> x <app> pure(y);
+        const auto z = pure(f) <ap> x <ap> pure(y);
         EXPECT_EQ(z.size(), 2);
         const auto u = {15, 20};
         EXPECT_TRUE(std::equal(z.begin(), z.end(), u.begin()));
@@ -343,12 +338,21 @@ TEST(Applicative, list)
     test(h);
 }
 
+TEST(Applicative, list2)
+{
+    const std::list<int> x = {3, 4};
+    const std::list<bool> y = {true, false};
+    const auto z = pure(makeTuple<>) <ap> x <ap> y;
+    const auto u = std::list{std::make_tuple(3, true),std::make_tuple(3, false), std::make_tuple(4, true),std::make_tuple(4, false)};
+    EXPECT_EQ(z, u);
+}
+
 TEST(Applicative, range)
 {
     auto const test = [=](auto f)
     {
         const std::list<int> x = {3, 4};
-        const auto z = pure(f) <app> nonOwnedRange(x);
+        const auto z = pure(f) <ap> nonOwnedRange(x);
         std::vector<int> zz = toVector(z);
         const auto u = {-3, -4};
         EXPECT_EQ(zz.size(), u.size());
@@ -362,9 +366,9 @@ TEST(Applicative, range)
 
 TEST(Applicative, tuple)
 {
-    const auto x = std::make_tuple(3, "4");
-    const auto result = pure(show) <app> x;
-    const auto expected = std::make_tuple("3", "4");
+    const auto x = std::make_tuple(all | true, 4);
+    const auto result = pure(show) <ap> x;
+    const auto expected = std::make_tuple(all | true, "4");
     EXPECT_EQ(result, expected);
 }
 
@@ -374,10 +378,10 @@ TEST(Applicative, range1)
     {
         const std::list<int> x = {3, 4};
         const std::list<int> y = {5, 6};
-        const auto z0 = pure(f) <app> nonOwnedRange(x);
+        const auto z0 = pure(f) <ap> nonOwnedRange(x);
         auto result0 = toVector(z0);
         EXPECT_EQ(result0.size(), 2);
-        const auto z = z0 <app> nonOwnedRange(y);
+        const auto z = z0 <ap> nonOwnedRange(y);
         auto result = toVector(z);
         EXPECT_EQ(result.size(), 4);
         const auto u = {15, 18, 20, 24};
@@ -395,10 +399,10 @@ TEST(Applicative, range2)
     {
         const std::list<int> x = {3, 4};
         const std::list<size_t> y = {1U, 2U};
-        const auto z0 = pure(f) <app> nonOwnedRange(x);
+        const auto z0 = pure(f) <ap> nonOwnedRange(x);
         auto result0 = toVector(z0);
         EXPECT_EQ(result0.size(), 2);
-        const auto z = z0 <app> nonOwnedRange(y);
+        const auto z = z0 <ap> nonOwnedRange(y);
         auto result = toVector(toVector <fmap> z);
         EXPECT_EQ(result.size(), 4);
         const std::vector<std::vector<int>> u = {{3}, {3, 3}, {4}, {4, 4}};
@@ -412,8 +416,8 @@ TEST(Applicative, Maybe)
     auto const test = [=](auto f)
     {
         const Maybe<int> x = {1};
-        const auto y = pure(f) <app> x;
-        EXPECT_EQ(Just{-1}, y);
+        const auto y = pure(f) <ap> x;
+        EXPECT_EQ(just(-1), y);
     };
     const TEFunction<int, int> g = std::negate<>{};
     test(g);
@@ -426,7 +430,7 @@ TEST(Applicative, IO)
     auto const test = [=](auto f)
     {
         const auto x = ioData(42);
-        const auto y = pure(f) <app> x;
+        const auto y = pure(f) <ap> x;
         EXPECT_EQ(-42, y.run());
     };
     const TEFunction<int, int> g = std::negate<>{};
@@ -439,7 +443,7 @@ TEST(Applicative, TEFunction)
 {
     const TEFunction<int, std::string> u = [](std::string const& str) { return str.size(); };
     const TEFunction<std::string, bool> f = [](bool x) { return x ? "true" : "false"; };
-    const auto y = pure(u) <app> f;
+    const auto y = pure(u) <ap> f;
     EXPECT_EQ(y(true), 4);
     EXPECT_EQ(y(false), 5);
 }
@@ -448,7 +452,7 @@ TEST(Applicative, GenericFunction)
 {
     const auto u = toGFunc<1>([](std::string const& str) { return str.size(); });
     const auto f = toGFunc<1>([](auto x) { return x ? "true" : "false"; });
-    const auto y = pure(u) <app> f;
+    const auto y = pure(u) <ap> f;
     EXPECT_EQ(y(true), 4);
     EXPECT_EQ(y(false), 5);
 }
@@ -511,19 +515,17 @@ TEST(Monad, Range)
         auto const u = {3, -3, 4, -4, 5, -5, 6, -6};
         EXPECT_TRUE(std::equal(result.begin(), result.end(), u.begin()));
     };
-    auto const thisAndNeg = [](int x) { return std::list<int>{x, -x}; };
-    const TEFunction<std::list<int>, int> thisAndNeg1 = thisAndNeg;
-    test(thisAndNeg1);
+    auto const thisAndNeg = [](int x) { return ownedRange(ChainView{SingleView{x}, SingleView{-x}}); };
     const auto thisAndNeg2 = toFunc(thisAndNeg);
     test(thisAndNeg2);
 }
 
 TEST(Monad, tuple)
 {
-    auto const thisAndRepr = [](auto x) { return std::make_tuple(x, show | x); };
-    auto const x = std::make_tuple(3, true);
+    auto const thisAndRepr = [](auto x) { return std::make_tuple(all | true, show | x); };
+    auto const x = std::make_tuple(all | false, true);
     auto const result = x >>= thisAndRepr;
-    const auto expected = std::make_tuple(3, "3", true, "true");
+    const auto expected = std::make_tuple(all | false, "true"s);
     EXPECT_EQ(result, expected);
 }
 
@@ -536,7 +538,7 @@ TEST(Monad, Maybe)
         const auto z = x >>= filterEven;
         const auto u = y >>= filterEven;
         EXPECT_EQ(z, nothing);
-        EXPECT_EQ(u, Just{4});
+        EXPECT_EQ(u, just(4));
     };
     auto const filterEven = [](int x)-> Maybe<int> { return x%2==0 ? Maybe<int>{x} : Maybe<int>{}; };
     const TEFunction<Maybe<int>, int> filterEven1 = filterEven;
@@ -555,7 +557,6 @@ TEST(Monad, IO)
 {
     testing::internal::CaptureStdout();
 
-    using namespace std::literals;
     const auto x = return_("3");
     const auto y = return_("4");
 
@@ -654,7 +655,7 @@ TEST(IO, myAction)
             return l + r;
         }
     );
-    auto const myAction = f <fmap> getLine <app> getLine;
+    auto const myAction = f <fmap> getLine <ap> getLine;
     (void)myAction;
 }
 
@@ -662,7 +663,7 @@ TEST(Function, myFunc)
 {
     constexpr auto myFunc = toFunc(std::plus<int>{})
                      <fmap> toFunc([](int x) { return x + 3;})
-                      <app> toFunc([](int x) { return x * 100; });
+                      <ap> toFunc([](int x) { return x * 100; });
     EXPECT_EQ(myFunc(5), 508);
 }
 
@@ -670,8 +671,8 @@ TEST(Function, myFunc2)
 {
     constexpr auto myFunc = toFunc([](float x, float y, float z) { return std::vector{x, y, z}; })
                      <fmap> toFunc([](float x) { return x + 3;})
-                      <app> toFunc([](float x) { return x * 2; })
-                      <app> toFunc([](float x) { return x / 2; });
+                      <ap> toFunc([](float x) { return x * 2; })
+                      <ap> toFunc([](float x) { return x / 2; });
     auto const result = myFunc(5);
     auto const expected = {8.0,10.0,2.5};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
@@ -715,7 +716,6 @@ TEST(map, 1)
 
 TEST(replicate, 1)
 {
-    using namespace std::literals;
     auto const str = "3";
     auto const x = replicate | str | 4U;
     auto const z = toVector(x);
@@ -827,7 +827,6 @@ TEST(equalTo, x)
 TEST(equalTo, 2)
 {
     constexpr auto f = length <o> (filter || equalTo | 'a');
-    using namespace std::literals;
 
     EXPECT_EQ(f | "abracadabra"sv, 5);
 }
@@ -839,6 +838,12 @@ TEST(print, 1)
     io.run();
     std::string output1 = testing::internal::GetCapturedStdout();
     EXPECT_EQ(output1, "3\n");
+}
+
+TEST(read, 1)
+{
+    auto const i = hspp::read<int> | "3";
+    EXPECT_EQ(i, 3);
 }
 
 TEST(Monoid, vector)
@@ -879,6 +884,15 @@ TEST(Monoid, list)
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
+TEST(Monoid, ZipList)
+{
+    auto const nested = std::list{zipList || sum <fmap> std::list{1, 2}, zipList || sum <fmap> std::list{3, 4}};
+    auto v = mconcat | nested;
+    auto const result = toVector(v);
+    auto const expected = sum <fmap> std::vector{4, 6};
+    EXPECT_EQ(result, expected);
+}
+
 TEST(Monoid, range2)
 {
     auto const a = std::vector{1, 2};
@@ -892,9 +906,9 @@ TEST(Monoid, range2)
 
 TEST(Monoid, maybe)
 {
-    auto const nested = std::list{Maybe{product(2)}, Maybe<Product<int>>{}, Maybe{product(3)}};
+    auto const nested = std::list{just(product(2)), Maybe<Product<int>>{}, just(product(3))};
     auto const result = mconcat | nested;
-    auto const expected = Maybe{product(6)};
+    auto const expected = just(product(6));
     EXPECT_EQ(result, expected);
 }
 
@@ -941,14 +955,14 @@ TEST(Monoid, any)
 
 TEST(Monoid, first)
 {
-    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, Maybe{2}};
-    EXPECT_EQ(result, Maybe{2});
+    auto const result = getFirst <o> mconcat <o> (map | first) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    EXPECT_EQ(result, just(2));
 }
 
 TEST(Monoid, last)
 {
-    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, Maybe{2}};
-    EXPECT_EQ(result, Maybe{2});
+    auto const result = getLast <o> mconcat <o> (map | last) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    EXPECT_EQ(result, just(3));
 }
 
 TEST(Monoid, Ordering)
@@ -985,26 +999,26 @@ TEST(Monoid, Function)
 
 TEST(Monoid, Tuple)
 {
-    auto const x = std::make_tuple(1, std::string{"123"});
-    auto const y = std::make_tuple(true);
-    auto const z = x <mappend> y <mappend> _o_;
-    EXPECT_EQ(z, std::make_tuple(1, std::string("123"), true));
+    auto const x = std::make_tuple(sum | 1, std::string{"123"});
+    auto const y = std::make_tuple(sum | 0, std::string{"23"});
+    auto const z = x <mappend> y;
+    EXPECT_EQ(z, std::make_tuple(sum | 1, std::string("12323")));
 
-    auto const result = mconcat | std::tuple{y, std::make_tuple(_o_), x};
-    EXPECT_EQ(result, std::make_tuple(true, _o_, 1, std::string("123")));
+    auto const result = mconcat | std::list{x, y};
+    EXPECT_EQ(result, std::make_tuple(sum | 1, std::string("12323")));
 }
 
 TEST(Maybe, 1)
 {
-    auto result = Maybe<std::string>{"andy"} <mappend> Maybe<std::string>{};
-    EXPECT_EQ(result, Just<std::string>{"andy"});
-    result = Maybe<std::string>{"andy"} <mappend> Maybe<std::string>{"123"};
-    EXPECT_EQ(result, Just<std::string>{"andy123"});
-    result = Maybe<std::string>{} <mappend> Maybe<std::string>{};
+    auto result = just("andy"s) <mappend> nothing;
+    EXPECT_EQ(result, just("andy"s));
+    result = just("andy"s) <mappend> just("123"s);
+    EXPECT_EQ(result, just("andy123"s));
+    result = Maybe<std::string>{nothing} <mappend> Maybe<std::string>{nothing};
     EXPECT_EQ(result, nothing);
 
-    result = mconcat | std::vector{Maybe<std::string>{"123"}, Maybe<std::string>{"xxx"}};
-    EXPECT_EQ(result, Just<std::string>{"123xxx"});
+    result = mconcat | std::vector{just("123"s), just("xxx"s)};
+    EXPECT_EQ(result, just("123xxx"s));
 }
 
 TEST(Monad, WalkTheLine)
@@ -1030,7 +1044,7 @@ TEST(Monad, WalkTheLine)
         return Maybe<Pole>{};
     });
     auto const result = (((return_ | Pole{0,0}) >>= (landRight | 2)) >>= (landLeft | 2)) >>= (landRight | 2);
-    EXPECT_EQ(result, Just(Pole(2, 4)));
+    EXPECT_EQ(result, just(Pole(2, 4)));
 
     auto const result2 = ((((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= (landRight | 4)) >>= (landLeft | -1)) >>= (landRight | -2);
     EXPECT_EQ(result2, nothing);
@@ -1069,7 +1083,7 @@ TEST(Applicative, vec)
         return std::make_pair(n,ch);
     })
     <fmap> std::vector{1,2}
-    <app> std::vector{'a','b'};
+    <ap> std::vector{'a','b'};
 
     auto const expected = std::vector<std::pair<int, char>>{
         std::make_pair(1,'a'),
@@ -1092,7 +1106,7 @@ TEST(Copy, View)
 TEST(MonadPlus, guard)
 {
     auto const result = guard<Maybe>(5 > 2);
-    EXPECT_EQ(result, Maybe{_o_});
+    EXPECT_EQ(result, just(_o_));
 
     auto const result1 = guard<Maybe>(1 > 2);
     EXPECT_EQ(result1, nothing);
