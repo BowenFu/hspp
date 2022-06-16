@@ -2492,7 +2492,7 @@ public:
 };
 
 template <typename T>
-using MonadType = typename TypeClassTrait<Monad, T>::Type;
+using MonadType = typename TypeClassTrait<Monad, std::decay_t<T>>::Type;
 
 /////////// MonadPlus //////////
 
@@ -2555,7 +2555,7 @@ constexpr auto read = toFunc([](std::string const& d)
 
 constexpr auto print = putStrLn <o> show;
 
-template <typename MType, typename T>
+template <typename MType, typename T, typename = std::enable_if_t<std::is_same_v<MType, MonadType<T>>, void>>
 constexpr auto evalDeferredImpl(T&& t)
 {
     return std::forward<T>(t);

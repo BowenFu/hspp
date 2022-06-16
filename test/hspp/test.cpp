@@ -515,9 +515,7 @@ TEST(Monad, Range)
         auto const u = {3, -3, 4, -4, 5, -5, 6, -6};
         EXPECT_TRUE(std::equal(result.begin(), result.end(), u.begin()));
     };
-    auto const thisAndNeg = [](int x) { return std::list<int>{x, -x}; };
-    const TEFunction<std::list<int>, int> thisAndNeg1 = thisAndNeg;
-    test(thisAndNeg1);
+    auto const thisAndNeg = [](int x) { return ownedRange(ChainView{SingleView{x}, SingleView{-x}}); };
     const auto thisAndNeg2 = toFunc(thisAndNeg);
     test(thisAndNeg2);
 }
