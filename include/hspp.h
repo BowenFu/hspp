@@ -2344,6 +2344,15 @@ constexpr auto show = toGFunc<1>([](auto&& d)
     return os.str();
 });
 
+template <typename T>
+constexpr auto read = toFunc([](std::string const& d)
+{
+    std::stringstream is{d};
+    T t;
+    is >> t;
+    return t;
+});
+
 constexpr auto print = putStrLn <o> show;
 
 template <typename MType, typename T>

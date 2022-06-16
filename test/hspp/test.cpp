@@ -839,6 +839,12 @@ TEST(print, 1)
     EXPECT_EQ(output1, "3\n");
 }
 
+TEST(read, 1)
+{
+    auto const i = hspp::read<int> | "3";
+    EXPECT_EQ(i, 3);
+}
+
 TEST(Monoid, vector)
 {
     auto const l = std::vector{1, 2, 3};
