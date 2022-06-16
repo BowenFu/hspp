@@ -7,6 +7,8 @@
 using namespace hspp;
 using namespace std::literals;
 
+constexpr auto toVector = to<std::vector>;
+
 TEST(Range, 1)
 {
     auto vv = MapView{ProductView{SingleView{42}},
@@ -123,7 +125,7 @@ TEST(zipWith, 1)
     std::vector<int> a = {1, 2};
     std::list<int> b = {3, 4, 5};
     auto v = zipWith | toGFunc<2>(std::plus<>{}) | RefView{a} | RefView{b};
-    std::vector<int> result = toVector(v);
+    std::vector<int> result = toVector | v;
     std::vector<int> expected = {4, 6};
     EXPECT_EQ(result, expected);
 }
@@ -882,6 +884,15 @@ TEST(Monoid, list)
     std::decay_t<decltype(result)> x;
     auto const expected = {1, 2, 3, 4};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
+}
+
+TEST(Monoid, ZipList)
+{
+    auto const nested = std::list{zipList || sum <fmap> std::list{1, 2}, zipList || sum <fmap> std::list{3, 4}};
+    auto v = mconcat | nested;
+    auto const result = toVector(v);
+    auto const expected = sum <fmap> std::vector{4, 6};
+    EXPECT_EQ(result, expected);
 }
 
 TEST(Monoid, range2)
