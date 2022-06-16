@@ -2595,7 +2595,8 @@ constexpr auto operator>>(DeferredPure<Arg> const& arg, MonadData const& data)
     return MType::rshift(evalDeferred<MType> | arg, data);
 }
 
-template <typename MonadData1, typename MonadData2, typename MType = MonadType<MonadData1>>
+template <typename MonadData1, typename MonadData2, typename MType = MonadType<MonadData1>,
+    typename = std::enable_if_t<std::is_same_v<MType, MonadType<MonadData2>> || isDeferredPureV<MonadData2>, bool>>
 constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     return MType::rshift | lhs || evalDeferred<MType> | rhs;
