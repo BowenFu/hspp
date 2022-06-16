@@ -344,6 +344,15 @@ TEST(Applicative, list)
     test(h);
 }
 
+TEST(Applicative, list2)
+{
+    const std::list<int> x = {3, 4};
+    const std::list<bool> y = {true, false};
+    const auto z = pure(makeTuple<>) <ap> x <ap> y;
+    const auto u = std::list{std::make_tuple(3, true),std::make_tuple(3, false), std::make_tuple(4, true),std::make_tuple(4, false)};
+    EXPECT_EQ(z, u);
+}
+
 TEST(Applicative, range)
 {
     auto const test = [=](auto f)

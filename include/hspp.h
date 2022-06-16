@@ -2500,6 +2500,13 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
         return l;
     }
 });
+
+template <size_t N=2>
+constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
+{
+    return std::make_tuple(std::move(e), std::move(l)...);
+});
+
 } // namespace hspp
 
 #endif // HSPP_H
