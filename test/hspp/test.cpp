@@ -5,9 +5,10 @@
 #include <cmath>
 
 using namespace hspp;
+using namespace hspp::data;
 using namespace std::literals;
 
-constexpr auto toVector = to<std::vector>;
+constexpr auto toVector = data::to<std::vector>;
 
 TEST(Range, 1)
 {
@@ -776,7 +777,7 @@ TEST(foldr, 1)
     {
         return l + acc;
     });
-    auto const x = foldr | f | std::string{};
+    auto const x = hspp::foldr | f | std::string{};
     auto const l = std::vector{"1", "2", "3"};
     auto const result = x | l;
     EXPECT_EQ(result, "123");
@@ -785,9 +786,9 @@ TEST(foldr, 1)
 TEST(fold, 1)
 {
     constexpr auto pow = toGFunc<2>([](auto x, auto y) { return std::pow(x, y); });
-    auto const r1 = foldr | pow | 2.f | IotaView{1.f, 4.f};
+    auto const r1 = foldr | pow | 2.f | ownedRange(IotaView{1.f, 4.f});
     EXPECT_EQ(r1, 1);
-    auto const r2 = foldl | pow | 2.f | IotaView{1.f, 4.f};
+    auto const r2 = foldl | pow | 2.f | ownedRange(IotaView{1.f, 4.f});
     EXPECT_EQ(r2, 64);
 }
 
@@ -864,22 +865,11 @@ TEST(Monoid, string)
     EXPECT_EQ(result, expected);
 }
 
-TEST(Monoid, range)
-{
-    auto const l = std::vector{1, 2, 3};
-    auto const r = std::vector{4, 5, 6};
-    auto const result_ = nonOwnedRange(l) <mappend> nonOwnedRange(r);
-    auto const result = toVector(result_);
-    auto const expected = {1, 2, 3, 4, 5, 6};
-    EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
-}
-
 TEST(Monoid, list)
 {
     std::list<std::list<int>> nested = {{1, 2}, {3, 4}};
     auto v = mconcat | nested;
     auto const result = toVector(v);
-    std::decay_t<decltype(result)> x;
     auto const expected = {1, 2, 3, 4};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
@@ -893,7 +883,28 @@ TEST(Monoid, ZipList)
     EXPECT_EQ(result, expected);
 }
 
+TEST(Monoid, range)
+{
+    auto const l = std::vector{1, 2, 3};
+    auto const r = std::vector{4, 5, 6};
+    auto const result_ = nonOwnedRange(l) <mappend> nonOwnedRange(r);
+    auto const result = toVector(result_);
+    auto const expected = {1, 2, 3, 4, 5, 6};
+    EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
+}
+
 TEST(Monoid, range2)
+{
+    auto const a = std::vector{1, 2};
+    auto const b = std::vector{3, 4};
+    auto nested = std::tuple{nonOwnedRange(a), nonOwnedRange(b)};
+    auto v = mconcat | nested;
+    auto const result = toVector(v);
+    auto const expected = {1, 2, 3, 4};
+    EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
+}
+
+TEST(Monoid, range3)
 {
     auto const a = std::vector{1, 2};
     auto const b = std::vector{3, 4};
@@ -1006,6 +1017,37 @@ TEST(Monoid, Tuple)
 
     auto const result = mconcat | std::list{x, y};
     EXPECT_EQ(result, std::make_tuple(sum | 1, std::string("12323")));
+}
+
+TEST(Monoid, endo)
+{
+    auto const result = appEndo || (endo | id) <mappend> (endo | show);
+    EXPECT_EQ(result | 2, "2");
+}
+
+TEST(Foldable, list)
+{
+    std::list<std::list<int>> nested = {{1, 2}, {3, 4}};
+    auto v = fold | nested;
+    auto const result = toVector(v);
+    auto const expected = std::vector{1, 2, 3, 4};
+    EXPECT_EQ(result, expected);
+}
+
+TEST(Foldable, list2)
+{
+    auto const nested = std::vector{3, 4};
+    auto const result = foldMap | sum | nested;
+    auto const expected = sum | 7;
+    EXPECT_EQ(result, expected);
+}
+
+TEST(Foldable, tuple)
+{
+    std::list<std::tuple<Sum<int>, All>> nested = {{1, true}, {3, false}};
+    auto result = fold | nested;
+    std::tuple<Sum<int>, All> const expected = {4, false};
+    EXPECT_EQ(result, expected);
 }
 
 TEST(Maybe, 1)
