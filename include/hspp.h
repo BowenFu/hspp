@@ -323,7 +323,7 @@ constexpr auto toGFunc(Func const& func)
 
 constexpr inline auto id = toGFunc<1>([](auto data)
 {
-    return std::move(data);
+    return data;
 });
 
 constexpr auto just = toGFunc<1>([](auto d)
