@@ -74,7 +74,25 @@ constexpr decltype(auto) takeTuple(Tuple &&t)
 template <std::size_t len, class Tuple>
 using TakeTupleType = std::decay_t<decltype(takeTuple<len>(std::declval<Tuple>()))>;
 
+template <typename... Ts>
+class Overload : Ts...
+{
+public:
+    constexpr Overload(Ts... ts)
+    : Ts{ts}...
+    {}
+    using Ts::operator()...;
+};
 
+template <typename... Ts>
+auto overload(Ts&&... ts)
+{
+    return Overload<Ts...>{std::forward<Ts>(ts)...};
+}
+
+
+namespace data
+{
 template <typename Data>
 class Maybe;
 
@@ -122,22 +140,6 @@ public:
         return std::get<Just<Data>>(*this).data;
     }
 };
-
-template <typename... Ts>
-class Overload : Ts...
-{
-public:
-    constexpr Overload(Ts... ts)
-    : Ts{ts}...
-    {}
-    using Ts::operator()...;
-};
-
-template <typename... Ts>
-auto overload(Ts&&... ts)
-{
-    return Overload<Ts...>{std::forward<Ts>(ts)...};
-}
 
 template <typename T>
 constexpr bool operator== (Maybe<T> const& lhs, Maybe<T> const& rhs)
@@ -321,7 +323,7 @@ constexpr auto toGFunc(Func const& func)
 
 constexpr inline auto id = toGFunc<1>([](auto data)
 {
-    return std::move(data);
+    return data;
 });
 
 constexpr auto just = toGFunc<1>([](auto d)
@@ -1308,6 +1310,10 @@ namespace impl
     }
 } // namespace impl
 
+using impl::isContainerV;
+using impl::isTupleLikeV;
+using impl::hasReverseIteratorsV;
+
 constexpr auto flip = toGFunc<1>([](auto func)
 {
     return impl::flipImpl(std::move(func));
@@ -1335,9 +1341,9 @@ constexpr auto foldrRecur(Iter1 begin, Iter2 end, Init init, Func func) -> Init
     return init;
 }
 
-constexpr auto foldr = toGFunc<3>([](auto func, auto init, auto const& list)
+constexpr auto listFoldr = toGFunc<3>([](auto func, auto init, auto const& list)
 {
-    if constexpr (impl::hasReverseIteratorsV<decltype(list)>)
+    if constexpr (data::hasReverseIteratorsV<decltype(list)>)
     {
         return accumulate(list.rbegin(), list.rend(), init, unCurry <o> flip | func);
     }
@@ -1349,11 +1355,12 @@ constexpr auto foldr = toGFunc<3>([](auto func, auto init, auto const& list)
 
 constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 {
-    return hspp::accumulate(list.begin(), list.end(), init, unCurry | func);
+    return data::accumulate(list.begin(), list.end(), init, unCurry | func);
 });
 
 constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
 
+// constexpr inline auto elem = any <o> equalTo;
 constexpr inline auto elem = toGFunc<2>([](auto t, auto const& c)
 {
     return std::any_of(c.begin(), c.end(), [t=std::move(t)](auto const& e){return e == t;});
@@ -1461,7 +1468,19 @@ constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
     return std::make_tuple(std::move(e), std::move(l)...);
 });
 
-/////////////// TypeClass //////////////////
+} // namespace data
+
+using data::o;
+using data::_o_;
+using data::_O_;
+using data::flip;
+using data::putStrLn;
+using data::toFunc;
+using data::toGFunc;
+using data::unCurry;
+using data::id;
+
+/////////////// TypeClass Traits //////////////////
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT,  typename T>
 struct TypeClassTrait;
@@ -1473,9 +1492,9 @@ struct TypeClassTrait<TypeClassT, C<Args...>>
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Repr, typename Ret, typename Arg, typename... Rest>
-struct TypeClassTrait<TypeClassT, Function<Repr, Ret, Arg, Rest...>>
+struct TypeClassTrait<TypeClassT, data::Function<Repr, Ret, Arg, Rest...>>
 {
-    using Type = TypeClassT<Function, Arg>;
+    using Type = TypeClassT<data::Function, Arg>;
 };
 
 template <typename>
@@ -1484,7 +1503,7 @@ class DummyTemplateClass{};
 struct GenericFunctionTag{};
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, size_t nbArgs, typename Repr>
-struct TypeClassTrait<TypeClassT, GenericFunction<nbArgs, Repr>>
+struct TypeClassTrait<TypeClassT, data::GenericFunction<nbArgs, Repr>>
 {
     using Type = TypeClassT<DummyTemplateClass, GenericFunctionTag>;
 };
@@ -1507,12 +1526,75 @@ struct TypeClassTrait<TypeClassT, std::tuple<Args...>>
     using Type = typename impl::TupleTypeClassTrait<TypeClassT, TakeTupleType<sizeof...(Args)-1, std::tuple<Args...>>>::Type;
 };
 
-/////////// Monoid ///////////
+/////////////// Functor Traits ///////////////
+
+template <template<typename...> typename Type, typename... Ts>
+class Functor;
+
+template <typename T>
+using FunctorType = typename TypeClassTrait<Functor, T>::Type;
+
+class Fmap
+{
+public:
+    template <typename Func, typename Data>
+    constexpr auto operator()(Func const& func, Data const& data) const
+    {
+        using FType = FunctorType<Data>;
+        return FType::fmap(func, data);
+    }
+};
+
+constexpr inline auto fmap = toGFunc<2>(Fmap{});
+
+template <template<typename...> typename Type, typename... Args>
+class Foldable;
+
+template <typename T>
+using FoldableType = typename TypeClassTrait<Foldable, std::decay_t<T>>::Type;
+
+class Fold
+{
+public:
+    template <template <typename...> class T, typename MData, typename... Rest, typename FType = FoldableType<T<MData, Rest...>>>
+    constexpr auto operator()(T<MData, Rest...> const& data) const
+    {
+        return FType::fold | data;
+    }
+};
+
+constexpr inline auto fold = toGFunc<1>(Fold{});
+
+class Foldr
+{
+public:
+    template <typename Func, typename Init, template <typename...> class T, typename MData, typename... Rest, typename FType = FoldableType<T<MData, Rest...>>>
+    constexpr auto operator()(Func func, Init init, T<MData, Rest...> const& list) const
+    {
+        return FType::foldr | func | init | list;
+    }
+};
+
+constexpr inline auto foldr = toGFunc<3>(Foldr{});
+
+class FoldMap
+{
+public:
+    template <typename Func, template <typename...> class T, typename MData, typename... Rest, typename FType = FoldableType<T<MData, Rest...>>>
+    constexpr auto operator()(Func&& func, T<MData, Rest...> const& data) const
+    {
+        return FType::foldMap | func | data;
+    }
+};
+
+constexpr inline auto foldMap = toGFunc<2>(FoldMap{});
+
+/////////////// Monoid Traits ///////////////
 
 template <template<typename...> typename Type, typename... Args>
 class Monoid;
 
-template <typename T, typename Enable=void>
+template <typename T>
 struct MonoidTrait;
 
 template <typename T>
@@ -1541,31 +1623,36 @@ public:
         return MType::mconcat | data;
     }
     template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
-    constexpr auto operator()(Function<Repr, Ret, FirstArg, Rest...> const& func) const
+    constexpr auto operator()(data::Function<Repr, Ret, FirstArg, Rest...> const& func) const
     {
-        using MType = MonoidType<Function<Repr, Ret, FirstArg, Rest...>>;
+        using MType = MonoidType<data::Function<Repr, Ret, FirstArg, Rest...>>;
         return MType::mconcat | func;
     }
 };
 
 constexpr inline auto mconcat = toGFunc<1>(Mconcat{});
 
+/////////////// Monoid ///////////////
+
 template <typename MType>
 class MonoidConcat
 {
 public:
-    constexpr static auto mconcat = toGFunc<1>([](auto v) { return foldl | MType::mappend | MType::mempty | v; });
+    constexpr static auto mconcat = toGFunc<1>([](auto v) { return data::foldl | MType::mappend | MType::mempty | v; });
 };
 
 template <template<typename...> typename Type, typename... Args>
-class MonoidBase
+class MonoidBase{};
+
+template <template<typename...> typename Type, typename... Args>
+class MonoidBaseImpl
 {
 public:
     const static Type<Args...> mempty;
 
-    constexpr static auto mappend = toFunc([](Type<Args...> const& lhs, Type<Args...> const& rhs)
+    constexpr static auto mappend = data::toFunc([](Type<Args...> const& lhs, Type<Args...> const& rhs)
     {
-        auto const r = ChainView{RefView{lhs}, RefView{rhs}};
+        auto const r = data::ChainView{data::RefView{lhs}, data::RefView{rhs}};
         Type<Args...> result;
         for (auto e : r)
         {
@@ -1576,7 +1663,16 @@ public:
 };
 
 template <template<typename...> typename Type, typename... Args>
-const Type<Args...> MonoidBase<Type, Args...>::mempty{};
+const Type<Args...> MonoidBaseImpl<Type, Args...>::mempty{};
+
+template <typename... Args>
+class MonoidBase<std::vector, Args...> : public MonoidBaseImpl<std::vector, Args...>{};
+
+template <typename... Args>
+class MonoidBase<std::list, Args...> : public MonoidBaseImpl<std::list, Args...>{};
+
+template <typename... Args>
+class MonoidBase<std::basic_string, Args...> : public MonoidBaseImpl<std::basic_string, Args...>{};
 
 template <typename Data>                                        
 class DataHolder                                                 
@@ -1638,17 +1734,17 @@ public:
 };
 
 template <typename Data>
-class First : public DataHolder<Maybe<Data>>
+class First : public DataHolder<data::Maybe<Data>>
 {
 public:
-    using DataHolder<Maybe<Data>>::DataHolder;
+    using DataHolder<data::Maybe<Data>>::DataHolder;
 };
 
 template <typename Data>
-class Last : public DataHolder<Maybe<Data>>
+class Last : public DataHolder<data::Maybe<Data>>
 {
 public:
-    using DataHolder<Maybe<Data>>::DataHolder;
+    using DataHolder<data::Maybe<Data>>::DataHolder;
 };
 
 template <typename Data>
@@ -1723,6 +1819,13 @@ public:
     }
 };
 
+template <typename Func>
+class Endo : public DataHolder<Func>
+{
+public:
+    using DataHolder<Func>::DataHolder;
+};
+
 constexpr auto product = toType<Product>;
 constexpr auto sum = toType<Sum>;
 constexpr auto all = toType<AllImpl>;
@@ -1741,6 +1844,7 @@ constexpr auto zipList = toGFunc<1>([](auto data)
 {
     return ZipList{data};                                     
 });
+constexpr auto endo = toType<Endo>;
 
 constexpr auto getProduct = from;
 constexpr auto getSum = from;
@@ -1749,6 +1853,7 @@ constexpr auto getAny = from;
 constexpr auto getFirst = from;
 constexpr auto getLast = from;
 constexpr auto getZipList = from;
+constexpr auto appEndo = from;
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
@@ -1759,7 +1864,7 @@ class MonoidBase<Product, Data>
 public:
     constexpr static auto mempty = Product<Data>{1};
 
-    constexpr static auto mappend = toFunc([](Product<Data> const& lhs, Product<Data> const& rhs)
+    constexpr static auto mappend = data::toFunc([](Product<Data> const& lhs, Product<Data> const& rhs)
     {
         return Product<Data>{lhs.get() * rhs.get()};
     });
@@ -1771,7 +1876,7 @@ class MonoidBase<Sum, Data>
 public:
     constexpr static auto mempty = Sum<Data>{0};
 
-    constexpr static auto mappend = toFunc([](Sum<Data> const& lhs, Sum<Data> const& rhs)
+    constexpr static auto mappend = data::toFunc([](Sum<Data> const& lhs, Sum<Data> const& rhs)
     {
         return Sum<Data>{lhs.get() + rhs.get()};
     });
@@ -1783,7 +1888,7 @@ class MonoidBase<DummyTemplateClass, Any>
 public:
     constexpr static auto mempty = Any{false};
 
-    constexpr static auto mappend = toFunc([](Any lhs, Any rhs)
+    constexpr static auto mappend = data::toFunc([](Any lhs, Any rhs)
     {
         return Any{lhs.get() || rhs.get()};
     });
@@ -1795,7 +1900,7 @@ class MonoidBase<DummyTemplateClass, All>
 public:
     constexpr static auto mempty = All{true};
 
-    constexpr static auto mappend = toFunc([](All lhs, All rhs)
+    constexpr static auto mappend = data::toFunc([](All lhs, All rhs)
     {
         return All{lhs.get() && rhs.get()};
     });
@@ -1805,11 +1910,11 @@ template <typename Data>
 class MonoidBase<First, Data>
 {
 public:
-    constexpr static auto mempty = First<Data>{nothing};
+    constexpr static auto mempty = First<Data>{data::nothing};
 
-    constexpr static auto mappend = toFunc([](First<Data> lhs, First<Data> rhs)
+    constexpr static auto mappend = data::toFunc([](First<Data> lhs, First<Data> rhs)
     {
-        return (getFirst | lhs) == nothing ? rhs : lhs;
+        return (getFirst | lhs) == data::nothing ? rhs : lhs;
     });
 };
 
@@ -1817,11 +1922,11 @@ template <typename Data>
 class MonoidBase<Last, Data>
 {
 public:
-    constexpr static auto mempty = Last<Data>{nothing};
+    constexpr static auto mempty = Last<Data>{data::nothing};
 
-    constexpr static auto mappend = toFunc([](Last<Data> lhs, Last<Data> rhs)
+    constexpr static auto mappend = data::toFunc([](Last<Data> lhs, Last<Data> rhs)
     {
-        return (getLast | rhs) == nothing ? lhs : rhs;
+        return (getLast | rhs) == data::nothing ? lhs : rhs;
     });
 };
 
@@ -1834,14 +1939,24 @@ public:
 
     constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
     {
-        return zipList <o> to<std::list> || zipWith | DataMType::mappend | nonOwnedRange(lhs) | nonOwnedRange(rhs);
+        return zipList <o> data::to<std::list> || data::zipWith | DataMType::mappend | data::nonOwnedRange(lhs) | data::nonOwnedRange(rhs);
     });
 };
 
 template <typename Data>
 const ZipList<Data> MonoidBase<ZipList, Data>::mempty = ZipList{MonoidType<Data>::mempty};
 
+template <>
+class MonoidBase<Endo>
+{
+public:
+    constexpr static auto mempty = endo | id;
 
+    constexpr static auto mappend = data::toGFunc<2>([](auto&& lhs, auto&& rhs)
+    {
+        return endo || lhs.get() <o> rhs.get();
+    });
+};
 
 enum class Ordering
 {
@@ -1869,7 +1984,7 @@ class MonoidBase<DummyTemplateClass, Ordering>
 public:
     constexpr static auto mempty = Ordering::kEQ;
 
-    constexpr static auto mappend = toFunc([](Ordering lhs, Ordering rhs)
+    constexpr static auto mappend = data::toFunc([](Ordering lhs, Ordering rhs)
     {
         switch (lhs)
         {
@@ -1890,7 +2005,7 @@ class MonoidBase<DummyTemplateClass, _O_>
 public:
     constexpr static auto mempty = _o_;
 
-    constexpr static auto mappend = toFunc([](_O_, _O_)
+    constexpr static auto mappend = data::toFunc([](_O_, _O_)
     {
         return _o_;
     });
@@ -1901,19 +2016,30 @@ class Monoid : public MonoidBase<Type, Args...>, public MonoidConcat<MonoidBase<
 {};
 
 template <typename Data>
-class Monoid<Range, Data>
+class Monoid<data::Range, Data>
 {
 public:
-    constexpr static auto mempty = ownedRange(EmptyView<Data>{});
+    constexpr static auto mempty = data::ownedRange(data::EmptyView<Data>{});
 
     constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
     {
-        return ownedRange(ChainView{lhs, rhs});
+        return data::ownedRange(data::ChainView{lhs, rhs});
     });
 
     constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
     {
-        return ownedRange(JoinView{nested});
+        if constexpr (data::isTupleLikeV<decltype(nested)>)
+        {
+            return std::apply([](auto&&... rngs)
+            {
+                return data::ChainView{rngs...};
+            }
+            , nested);
+        }
+        else
+        {
+            return data::ownedRange(data::JoinView{nested});
+        }
     });
 };
 
@@ -1939,17 +2065,17 @@ public:
 };
 
 template <typename InArg, typename RetType>
-class MonoidBase<Function, InArg, RetType>
+class MonoidBase<data::Function, InArg, RetType>
 {
 public:
-    constexpr static auto mempty = toFunc([](InArg)
+    constexpr static auto mempty = data::toFunc([](InArg)
     {
         return MonoidType<RetType>::mempty;
     });
 
     constexpr static auto mappend = toGFunc<2>([](auto f, auto g)
     {
-        return toFunc([f=std::move(f), g=std::move(g)](InArg arg)
+        return data::toFunc([f=std::move(f), g=std::move(g)](InArg arg)
         {
             using MType = MonoidType<RetType>;
             return (f | arg) <MType::mappend> (g | arg);
@@ -1980,7 +2106,7 @@ class MonoidBase<std::tuple, Ts...>
 public:
     const static decltype(std::make_tuple(MonoidType<Ts>::mempty...)) mempty;
 
-    constexpr static auto mappend = toFunc([](std::tuple<Ts...> lhs, std::tuple<Ts...> rhs)
+    constexpr static auto mappend = data::toFunc([](std::tuple<Ts...> lhs, std::tuple<Ts...> rhs)
     {
         constexpr auto mapp = toGFunc<2>(Mappend{});
         return zipTupleWith(mapp, lhs, rhs);
@@ -1991,41 +2117,71 @@ template <typename... Ts>
 const decltype(std::make_tuple(MonoidType<Ts>::mempty...)) MonoidBase<std::tuple, Ts...>::mempty = std::make_tuple(MonoidType<Ts>::mempty...);
 
 template <typename Data>
-class MonoidBase<Maybe, Data>
+class MonoidBase<data::Maybe, Data>
 {
 public:
-    const static Maybe<Data> mempty;
+    const static data::Maybe<Data> mempty;
 
-    constexpr static auto mappend = toFunc([](Maybe<Data> const& lhs, Maybe<Data> const& rhs)
+    constexpr static auto mappend = data::toFunc([](data::Maybe<Data> const& lhs, data::Maybe<Data> const& rhs)
     {
         return std::visit(overload(
-            [](Just<Data> const& l, Just<Data> const& r) -> Maybe<Data>
+            [](data::Just<Data> const& l, data::Just<Data> const& r) -> data::Maybe<Data>
             {
                 using MType = MonoidType<Data>;
-                return Just{MType::mappend | l.data | r.data};
+                return data::Just{MType::mappend | l.data | r.data};
             },
-            [&](Nothing, Just<Data> const&)
+            [&](data::Nothing, data::Just<Data> const&)
             {
                 return rhs;
             },
-            [&](auto, Nothing)
+            [&](auto, data::Nothing)
             {
                 return lhs;
             }
         ),
-        static_cast<MaybeBase<Data> const&>(lhs),
-        static_cast<MaybeBase<Data> const&>(rhs));
+        static_cast<data::MaybeBase<Data> const&>(lhs),
+        static_cast<data::MaybeBase<Data> const&>(rhs));
     });
 };
 
 template <typename Data>
-const Maybe<Data> MonoidBase<Maybe, Data>::mempty = nothing;
+const data::Maybe<Data> MonoidBase<data::Maybe, Data>::mempty = data::nothing;
 
-template <template <typename...> class C, typename Data, typename... Rest>
-struct MonoidTrait<C<Data, Rest...>, std::enable_if_t<!impl::isTupleLikeV<C<Data, Rest...>> && !isFunctionV<C<Data, Rest...>>, void>>
+template <template <typename...> class C, typename Data>
+struct MonoidTraitImpl
 {
     using Type = Monoid<C, Data>;
 };
+
+template <typename Data, typename... Rest>
+struct MonoidTrait<std::vector<Data, Rest...>> : MonoidTraitImpl<std::vector, Data> {};
+
+template <typename Data, typename... Rest>
+struct MonoidTrait<std::list<Data, Rest...>> : MonoidTraitImpl<std::list, Data> {};
+
+template <typename Data, typename... Rest>
+struct MonoidTrait<std::basic_string<Data, Rest...>> : MonoidTraitImpl<std::basic_string, Data> {};
+
+template <typename Data, typename... Rest>
+struct MonoidTrait<data::Range<Data, Rest...>> : MonoidTraitImpl<data::Range, Data> {};
+
+template <typename Data>
+struct MonoidTrait<data::Maybe<Data>> : MonoidTraitImpl<data::Maybe, Data> {};
+
+template <typename Data>
+struct MonoidTrait<ZipList<Data>> : MonoidTraitImpl<ZipList, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Sum<Data>> : MonoidTraitImpl<Sum, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Product<Data>> : MonoidTraitImpl<Product, Data> {};
+
+template <typename Data>
+struct MonoidTrait<First<Data>> : MonoidTraitImpl<First, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Last<Data>> : MonoidTraitImpl<Last, Data> {};
 
 template <typename... Args>
 struct MonoidTrait<std::tuple<Args...>>
@@ -2045,6 +2201,12 @@ struct MonoidTrait<All>
     using Type = Monoid<DummyTemplateClass, All>;
 };
 
+template <typename Func>
+struct MonoidTrait<Endo<Func>>
+{
+    using Type = Monoid<Endo>;
+};
+
 template <>
 struct MonoidTrait<Ordering>
 {
@@ -2058,23 +2220,66 @@ struct MonoidTrait<_O_>
 };
 
 template <size_t nbArgs, typename Repr>
-struct MonoidTrait<GenericFunction<nbArgs, Repr>>
+struct MonoidTrait<data::GenericFunction<nbArgs, Repr>>
 {
-    using Type = Monoid<DummyTemplateClass, GenericFunctionTag, GenericFunction<nbArgs, Repr>>;
+    using Type = Monoid<DummyTemplateClass, GenericFunctionTag, data::GenericFunction<nbArgs, Repr>>;
 };
 
 template <typename Repr, typename Ret, typename FirstArg, typename... Rest>
-struct MonoidTrait<Function<Repr, Ret, FirstArg, Rest...>>
+struct MonoidTrait<data::Function<Repr, Ret, FirstArg, Rest...>>
 {
-    using RetT = std::invoke_result_t<Function<Repr, Ret, FirstArg, Rest...>, FirstArg>;
-    using Type = Monoid<Function, FirstArg, RetT>;
+    using RetT = std::invoke_result_t<data::Function<Repr, Ret, FirstArg, Rest...>, FirstArg>;
+    using Type = Monoid<data::Function, FirstArg, RetT>;
 };
 
 /////////// Foldable ///////////
 
 template <template<typename...> typename Type, typename... Args>
-class Foldable
-{};
+class FoldableBase
+{
+public:
+    constexpr static auto foldr = toGFunc<3>([](auto&& f, auto&& z, auto&& t)
+    {
+        return appEndo || hspp::foldMap | (endo <o> f) | t || z;
+    });
+    constexpr static auto foldMap = toGFunc<2>([](auto&& func, auto&& ta)
+    {
+        using Data = decltype(*ta.begin());
+        using MData = std::invoke_result_t<decltype(func), Data>;
+        return hspp::foldr | (mappend <o> func) | MonoidType<MData>::mempty | ta;
+    });
+    constexpr static auto fold = hspp::foldMap | id;
+    constexpr static auto toRange = toGFunc<1>([](auto&& tm)
+    {
+        return nonOwnedRange(data::RefView{tm});
+    });
+    constexpr static auto null = hspp::foldr | [](auto, auto){ return false; } | true;
+};
+
+template <template<typename...> typename Type, typename... Args>
+class Foldable : public FoldableBase<Type, Args...>
+{
+public:
+    constexpr static auto foldr = data::listFoldr;
+};
+
+template <typename... Init>
+class Foldable<std::tuple, Init...> : public FoldableBase<std::tuple, Init...>
+{
+public:
+    constexpr static auto foldMap = toGFunc<2>([](auto&& func, auto&& ta)
+    {
+        static_assert(std::tuple_size_v<std::decay_t<decltype(ta)>> == sizeof...(Init)+1);
+        auto const& last = std::get<sizeof...(Init)>(ta);
+        return func | last;
+    });
+    constexpr static auto foldr = toGFunc<1>([](auto&& func, auto&& z, auto&& ta)
+    {
+        static_assert(std::tuple_size_v<std::decay_t<decltype(ta)>> == sizeof...(Init)+1);
+        auto const& last = std::get<sizeof...(Init)>(ta);
+        return func | last | z;
+    });
+};
 
 /////////// Functor ///////////
 
@@ -2093,13 +2298,13 @@ public:
 };
 
 template <>
-class Functor<Range>
+class Functor<data::Range>
 {
 public:
     template <typename Func, typename Arg, typename Repr>
-    constexpr static auto fmap(Func const& func, Range<Arg, Repr> const& in)
+    constexpr static auto fmap(Func const& func, data::Range<Arg, Repr> const& in)
     {
-        return ownedRange(MapView{in, func});
+        return data::ownedRange(data::MapView{in, func});
     }
 };
 
@@ -2117,32 +2322,32 @@ public:
 };
 
 template <>
-class Functor<Maybe>
+class Functor<data::Maybe>
 {
 public:
     template <typename Func, typename Arg>
-    constexpr static auto fmap(Func const& func, Maybe<Arg> const& in)
+    constexpr static auto fmap(Func const& func, data::Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
-            [](Nothing) -> Maybe<R>
+            [](data::Nothing) -> data::Maybe<R>
             {
-                return nothing;
+                return data::nothing;
             },
-            [func](Just<Arg> const& j) -> Maybe<R>
+            [func](data::Just<Arg> const& j) -> data::Maybe<R>
             {
-                return Just<R>(func(j.data));
+                return data::Just<R>(func(j.data));
             }
-        ), static_cast<MaybeBase<Arg>const &>(in));
+        ), static_cast<data::MaybeBase<Arg>const &>(in));
     }
 };
 
 template <typename FirstArg>
-class Functor<Function, FirstArg>
+class Functor<data::Function, FirstArg>
 {
 public:
     template <typename Func, typename Repr, typename Ret, typename... Args>
-    constexpr static auto fmap(Func&& func, Function<Repr, Ret, FirstArg, Args...> const& in)
+    constexpr static auto fmap(Func&& func, data::Function<Repr, Ret, FirstArg, Args...> const& in)
     {
         return o | func | in;
     }
@@ -2153,38 +2358,22 @@ class Functor<DummyTemplateClass, GenericFunctionTag>
 {
 public:
     template <typename Func, size_t nbArgs, typename Repr>
-    constexpr static auto fmap(Func&& func, GenericFunction<nbArgs, Repr> const& in)
+    constexpr static auto fmap(Func&& func, data::GenericFunction<nbArgs, Repr> const& in)
     {
         return o | func | in;
     }
 };
 
 template <>
-class Functor<IO>
+class Functor<data::IO>
 {
 public:
     template <typename Func1, typename Data, typename Func2>
-    constexpr static auto fmap(Func1 const& func, IO<Data, Func2> const& in)
+    constexpr static auto fmap(Func1 const& func, data::IO<Data, Func2> const& in)
     {
-        return io([=]{ return func(in.run()); });
+        return data::io([=]{ return func(in.run()); });
     }
 };
-
-template <typename T>
-using FunctorType = typename TypeClassTrait<Functor, T>::Type;
-
-class Fmap
-{
-public:
-    template <typename Func, typename Data>
-    constexpr auto operator()(Func const& func, Data const& data) const
-    {
-        using FType = FunctorType<Data>;
-        return FType::fmap(func, data);
-    }
-};
-
-constexpr inline auto fmap = toGFunc<2>(Fmap{});
 
 template <template<typename...> class Type, typename... Ts>
 class Applicative : public Functor<Type, Ts...>
@@ -2212,19 +2401,19 @@ public:
 };
 
 template <>
-class Applicative<Range> : public Functor<Range>
+class Applicative<data::Range> : public Functor<data::Range>
 {
 public:
     template <typename In>
     constexpr static auto pure(In&& in)
     {
-        return ownedRange(SingleView{std::forward<In>(in)});
+        return data::ownedRange(data::SingleView{std::forward<In>(in)});
     }
     template <typename Func, typename Arg, typename Repr1, typename Repr2>
-    constexpr static auto ap(Range<Func, Repr1> const& func, Range<Arg, Repr2> const& in)
+    constexpr static auto ap(data::Range<Func, Repr1> const& func, data::Range<Arg, Repr2> const& in)
     {
-        auto view = MapView{ProductView{func, in}, [](auto&& tuple) { return std::get<0>(tuple)(std::get<1>(tuple)); }};
-        return ownedRange(view);
+        auto view = data::MapView{data::ProductView{func, in}, [](auto&& tuple) { return std::get<0>(tuple)(std::get<1>(tuple)); }};
+        return data::ownedRange(view);
     }
 };
 
@@ -2249,59 +2438,59 @@ public:
 };
 
 template <>
-class Applicative<Maybe> : public Functor<Maybe>
+class Applicative<data::Maybe> : public Functor<data::Maybe>
 {
 public:
-    constexpr static auto pure = just;
+    constexpr static auto pure = data::just;
     template <typename Func, typename Arg>
-    constexpr static auto ap(Maybe<Func> const& func, Maybe<Arg> const& in)
+    constexpr static auto ap(data::Maybe<Func> const& func, data::Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
-            [](Just<Func> const& f, Just<Arg> const& a) -> Maybe<R>
+            [](data::Just<Func> const& f, data::Just<Arg> const& a) -> data::Maybe<R>
             {
-                return Just<R>{f.data(a.data)};
+                return data::Just<R>{f.data(a.data)};
             },
-            [](auto, auto) -> Maybe<R>
+            [](auto, auto) -> data::Maybe<R>
             {
-                return nothing;
+                return data::nothing;
             }
         ),
-        static_cast<MaybeBase<Func>const &>(func),
-        static_cast<MaybeBase<Arg>const &>(in)
+        static_cast<data::MaybeBase<Func>const &>(func),
+        static_cast<data::MaybeBase<Arg>const &>(in)
         );
     }
 };
 
 template <>
-class Applicative<IO> : public Functor<IO>
+class Applicative<data::IO> : public Functor<data::IO>
 {
 public:
     template <typename In>
     constexpr static auto pure(In in)
     {
-        return ioData(std::move(in));
+        return data::ioData(std::move(in));
     }
     template <typename Func, typename Arg, typename Func1, typename Func2>
-    constexpr static auto ap(IO<Func, Func1> const& func, IO<Arg, Func2> const& in)
+    constexpr static auto ap(data::IO<Func, Func1> const& func, data::IO<Arg, Func2> const& in)
     {
-        return io([=]{ return func.run()(in.run()); });
+        return data::io([=]{ return func.run()(in.run()); });
     }
 };
 
 template <typename FirstArg>
-class Applicative<Function, FirstArg> : public Functor<Function, FirstArg>
+class Applicative<data::Function, FirstArg> : public Functor<data::Function, FirstArg>
 {
 public:
     template <typename Ret>
     constexpr static auto pure(Ret ret)
     {
-        return toFunc([ret=std::move(ret)](FirstArg){ return ret; });
+        return data::toFunc([ret=std::move(ret)](FirstArg){ return ret; });
     }
     template <typename Func1, typename Func2>
     constexpr static auto ap(Func1 func, Func2 in)
     {
-        return toFunc(
+        return data::toFunc(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return func(arg)(in(arg));
@@ -2423,23 +2612,23 @@ public:
 };
 
 template <>
-class MonadBase<Maybe>
+class MonadBase<data::Maybe>
 {
 public:
     template <typename Arg, typename Func>
-    constexpr static auto bind(Maybe<Arg> const& arg, Func const& func)
+    constexpr static auto bind(data::Maybe<Arg> const& arg, Func const& func)
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
-            [](Nothing) -> R
+            [](data::Nothing) -> R
             {
-                return nothing;
+                return data::nothing;
             },
-            [func](Just<Arg> const& j) -> R
+            [func](data::Just<Arg> const& j) -> R
             {
                 return func(j.data);
             }
-        ), static_cast<MaybeBase<Arg> const&>(arg));
+        ), static_cast<data::MaybeBase<Arg> const&>(arg));
     }
 };
 
@@ -2459,13 +2648,13 @@ public:
 };
 
 template <>
-class MonadBase<IO>
+class MonadBase<data::IO>
 {
 public:
     template <typename Arg, typename Func1, typename Func>
-    constexpr static auto bind(IO<Arg, Func1> const& arg, Func const& func)
+    constexpr static auto bind(data::IO<Arg, Func1> const& arg, Func const& func)
     {
-        return io([=]{ return func(arg.run()).run(); });
+        return data::io([=]{ return func(arg.run()).run(); });
     }
 };
 
@@ -2474,18 +2663,18 @@ class MonadBase<DummyTemplateClass, GenericFunctionTag>
 {
 public:
     template <size_t nbArgs, typename Repr, typename Func>
-    constexpr static auto bind(GenericFunction<nbArgs, Repr> const& m, Func k)
+    constexpr static auto bind(data::GenericFunction<nbArgs, Repr> const& m, Func k)
     {
         return (flip | std::move(k)) <ap> m;
     }
 };
 
 template <typename FirstArg>
-class MonadBase<Function, FirstArg>
+class MonadBase<data::Function, FirstArg>
 {
 public:
     template <typename Repr, typename Ret, typename... Rest, typename Func>
-    constexpr static auto bind(Function<Repr, Ret, FirstArg, Rest...> const& m, Func k)
+    constexpr static auto bind(data::Function<Repr, Ret, FirstArg, Rest...> const& m, Func k)
     {
         return (flip | std::move(k)) <ap> m;
     }
@@ -2526,13 +2715,13 @@ constexpr auto guardImpl(bool b)
 }
 
 template <>
-constexpr auto guardImpl<Range>(bool b)
+constexpr auto guardImpl<data::Range>(bool b)
 {
-    return ownedRange(FilterView{Monad<Range>::return_(_o_), [b](auto){ return b; }});
+    return data::ownedRange(data::FilterView{Monad<data::Range>::return_(_o_), [b](auto){ return b; }});
 }
 
 template <template <typename...> class ClassT>
-constexpr auto guard = toFunc([](bool b)
+constexpr auto guard = data::toFunc([](bool b)
 {
     return guardImpl<ClassT>(b);
 });
@@ -2545,7 +2734,7 @@ constexpr auto show = toGFunc<1>([](auto&& d)
 });
 
 template <typename T>
-constexpr auto read = toFunc([](std::string const& d)
+constexpr auto read = data::toFunc([](std::string const& d)
 {
     std::stringstream is{d};
     T t;
