@@ -1042,12 +1042,24 @@ TEST(Foldable, list2)
     EXPECT_EQ(result, expected);
 }
 
-TEST(Foldable, tuple)
+TEST(Foldable, list3)
 {
     std::list<std::tuple<Sum<int>, All>> nested = {{1, true}, {3, false}};
     auto result = fold | nested;
     std::tuple<Sum<int>, All> const expected = {4, false};
     EXPECT_EQ(result, expected);
+}
+
+TEST(Foldable, tuple)
+{
+    auto const t = std::tuple{3, false};
+    auto const result = foldMap | show | t;
+    auto const result2 = foldMap | id | t;
+    auto const result3 = fold | t;
+    auto const expected = "false";
+    EXPECT_EQ(result, expected);
+    EXPECT_EQ(result2, false);
+    EXPECT_EQ(result3, false);
 }
 
 TEST(Maybe, 1)

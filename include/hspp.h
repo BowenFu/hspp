@@ -2263,21 +2263,23 @@ public:
     constexpr static auto foldr = data::listFoldr;
 };
 
-// template <typename... Init>
-// class Foldable<std::tuple, Init...>
-// {
-// public:
-//     constexpr static auto fold = toGFunc<1>([](auto&& tm)
-//     {
-//         auto const& last = std::get<sizeof...(Init)>(ta);
-//         return mconcat | last;
-//     });
-//     constexpr static auto foldMap = toGFunc<2>([](auto&& func, auto&& ta)
-//     {
-//         auto const& last = std::get<sizeof...(Init)>(ta);
-//         return func | last;;
-//     });
-// };
+template <typename... Init>
+class Foldable<std::tuple, Init...> : public FoldableBase<std::tuple, Init...>
+{
+public:
+    constexpr static auto foldMap = toGFunc<2>([](auto&& func, auto&& ta)
+    {
+        static_assert(std::tuple_size_v<std::decay_t<decltype(ta)>> == sizeof...(Init)+1);
+        auto const& last = std::get<sizeof...(Init)>(ta);
+        return func | last;
+    });
+    constexpr static auto foldr = toGFunc<1>([](auto&& func, auto&& z, auto&& ta)
+    {
+        static_assert(std::tuple_size_v<std::decay_t<decltype(ta)>> == sizeof...(Init)+1);
+        auto const& last = std::get<sizeof...(Init)>(ta);
+        return func | last | z;
+    });
+};
 
 /////////// Functor ///////////
 
