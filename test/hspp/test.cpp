@@ -1387,23 +1387,29 @@ constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
     return sepByImpl(p, sep);
 };
 
-constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
+template <typename A, typename Repr, typename Op>
+constexpr auto chainl1Impl(Parser<A, Repr> p, Op op)
 {
-    auto const rest = yCombinator | [=](auto const& self, auto a)
+    auto const rest = toGFunc<1> | yCombinator | [=](auto const& self, auto a) -> TEParser<A>
     {
         auto const lhs =
             op >>= [&](auto f) { return
                 p >>= [&](auto b) { return
-                    return_ || self | (f | a | b);
+                    Monad<Parser>::return_ || self(f | a | b);
                 };
             };
-        auto const rhs = return_ | a;
+        auto const rhs = Monad<Parser>::return_ | a;
         return lhs <triPlus> rhs;
     };
-    return p >>= rest;
+    return toTEParser || (p >>= rest);
+}
+
+constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
+{
+    return chainl1Impl(p, op);
 };
 
-constexpr auto chainl = toGFunc<2> | [](auto p, auto op, auto a)
+constexpr auto chainl = toGFunc<3> | [](auto p, auto op, auto a)
 {
     return (p <chainl1> op) <triPlus> (Monad<Parser>::return_ | a);
 };
@@ -1522,14 +1528,87 @@ enum class Op
     kDIV
 };
 
-auto const addOp = ((symb | "+") >> (return_ | Op::kADD)) <triPlus> ((symb | "-") >> (return_ | Op::kSUB));
-auto const mulOp = ((symb | "*") >> (return_ | Op::kMUL)) <triPlus> ((symb | "/") >> (return_ | Op::kDIV));
+class OpFunc
+{
+    Op mOp;
+public:
+    constexpr OpFunc()
+    : mOp{}
+    {}
+    constexpr OpFunc(Op op)
+    : mOp{op}
+    {}
+    template <typename T>
+    constexpr auto operator()(T x, T y) const
+    {
+        switch (mOp)
+        {
+            case Op::kADD: return x + y;
+            case Op::kSUB: return x - y;
+            case Op::kMUL: return x * y;
+            case Op::kDIV: return x / y;
+        }
+        return 0;
+    }
+};
+
+namespace op
+{
+constexpr auto add = OpFunc{Op::kADD};
+constexpr auto sub = OpFunc{Op::kSUB};
+constexpr auto mul = OpFunc{Op::kMUL};
+constexpr auto div = OpFunc{Op::kDIV};
+
+auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
+auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
+} // namespace op
+
+using op::addOp;
+using op::mulOp;
+
+constexpr auto isDigit = toFunc<> | [](char x)
+{
+    return isdigit(x);
+};
+
+extern const TEParser<int> expr;
+
+constexpr auto digit = (token || sat | isDigit)
+                    >>= [](char x) { return
+                    return_ | (x - '0');
+                };
+
+// const auto factor =
+//     digit <triPlus>
+//         ((symb | "("s) >>
+//             expr >>= [](auto n){ return
+//                 (symb | ")"s) >>
+//                     (return_ | n);
+//     });
+
+// constexpr auto term = factor <chainl1> mulOp;
+
+// const TEParser<int> expr = toTEParser || term <chainl1> addOp;
 
 TEST(Parser, ops)
 {
     auto const result = apply || addOp || " +  * /-";
-    EXPECT_EQ(std::get<0>(result.at(0)), Op::kADD);
+    EXPECT_EQ(std::get<0>(result.at(0))(1, 2), 3);
 
     auto const result2 = apply || mulOp || "   * /-";
-    EXPECT_EQ(std::get<0>(result2.at(0)), Op::kMUL);
+    EXPECT_EQ(std::get<0>(result2.at(0))(1, 2), 2);
 }
+
+TEST(Parser, digit)
+{
+    auto const result = apply || many | digit || " 1  2 34";
+    auto const expected = std::vector{1, 2, 3, 4};
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}
+
+// TEST(Parser, factor)
+// {
+//     auto const result = apply || many | digit || " 1  2 34";
+//     auto const expected = std::vector{1, 2, 3, 4};
+//     EXPECT_EQ(std::get<0>(result.at(0)), expected);
+// }

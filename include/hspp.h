@@ -1586,7 +1586,7 @@ template <typename A, typename Repr>
 constexpr auto toTEParserImpl(Parser<A, Repr> p)
 {
     return TEParser<A>{(runParser | p)};
-};
+}
 
 constexpr auto toTEParser = toGFunc<1> | [](auto p)
 {
