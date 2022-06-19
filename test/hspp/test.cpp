@@ -1415,6 +1415,15 @@ constexpr auto isSpace = toFunc<> | [](char c)
 
 const auto space = many || sat | isSpace;
 
+constexpr auto token = toGFunc<1> | [](auto p)
+{
+    return p >>= [](auto a) { return
+        space >>
+        (return_ | a);
+    };
+};
+
+
 TEST(Parser, item)
 {
     constexpr auto p =
@@ -1474,5 +1483,12 @@ TEST(Parser, space)
 {
     auto const result = runParser || space || "  12123";
     auto const expected = std::vector{' ', ' '};
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}
+
+TEST(Parser, token)
+{
+    auto const result = runParser || token | (string | "12") || "12 123";
+    auto const expected = "12"s;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
