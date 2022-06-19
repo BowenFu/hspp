@@ -3094,6 +3094,7 @@ public:
         auto last = std::get<sizeMinusOne>(in);
         auto const func = toGFunc<1>([in=std::move(in)](auto&& lastElem)
         {
+            constexpr auto sizeMinusOne = std::tuple_size_v<std::decay_t<decltype(in)>> - 1;
             return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(lastElem));
         });
         return func <fmap> (f | last);
