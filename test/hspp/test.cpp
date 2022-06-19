@@ -3,6 +3,7 @@
 #include <list>
 #include <gtest/gtest.h>
 #include <cmath>
+#include <cctype>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -1407,6 +1408,13 @@ constexpr auto chainl = toGFunc<2> | [](auto p, auto op, auto a)
     return (p <chainl1> op) <triPlus> (Monad<Parser>::return_ | a);
 };
 
+constexpr auto isSpace = toFunc<> | [](char c)
+{
+    return isspace(c);
+};
+
+const auto space = many || sat | isSpace;
+
 TEST(Parser, item)
 {
     constexpr auto p =
@@ -1460,4 +1468,11 @@ TEST(Parser, chainl1)
 {
     (void)chainl1;
     (void)chainl;
+}
+
+TEST(Parser, space)
+{
+    auto const result = runParser || space || "  12123";
+    auto const expected = std::vector{' ', ' '};
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
