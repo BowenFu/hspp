@@ -1364,10 +1364,6 @@ constexpr auto many = toGFunc<1> | [](auto p)
     return manyImpl(p);
 };
 
-template <typename A, typename Repr, typename B, typename Repr1>
-constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
-    -> TEParser<std::vector<A>>;
-
 constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 {
     return p
@@ -1381,14 +1377,34 @@ constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 
 template <typename A, typename Repr, typename B, typename Repr1>
 constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
-    -> TEParser<std::vector<A>>
 {
-    return toTEParser || triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{});
+    return toParser || triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{});
 }
 
 constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
 {
     return sepByImpl(p, sep);
+};
+
+constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
+{
+    auto const rest = yCombinator | [=](auto const& self, auto a)
+    {
+        auto const lhs =
+            op >>= [&](auto f) { return
+                p >>= [&](auto b) { return
+                    return_ || self | (f | a | b);
+                };
+            };
+        auto const rhs = return_ | a;
+        return lhs <triPlus> rhs;
+    };
+    return p >>= rest;
+};
+
+constexpr auto chainl = toGFunc<2> | [](auto p, auto op, auto a)
+{
+    return (p <chainl1> op) <triPlus> (Monad<Parser>::return_ | a);
 };
 
 TEST(Parser, item)
@@ -1432,9 +1448,16 @@ TEST(Parser, many)
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
-// TEST(Parser, seqBy)
-// {
+TEST(Parser, seqBy)
+{
+    (void)sepBy;
 //     auto const result = runParser | (sepBy | (string | "1"s) | (char_ | '2')) || "12123";
 //     auto const expected = std::vector{"1"s, "1"s};
 //     EXPECT_EQ(std::get<0>(result.at(0)), expected);
-// }
+}
+
+TEST(Parser, chainl1)
+{
+    (void)chainl1;
+    (void)chainl;
+}
