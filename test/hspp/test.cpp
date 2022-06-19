@@ -1364,6 +1364,33 @@ constexpr auto many = toGFunc<1> | [](auto p)
     return manyImpl(p);
 };
 
+template <typename A, typename Repr, typename B, typename Repr1>
+constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
+    -> TEParser<std::vector<A>>;
+
+constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
+{
+    return p
+    >>= [=](auto a) { return
+        (many | (sep >>= p))
+        >>= [=](auto as) { return
+            return_ || a <cons>  as;
+        };
+    };
+};
+
+template <typename A, typename Repr, typename B, typename Repr1>
+constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
+    -> TEParser<std::vector<A>>
+{
+    return toTEParser || triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{});
+}
+
+constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
+{
+    return sepByImpl(p, sep);
+};
+
 TEST(Parser, item)
 {
     constexpr auto p =
@@ -1404,3 +1431,10 @@ TEST(Parser, many)
     auto const expected = std::vector{"12"s, "12"s};
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
+
+// TEST(Parser, seqBy)
+// {
+//     auto const result = runParser | (sepBy | (string | "1"s) | (char_ | '2')) || "12123";
+//     auto const expected = std::vector{"1"s, "1"s};
+//     EXPECT_EQ(std::get<0>(result.at(0)), expected);
+// }
