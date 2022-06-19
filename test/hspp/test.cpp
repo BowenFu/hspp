@@ -1395,13 +1395,13 @@ constexpr auto chainl1Impl(Parser<A, Repr> p, Op op)
         auto const lhs =
             op >>= [&](auto f) { return
                 p >>= [&](auto b) { return
-                    Monad<Parser>::return_ || self(f | a | b);
+                    self(f | a | b);
                 };
             };
         auto const rhs = Monad<Parser>::return_ | a;
-        return lhs <triPlus> rhs;
+        return toTEParser || (lhs <triPlus> rhs);
     };
-    return toTEParser || (p >>= rest);
+    return (p >>= rest);
 }
 
 constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
@@ -1486,12 +1486,6 @@ TEST(Parser, seqBy)
 //     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
-TEST(Parser, chainl1)
-{
-    (void)chainl1;
-    (void)chainl;
-}
-
 TEST(Parser, space)
 {
     auto const result = runParser || space || "  12123";
@@ -1554,10 +1548,10 @@ public:
 
 namespace op
 {
-constexpr auto add = OpFunc{Op::kADD};
-constexpr auto sub = OpFunc{Op::kSUB};
-constexpr auto mul = OpFunc{Op::kMUL};
-constexpr auto div = OpFunc{Op::kDIV};
+constexpr auto add = toGFunc<2> | OpFunc{Op::kADD};
+constexpr auto sub = toGFunc<2> | OpFunc{Op::kSUB};
+constexpr auto mul = toGFunc<2> | OpFunc{Op::kMUL};
+constexpr auto div = toGFunc<2> | OpFunc{Op::kDIV};
 
 auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
 auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
@@ -1578,25 +1572,24 @@ constexpr auto digit = (token || sat | isDigit)
                     return_ | (x - '0');
                 };
 
-// const auto factor =
-//     digit <triPlus>
-//         ((symb | "("s) >>
-//             expr >>= [](auto n){ return
-//                 (symb | ")"s) >>
-//                     (return_ | n);
-//     });
+const auto factor =
+    digit <triPlus>
+        (((symb | "("s) >> expr) >>= [](auto n){ return
+                (symb | ")"s) >>
+                    (return_ | n);
+    });
 
-// constexpr auto term = factor <chainl1> mulOp;
+const auto term = factor <chainl1> mulOp;
 
-// const TEParser<int> expr = toTEParser || term <chainl1> addOp;
+const TEParser<int> expr = toTEParser || (term <chainl1> addOp);
 
 TEST(Parser, ops)
 {
     auto const result = apply || addOp || " +  * /-";
-    EXPECT_EQ(std::get<0>(result.at(0))(1, 2), 3);
+    EXPECT_EQ(std::get<0>(result.at(0))| 1 | 2, 3);
 
     auto const result2 = apply || mulOp || "   * /-";
-    EXPECT_EQ(std::get<0>(result2.at(0))(1, 2), 2);
+    EXPECT_EQ(std::get<0>(result2.at(0))|1 | 2, 2);
 }
 
 TEST(Parser, digit)
@@ -1606,9 +1599,25 @@ TEST(Parser, digit)
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
-// TEST(Parser, factor)
-// {
-//     auto const result = apply || many | digit || " 1  2 34";
-//     auto const expected = std::vector{1, 2, 3, 4};
-//     EXPECT_EQ(std::get<0>(result.at(0)), expected);
-// }
+TEST(Parser, chainl1)
+{
+    auto const p = digit <chainl1> addOp;
+    auto const result = runParser | p | "1 + 2";
+    auto const expected = 3;
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+    (void)chainl;
+}
+
+TEST(Parser, factor)
+{
+    auto const result = apply || many | digit || " 1  2 34";
+    auto const expected = std::vector{1, 2, 3, 4};
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}
+
+TEST(Parser, expr)
+{
+    auto const result = apply | expr | "1 - 2 * 3 + 4";
+    auto const expected = -1;
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}

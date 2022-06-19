@@ -300,6 +300,10 @@ class GenericFunction : public CallViaPipe<GenericFunction<nbArgs, Repr>>
 {
     static_assert(nbArgs > 0);
 public:
+    constexpr GenericFunction()
+    : mFunc{}
+    {
+    }
     constexpr GenericFunction(Repr func)
     : mFunc{std::move(func)}
     {
