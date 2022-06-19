@@ -1423,6 +1423,13 @@ constexpr auto token = toGFunc<1> | [](auto p)
     };
 };
 
+constexpr auto symb = token <o> string;
+
+constexpr auto apply = toGFunc<1> | [](auto p)
+{
+    return runParser | (space >> p);
+};
+
 
 TEST(Parser, item)
 {
@@ -1489,6 +1496,20 @@ TEST(Parser, space)
 TEST(Parser, token)
 {
     auto const result = runParser || token | (string | "12") || "12 123";
+    auto const expected = "12"s;
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}
+
+TEST(Parser, symb)
+{
+    auto const result = runParser || symb | "12" || "12 123";
+    auto const expected = "12"s;
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
+}
+
+TEST(Parser, apply)
+{
+    auto const result = apply || symb | "12" || " 12 123";
     auto const expected = "12"s;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
