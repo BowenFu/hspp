@@ -3091,11 +3091,11 @@ public:
     constexpr static auto traverse = toGFunc<2>([](auto&& f, auto&& in)
     {
         constexpr auto sizeMinusOne = std::tuple_size_v<std::decay_t<decltype(in)>> - 1;
-        auto const func = toGFunc<1>([&](auto&& lastElem)
+        auto last = std::get<sizeMinusOne>(in);
+        auto const func = toGFunc<1>([in=std::move(in), sizeMinusOne](auto&& lastElem)
         {
             return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(lastElem));
         });
-        auto const& last = std::get<sizeMinusOne>(in);
         return func <fmap> (f | last);
     });
 };
