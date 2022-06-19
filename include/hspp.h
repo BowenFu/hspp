@@ -22,6 +22,7 @@
 #include <list>
 #include <vector>
 #include <tuple>
+#include <type_traits>
 
 namespace hspp
 {
