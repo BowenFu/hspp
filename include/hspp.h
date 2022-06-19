@@ -300,10 +300,6 @@ class GenericFunction : public CallViaPipe<GenericFunction<nbArgs, Repr>>
 {
     static_assert(nbArgs > 0);
 public:
-    constexpr GenericFunction()
-    : mFunc{}
-    {
-    }
     constexpr GenericFunction(Repr func)
     : mFunc{std::move(func)}
     {
@@ -3229,13 +3225,14 @@ constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
 {
     return data::toParser <o> data::toFunc<> | [=](std::string cs)
     {
-        auto tmp = data::runParser | (p <mplus> q) | cs;
+        auto const tmp = data::runParser | (p <mplus> q) | cs;
         if (tmp.empty())
         {
             return tmp;
         }
-        tmp.resize(1);
-        return tmp;
+        std::remove_const_t<decltype(tmp)> tmp2;
+        tmp2.push_back(tmp.front());
+        return tmp2;
     };
 };
 } // namespace hspp

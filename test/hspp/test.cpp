@@ -1526,9 +1526,6 @@ class OpFunc
 {
     Op mOp;
 public:
-    constexpr OpFunc()
-    : mOp{}
-    {}
     constexpr OpFunc(Op op)
     : mOp{op}
     {}
