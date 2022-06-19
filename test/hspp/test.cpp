@@ -1393,8 +1393,8 @@ constexpr auto chainl1Impl(Parser<A, Repr> p, Op op)
     auto const rest = toGFunc<1> | yCombinator | [=](auto const& self, auto a) -> TEParser<A>
     {
         auto const lhs =
-            op >>= [&](auto f) { return
-                p >>= [&](auto b) { return
+            op >>= [=](auto f) { return
+                p >>= [=](auto b) { return
                     self(f | a | b);
                 };
             };
@@ -1539,7 +1539,7 @@ public:
             case Op::kMUL: return x * y;
             case Op::kDIV: return x / y;
         }
-        return 0;
+        throw std::runtime_error{"Never reach here!"};
     }
 };
 
@@ -1549,6 +1549,11 @@ constexpr auto add = toGFunc<2> | OpFunc{Op::kADD};
 constexpr auto sub = toGFunc<2> | OpFunc{Op::kSUB};
 constexpr auto mul = toGFunc<2> | OpFunc{Op::kMUL};
 constexpr auto div = toGFunc<2> | OpFunc{Op::kDIV};
+
+static_assert((add | 1 | 2) == 3);
+static_assert((sub | 1 | 2) == -1);
+static_assert((mul | 1 | 2) == 2);
+static_assert((div | 4 | 2) == 2);
 
 auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
 auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
