@@ -1513,3 +1513,23 @@ TEST(Parser, apply)
     auto const expected = "12"s;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
+
+enum class Op
+{
+    kADD,
+    kSUB,
+    kMUL,
+    kDIV
+};
+
+auto const addOp = ((symb | "+") >> (return_ | Op::kADD)) <triPlus> ((symb | "-") >> (return_ | Op::kSUB));
+auto const mulOp = ((symb | "*") >> (return_ | Op::kMUL)) <triPlus> ((symb | "/") >> (return_ | Op::kDIV));
+
+TEST(Parser, ops)
+{
+    auto const result = apply || addOp || " +  * /-";
+    EXPECT_EQ(std::get<0>(result.at(0)), Op::kADD);
+
+    auto const result2 = apply || mulOp || "   * /-";
+    EXPECT_EQ(std::get<0>(result2.at(0)), Op::kMUL);
+}
