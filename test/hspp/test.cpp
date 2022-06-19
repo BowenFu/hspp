@@ -1332,7 +1332,7 @@ auto stringImpl(std::string const& cs)
     -> Parser<std::string, StringParser>
 {
     return toParser || toFunc<> | StringParser{cs};
-};
+}
 
 constexpr auto string = toFunc<> || [](std::string const& cs)
 {
