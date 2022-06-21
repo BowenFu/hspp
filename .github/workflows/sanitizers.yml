@@ -20,6 +20,7 @@ jobs:
         std: [20]
         cxx: [clang++]
         build_type: [ASAN, TSAN, UBSAN, LSAN] # MSAN not supported by macos
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v2
