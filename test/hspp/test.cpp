@@ -1678,8 +1678,8 @@ TEST(do_, vector)
         i <= std::vector{1, 2},
         j <= std::vector{3, 4},
         guard | (i + j == 5),
-        Monad<std::vector>::return_ | (i * j)
+        Monad<std::vector>::return_ | (i * 3)
     );
-    auto const expected = std::vector{4, 6};
+    auto const expected = std::vector{3, 6};
     EXPECT_EQ(result, expected);
 }
