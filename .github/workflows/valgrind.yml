@@ -47,6 +47,7 @@ jobs:
         # --overwrite MemoryCheckSuppressionFile=/path/to/valgrind.suppressions \
     
     - name: Cat log
+      if: failure()
       run: |
         cat ${{github.workspace}}/build/Testing/Temporary/MemoryChecker*.log
       
