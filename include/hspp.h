@@ -26,6 +26,61 @@
 
 namespace hspp
 {
+namespace do_
+{
+template <typename T>
+class Id
+{
+public:
+    constexpr Id() = default;
+    constexpr auto value() const
+    {
+        if (!mT.has_value())
+        {
+            throw std::runtime_error{"Id has no binding!"};
+        }
+        return mT.value();
+    }
+    constexpr void bind(T t)
+    {
+        mT = std::move(t);
+    }
+private:
+    std::optional<T> mT;
+};
+
+template <typename T>
+class Nullary : public T
+{
+public:
+    using T::operator();
+};
+
+template <typename T>
+constexpr auto nullary(T const &t)
+{
+    return Nullary<T>{t};
+}
+
+template <typename T>
+class IsNullaryOrId : public std::false_type
+{
+};
+
+template <typename T>
+class IsNullaryOrId<Id<T>> : public std::true_type
+{
+};
+
+template <typename T>
+class IsNullaryOrId<Nullary<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isNullaryOrIdV = IsNullaryOrId<std::decay_t<T>>::value;
+
+} // namespace do_
 namespace impl
 {
     template <typename T>
@@ -220,19 +275,19 @@ template <typename F>
 class CallViaPipe
 {
 public:
-    template <typename Arg>
+    template <typename Arg, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg>>>
     constexpr auto operator|(Arg&& arg) const
     {
-        return static_cast<F const*>(this)->operator()(std::forward<Arg>(arg));
+        return static_cast<F const&>(*this).operator()(std::forward<Arg>(arg));
     }
-    template <typename Arg>
+
+    template <typename Arg, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg>>>
     constexpr auto operator||(Arg&& arg) const
     {
         return operator|(arg);
     }
 };
-
-template <typename Arg, typename F>
+template <typename Arg, typename F, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg> && !do_::isNullaryOrIdV<F>>>
 constexpr auto operator&(Arg&& arg, CallViaPipe<F> const& func)
 {
     return func | arg;
@@ -382,13 +437,13 @@ public:
     Left left;
 };
 
-template <typename Left, typename Func, typename = std::enable_if_t<isFunctionV<Func> || isGenericFunctionV<Func>, bool>>
+template <typename Left, typename Func, typename = std::enable_if_t<(isFunctionV<Func> || isGenericFunctionV<Func>) && !do_::isNullaryOrIdV<Left>, bool>>
 constexpr auto operator<(Left&& left, Func&& func)
 {
     return LeftClosedFunc<std::decay_t<Func>, std::decay_t<Left>>{std::forward<Func>(func), std::forward<Left>(left)};
 }
 
-template <typename Left, typename Func, typename Right>
+template <typename Left, typename Func, typename Right, typename = std::enable_if_t<!do_::isNullaryOrIdV<Right>, bool>>
 constexpr auto operator>(LeftClosedFunc<Func, Left> const& lcFunc, Right&& right)
 {
     return lcFunc.func | lcFunc.left | right;
@@ -1617,6 +1672,12 @@ struct DataTrait<Class<Data, Rest...>>
     using Type = Data;
     template <typename DataT>
     using ReplaceDataTypeWith = Class<DataT>;
+};
+
+template <typename A, typename Repr>
+struct DataTrait<data::Parser<A, Repr>>
+{
+    using Type = A;
 };
 
 template <typename T>
@@ -3169,21 +3230,22 @@ constexpr auto evalDeferred = toGFunc<1>([](auto&& d)
 });
 
 // >>= is right-assocative in C++, have to add some parens when chaining the calls.
-template <typename Arg, typename Func, typename Ret = std::invoke_result_t<Func, Arg>>
+template <typename Arg, typename Func, typename Ret = std::invoke_result_t<Func, Arg>,
+    typename = std::enable_if_t<!do_::isNullaryOrIdV<Func> && !do_::isNullaryOrIdV<Arg>, bool>>
 constexpr auto operator>>=(DeferredPure<Arg> const& arg, Func const& func)
 {
     using MType = MonadType<Ret>;
     return MType::bind(evalDeferred<Ret> | arg, func);
 }
 
-template <typename MonadData, typename Func>
+template <typename MonadData, typename Func, typename = std::enable_if_t<!do_::isNullaryOrIdV<MonadData> && !do_::isNullaryOrIdV<Func>, bool>>
 constexpr auto operator>>=(MonadData const& data, Func const& func)
 {
     using MType = MonadType<MonadData>;
     return MType::bind(data, evalDeferred<MonadData> <o> func);
 }
 
-template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred>, bool>>
+template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred> && !do_::isNullaryOrIdV<MonadData>, bool>>
 constexpr auto operator>>(Deferred const& arg, MonadData const& data)
 {
     using MType = MonadType<MonadData>;
@@ -3238,6 +3300,135 @@ constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
         return tmp2;
     };
 };
+
+namespace do_
+{
+
+template <typename M, typename T = DataType<M>>
+class DeMonad
+{
+public:
+    constexpr DeMonad(M m, Id<T>& id)
+    : mM{std::move(m)}
+    , mId{id}
+    {
+    }
+    constexpr decltype(auto) m() const
+    {
+        return mM;
+    }
+    constexpr auto id() const -> std::reference_wrapper<Id<T>>
+    {
+        return mId;
+    }
+
+private:
+    M mM;
+    std::reference_wrapper<Id<T>> mId;
+};
+
+template <typename M, typename T = DataType<M>>
+constexpr auto operator<= (Id<T>& id, M const& m)
+{
+    return DeMonad{m, id};
+}
+
+template <typename Head, typename... Rest>
+constexpr auto doImpl(Head head)
+{
+    return head;
+}
+
+template <typename T>
+class EvalTraits
+{
+public:
+    template <typename... Args>
+    constexpr static decltype(auto) evalImpl(T const &v)
+    {
+        return v;
+    }
+};
+
+template <typename T>
+class EvalTraits<Nullary<T>>
+{
+public:
+    constexpr static decltype(auto) evalImpl(Nullary<T> const &e) { return e(); }
+};
+
+// Only allowed in nullary
+template <typename T>
+class EvalTraits<Id<T>>
+{
+public:
+    constexpr static decltype(auto) evalImpl(Id<T> const &id)
+    {
+        return id.value();
+    }
+};
+
+template <typename T>
+constexpr decltype(auto) evaluate_(T const &t)
+{
+    return EvalTraits<T>::evalImpl(t);
+}
+
+#define UN_OP_FOR_NULLARY(op)                                               \
+    template <typename T, std::enable_if_t<isNullaryOrIdV<T>, bool> = true> \
+    constexpr auto operator op(T&&t)                                  \
+    {                                                                       \
+        return nullary([&] { return op evaluate_(t); });                    \
+    }
+
+#define BIN_OP_FOR_NULLARY(op)                                                  \
+    template <typename T, typename U,                                           \
+              std::enable_if_t<isNullaryOrIdV<T> || isNullaryOrIdV<U>, bool> =  \
+                  true>                                                         \
+    constexpr auto operator op(T &&t, U &&u)                                    \
+    {                                                                           \
+        return nullary([&] { return evaluate_(t) op evaluate_(u); });           \
+    }
+
+BIN_OP_FOR_NULLARY(|)
+BIN_OP_FOR_NULLARY(||)
+BIN_OP_FOR_NULLARY(>>)
+BIN_OP_FOR_NULLARY(*)
+BIN_OP_FOR_NULLARY(+)
+BIN_OP_FOR_NULLARY(==)
+
+template <typename T, typename BodyBaker>
+constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker&& bodyBaker)
+{
+    return [&](T const& t)
+    {
+        // bind before baking body.
+        param.get().bind(t);
+        return evaluate_(bodyBaker());
+    };
+}
+
+template <typename M, typename... Rest>
+constexpr auto doImpl(DeMonad<M> const& dm, Rest&&... rest)
+{
+    auto const bodyBaker = [=] { return doImpl(rest...);};
+    return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
+}
+
+template <typename Head, typename... Rest>
+constexpr auto doImpl(Head const& head, Rest&&... rest)
+{
+    using hspp::operator>>;
+    return head >> doImpl(rest...);
+}
+
+template <typename Head, typename... Rest>
+constexpr auto do_(Head&& head, Rest&&... rest)
+{
+    return doImpl(head, rest...);
+}
+
+}
 } // namespace hspp
 
 #endif // HSPP_H

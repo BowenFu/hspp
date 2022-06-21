@@ -1369,7 +1369,7 @@ constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 {
     return p
     >>= [=](auto a) { return
-        (many | (sep >>= p))
+        (many | (sep >> p))
         >>= [=](auto as) { return
             return_ || a <cons>  as;
         };
@@ -1379,7 +1379,7 @@ constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 template <typename A, typename Repr, typename B, typename Repr1>
 constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
 {
-    return toParser || triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{});
+    return (triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{}));
 }
 
 constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
@@ -1420,6 +1420,18 @@ constexpr auto isSpace = toFunc<> | [](char c)
 };
 
 const auto space = many || sat | isSpace;
+
+// This will fail some tests.
+// constexpr auto token = toGFunc<1> | [](auto p)
+// {
+//     using A = DataType<decltype(p)>;
+//     do_::Id<A> a;
+//     return do_::do_(
+//         a <= p,
+//         space,
+//         return_ | a
+//     );
+// };
 
 constexpr auto token = toGFunc<1> | [](auto p)
 {
@@ -1480,10 +1492,9 @@ TEST(Parser, many)
 
 TEST(Parser, seqBy)
 {
-    (void)sepBy;
-//     auto const result = runParser | (sepBy | (string | "1"s) | (char_ | '2')) || "12123";
-//     auto const expected = std::vector{"1"s, "1"s};
-//     EXPECT_EQ(std::get<0>(result.at(0)), expected);
+    auto const result = runParser | (sepBy | (string | "1"s) | (char_ | '2')) || "12123";
+    auto const expected = std::vector{"1"s, "1"s};
+    EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
 TEST(Parser, space)
@@ -1569,7 +1580,7 @@ constexpr auto isDigit = toFunc<> | [](char x)
 
 extern const TEParser<int> expr;
 
-constexpr auto digit = (token || sat | isDigit)
+const auto digit = (token || sat | isDigit)
                     >>= [](char x) { return
                     return_ | (x - '0');
                 };
@@ -1623,3 +1634,52 @@ TEST(Parser, expr)
     auto const expected = -1;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
+
+TEST(do_, x)
+{
+    auto const result = do_::do_(
+        just | 1,
+        return_ | 2
+    );
+    auto const expected = just(2);
+    EXPECT_EQ(result, expected);
+}
+
+TEST(do_, y)
+{
+    do_::Id<int> i;
+    auto const result = do_::do_(
+        i <= (just | 1),
+        return_ | i
+    );
+    auto const expected = just(1);
+    EXPECT_EQ(result, expected);
+}
+
+TEST(do_, z)
+{
+    do_::Id<int> i;
+    do_::Id<int> j;
+    auto const result = do_::do_(
+        j <= (just | 2),
+        just(4),
+        i <= (just | 1),
+        return_ | j
+    );
+    auto const expected = just(2);
+    EXPECT_EQ(result, expected);
+}
+
+// TEST(do_, vector)
+// {
+//     do_::Id<int> i;
+//     do_::Id<int> j;
+//     auto const result = do_::do_(
+//         i <= std::vector{1, 2},
+//         j <= std::vector{3, 4},
+//         guard | (i + j == 5),
+//         Monad<std::vector>::return_ | (i * j)
+//     );
+//     auto const expected = std::vector{4, 6};
+//     EXPECT_EQ(result, expected);
+// }

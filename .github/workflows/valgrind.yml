@@ -8,7 +8,7 @@ on:
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: RelWithDebInfo
+  BUILD_TYPE: Debug
 
 jobs:
   build:
@@ -45,4 +45,9 @@ jobs:
       run: |
         ctest --output-on-failure --parallel 4 -C ${{env.BUILD_TYPE}} --overwrite MemoryCheckCommandOptions="--leak-check=full --error-exitcode=100" -T memcheck
         # --overwrite MemoryCheckSuppressionFile=/path/to/valgrind.suppressions \
+    
+    - name: Cat log
+      if: failure()
+      run: |
+        cat ${{github.workspace}}/build/Testing/Temporary/MemoryChecker*.log
       
