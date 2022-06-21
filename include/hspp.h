@@ -3390,12 +3390,12 @@ constexpr decltype(auto) evaluate_(T const &t)
         return nullary([&] { return evaluate_(t) op evaluate_(u); });           \
     }
 
-BIN_OP_FOR_NULLARY(|);
-BIN_OP_FOR_NULLARY(||);
-BIN_OP_FOR_NULLARY(>>);
-BIN_OP_FOR_NULLARY(*);
-BIN_OP_FOR_NULLARY(+);
-BIN_OP_FOR_NULLARY(==);
+BIN_OP_FOR_NULLARY(|)
+BIN_OP_FOR_NULLARY(||)
+BIN_OP_FOR_NULLARY(>>)
+BIN_OP_FOR_NULLARY(*)
+BIN_OP_FOR_NULLARY(+)
+BIN_OP_FOR_NULLARY(==)
 
 template <typename T, typename BodyBaker>
 constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker&& bodyBaker)
