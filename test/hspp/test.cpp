@@ -1675,10 +1675,9 @@ TEST(do_, vector)
     do_::Id<int> i;
     auto const result = do_::do_(
         i <= std::vector{1, 2, 3, 4},
-        guard | (i % 2 == 0),
         Monad<std::vector>::return_ | i
     );
-    auto const expected = std::vector{2, 4};
+    auto const expected = std::vector{1, 2, 3, 4};
     EXPECT_EQ(result, expected);
 }
 
