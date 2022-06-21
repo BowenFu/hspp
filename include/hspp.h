@@ -3411,7 +3411,7 @@ constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBa
 template <typename M, typename... Rest>
 constexpr auto doImpl(DeMonad<M> const& dm, Rest&&... rest)
 {
-    auto const bodyBaker = [&] { return doImpl(rest...);};
+    auto const bodyBaker = [=] { return doImpl(rest...);};
     return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
