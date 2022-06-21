@@ -45,4 +45,8 @@ jobs:
       run: |
         ctest --output-on-failure --parallel 4 -C ${{env.BUILD_TYPE}} --overwrite MemoryCheckCommandOptions="--leak-check=full --error-exitcode=100" -T memcheck
         # --overwrite MemoryCheckSuppressionFile=/path/to/valgrind.suppressions \
+    
+    - name: Cat log
+      run: |
+        cat ${{github.workspace}}/build/Testing/Temporary/MemoryChecker*.log
       
