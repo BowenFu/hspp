@@ -3396,6 +3396,7 @@ BIN_OP_FOR_NULLARY(>>)
 BIN_OP_FOR_NULLARY(*)
 BIN_OP_FOR_NULLARY(+)
 BIN_OP_FOR_NULLARY(==)
+BIN_OP_FOR_NULLARY(%)
 
 template <typename T, typename BodyBaker>
 constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker const& bodyBaker)
