@@ -26,27 +26,42 @@
 
 namespace hspp
 {
+template <typename... Ts>
+class Overload : Ts...
+{
+public:
+    constexpr Overload(Ts... ts)
+    : Ts{ts}...
+    {}
+    using Ts::operator()...;
+};
+
+template <typename... Ts>
+auto overload(Ts&&... ts)
+{
+    return Overload<Ts...>{std::forward<Ts>(ts)...};
+}
+
 namespace do_
 {
 template <typename T>
 class Id
 {
+    std::shared_ptr<T> mT = std::make_shared<T>();
 public:
     constexpr Id() = default;
-    constexpr auto value() const
+    constexpr auto const& value() const
     {
-        if (!mT.has_value())
+        if (!mT)
         {
             throw std::runtime_error{"Id has no binding!"};
         }
-        return mT.value();
+        return *mT;
     }
-    constexpr void bind(T t)
+    constexpr void bind(T v)
     {
-        mT = std::move(t);
+        *mT = std::move(v);
     }
-private:
-    std::optional<T> mT;
 };
 
 template <typename T>
@@ -130,22 +145,6 @@ constexpr decltype(auto) takeTuple(Tuple &&t)
 
 template <std::size_t len, class Tuple>
 using TakeTupleType = std::decay_t<decltype(takeTuple<len>(std::declval<Tuple>()))>;
-
-template <typename... Ts>
-class Overload : Ts...
-{
-public:
-    constexpr Overload(Ts... ts)
-    : Ts{ts}...
-    {}
-    using Ts::operator()...;
-};
-
-template <typename... Ts>
-auto overload(Ts&&... ts)
-{
-    return Overload<Ts...>{std::forward<Ts>(ts)...};
-}
 
 
 namespace data
@@ -3253,7 +3252,8 @@ constexpr auto operator>>(Deferred const& arg, MonadData const& data)
 }
 
 template <typename MonadData1, typename MonadData2,
-    std::enable_if_t<std::is_same_v<MonadType<MonadData1>, MonadType<MonadData2>>, bool*> = nullptr>
+    std::enable_if_t<std::is_same_v<MonadType<MonadData1>, MonadType<MonadData2>>
+    && !do_::isNullaryOrIdV<MonadData1> && !do_::isNullaryOrIdV<MonadData2>, bool*> = nullptr>
 constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     using MType = MonadType<MonadData1>;
@@ -3308,8 +3308,8 @@ template <typename M, typename T = DataType<M>>
 class DeMonad
 {
 public:
-    constexpr DeMonad(M m, Id<T>& id)
-    : mM{std::move(m)}
+    constexpr DeMonad(M const& m, Id<T>& id)
+    : mM{m}
     , mId{id}
     {
     }
@@ -3323,7 +3323,7 @@ public:
     }
 
 private:
-    M mM;
+    std::reference_wrapper<M const> mM;
     std::reference_wrapper<Id<T>> mId;
 };
 
@@ -3334,7 +3334,7 @@ constexpr auto operator<= (Id<T>& id, M const& m)
 }
 
 template <typename Head, typename... Rest>
-constexpr auto doImpl(Head head)
+constexpr auto doImpl(Head const& head)
 {
     return head;
 }
@@ -3385,9 +3385,9 @@ constexpr decltype(auto) evaluate_(T const &t)
     template <typename T, typename U,                                           \
               std::enable_if_t<isNullaryOrIdV<T> || isNullaryOrIdV<U>, bool> =  \
                   true>                                                         \
-    constexpr auto operator op(T &&t, U &&u)                                    \
+    constexpr auto operator op(T t, U u)                                    \
     {                                                                           \
-        return nullary([&] { return evaluate_(t) op evaluate_(u); });           \
+        return nullary([t=std::move(t), u=std::move(u)] { return evaluate_(t) op evaluate_(u); });           \
     }
 
 BIN_OP_FOR_NULLARY(|)
@@ -3396,9 +3396,10 @@ BIN_OP_FOR_NULLARY(>>)
 BIN_OP_FOR_NULLARY(*)
 BIN_OP_FOR_NULLARY(+)
 BIN_OP_FOR_NULLARY(==)
+BIN_OP_FOR_NULLARY(%)
 
 template <typename T, typename BodyBaker>
-constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker&& bodyBaker)
+constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker const& bodyBaker)
 {
     return [&](T const& t)
     {
@@ -3409,21 +3410,21 @@ constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBa
 }
 
 template <typename M, typename... Rest>
-constexpr auto doImpl(DeMonad<M> const& dm, Rest&&... rest)
+constexpr auto doImpl(DeMonad<M> const& dm, Rest const&... rest)
 {
-    auto const bodyBaker = [=] { return doImpl(rest...);};
-    return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
+    auto const bodyBaker = [&] { return doImpl(rest...);};
+    return dm.m().get() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
 template <typename Head, typename... Rest>
-constexpr auto doImpl(Head const& head, Rest&&... rest)
+constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
     using hspp::operator>>;
     return head >> doImpl(rest...);
 }
 
 template <typename Head, typename... Rest>
-constexpr auto do_(Head&& head, Rest&&... rest)
+constexpr auto do_(Head const& head, Rest const&... rest)
 {
     return doImpl(head, rest...);
 }
