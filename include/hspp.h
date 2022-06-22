@@ -3432,7 +3432,7 @@ constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBa
     };
 }
 
-template <typename MClass, typename Head, typename... Rest>
+template <typename MClass, typename Head>
 constexpr auto doImpl(Head const& head)
 {
     return evalDeferred<MClass> | head;
@@ -3445,7 +3445,7 @@ constexpr auto doImpl(DeMonad<MClass> const& dm, Rest const&... rest)
     return dm.m().get() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
-template <typename MClass, typename Head, typename... Rest>
+template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head>, void>>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
     return (evalDeferred<MClass> | head) >> doImpl<MClass>(rest...);
