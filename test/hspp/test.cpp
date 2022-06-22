@@ -1699,7 +1699,7 @@ TEST(do_, vector1)
     auto const result = do_::do_(
         i <= std::vector{1, 2, 3, 4},
         guard | (i % 2 == 0),
-        Monad<std::vector>::return_ | (i * 3)
+        return_ | (i * 3)
     );
     auto const expected = std::vector{6, 12};
     EXPECT_EQ(result, expected);
@@ -1713,8 +1713,18 @@ TEST(do_, vector2)
         i <= std::vector{1, 2},
         j <= std::vector{3, 4},
         guard | (i + j == 5),
-        Monad<std::vector>::return_ | (i * j)
+        return_ | (i * j)
     );
+    auto const expected = std::vector{4, 6};
+    EXPECT_EQ(result, expected);
+}
+
+TEST(do_, comprehension)
+{
+    do_::Id<int> i;
+    do_::Id<int> j;
+    auto const result =
+    do_::_(return_ | (i * j), i <= std::vector{1, 2}, j <= std::vector{3, 4}, guard | (i + j == 5));
     auto const expected = std::vector{4, 6};
     EXPECT_EQ(result, expected);
 }
