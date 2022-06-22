@@ -2809,6 +2809,10 @@ public:
     Data mData;
 };
 
+// Delete template.
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Data>
+struct TypeClassTrait<TypeClassT, DeferredPure<Data>>;
+
 template <typename Data>
 constexpr auto pureImpl(Data const& data)
 {
@@ -3014,6 +3018,17 @@ public:
 
 template <typename T>
 using MonadType = typename TypeClassTrait<Monad, std::decay_t<T>>::Type;
+
+template <typename T, typename Enable = void>
+class IsMonad : public std::false_type
+{};
+template <typename T>
+class IsMonad<T, std::void_t<MonadType<T>>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isMonadV = IsMonad<std::decay_t<T>>::value;
+
+static_assert(isMonadV<std::vector<int>>);
 
 /////////// MonadPlus //////////
 
@@ -3304,9 +3319,10 @@ constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
 namespace do_
 {
 
-template <typename M, typename T = DataType<M>>
+template <typename M>
 class DeMonad
 {
+    using T = DataType<M>;
 public:
     constexpr DeMonad(M const& m, Id<T>& id)
     : mM{m}
@@ -3327,16 +3343,21 @@ private:
     std::reference_wrapper<Id<T>> mId;
 };
 
-template <typename M, typename T = DataType<M>>
-constexpr auto operator<= (Id<T>& id, M const& m)
+template <typename... Ts>
+class IsDeMonad : public std::false_type
+{};
+template <typename... Ts>
+class IsDeMonad<DeMonad<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isDeMonadV = IsDeMonad<std::decay_t<T>>::value;
+
+
+
+template <typename M>
+constexpr auto operator<= (Id<DataType<M>>& id, M const& m)
 {
     return DeMonad{m, id};
-}
-
-template <typename Head, typename... Rest>
-constexpr auto doImpl(Head const& head)
-{
-    return head;
 }
 
 template <typename T>
@@ -3390,6 +3411,8 @@ constexpr decltype(auto) evaluate_(T const &t)
         return nullary([t=std::move(t), u=std::move(u)] { return evaluate_(t) op evaluate_(u); });           \
     }
 
+using hspp::operator>>;
+
 BIN_OP_FOR_NULLARY(|)
 BIN_OP_FOR_NULLARY(||)
 BIN_OP_FOR_NULLARY(>>)
@@ -3409,27 +3432,113 @@ constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBa
     };
 }
 
-template <typename M, typename... Rest>
-constexpr auto doImpl(DeMonad<M> const& dm, Rest const&... rest)
+template <typename MClass, typename Head, typename... Rest>
+constexpr auto doImpl(Head const& head)
 {
-    auto const bodyBaker = [&] { return doImpl(rest...);};
+    return evalDeferred<MClass> | head;
+}
+
+template <typename MClass, typename... Rest>
+constexpr auto doImpl(DeMonad<MClass> const& dm, Rest const&... rest)
+{
+    auto const bodyBaker = [&] { return doImpl<MClass>(rest...);};
     return dm.m().get() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
-template <typename Head, typename... Rest>
+template <typename MClass, typename Head, typename... Rest>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
-    using hspp::operator>>;
-    return head >> doImpl(rest...);
+    return (evalDeferred<MClass> | head) >> doImpl<MClass>(rest...);
 }
+
+// Get class type that is a monad.
+template <typename T, typename Enable = void>
+struct MonadClassImpl;
+
+template <>
+struct MonadClassImpl<std::tuple<>>
+{
+    using Type = void;
+};
+
+template <typename T1, typename T2, typename Enable1 = void, typename Enable2 = void>
+struct SameMType : std::false_type{};
+
+template <typename T1, typename T2>
+struct SameMType<T1, T2, std::void_t<MonadType<T1>>, std::void_t<MonadType<T2>>>
+{
+    constexpr static auto value = std::is_same_v<MonadType<T1>, MonadType<T2>>;
+};
+
+static_assert(SameMType<hspp::data::Maybe<int>, hspp::data::Maybe<int>>::value);
+
+template <typename Head, typename... Rest>
+struct MonadClassImpl<std::tuple<Head, Rest...>, std::enable_if_t<isMonadV<Head>, void>>
+{
+    using Type = Head;
+private:
+    using RType = typename MonadClassImpl<std::tuple<Rest...>>::Type;
+    static_assert(std::is_same_v<void, RType> || SameMType<Type, RType>::value);
+};
+
+template <typename Head, typename... Rest>
+struct MonadClassImpl<std::tuple<DeMonad<Head>, Rest...>, std::enable_if_t<isMonadV<Head>, void>>
+{
+    using Type = Head;
+private:
+    using RType = typename MonadClassImpl<std::tuple<Rest...>>::Type;
+    static_assert(std::is_same_v<void, RType> || SameMType<Type, RType>::value);
+};
+
+template <typename Head, typename... Rest>
+struct MonadClassImpl<std::tuple<Head, Rest...>, std::enable_if_t<!isMonadV<Head> && !isDeMonadV<Head>, void>>
+{
+    using Type = typename MonadClassImpl<std::tuple<Rest...>>::Type;
+};
+
+
+// Get class type that is a monad.
+template <typename... Ts>
+struct MonadClass
+{
+    using Type = typename MonadClassImpl<std::tuple<Ts...>>::Type;
+    static_assert(!std::is_same_v<Type, void>);
+};
+
+template <typename... Ts>
+using MonadClassType = typename MonadClass<std::decay_t<Ts>...>::Type;
+
+static_assert(isMonadV<data::Maybe<int>>);
+static_assert(std::is_same_v<MonadClassType<data::Maybe<int>>, data::Maybe<int>>);
 
 template <typename Head, typename... Rest>
 constexpr auto do_(Head const& head, Rest const&... rest)
 {
-    return doImpl(head, rest...);
+    using MClass = MonadClassType<Head, Rest...>;
+    return doImpl<MClass>(head, rest...);
 }
 
+
+template <typename Head, typename... Rest>
+constexpr auto _(Head const& head, Rest const&... rest)
+{
+    return do_(rest..., head);
 }
+
+} // namespace do_
+
+// Delete template.
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Data>
+struct TypeClassTrait<TypeClassT, do_::DeMonad<Data>>;
+
+// Delete template.
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename T>
+struct TypeClassTrait<TypeClassT, do_::Nullary<T>>;
+
+// Delete template.
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename T>
+struct TypeClassTrait<TypeClassT, do_::Id<T>>;
+
 } // namespace hspp
 
 #endif // HSPP_H
