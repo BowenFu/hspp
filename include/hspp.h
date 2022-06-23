@@ -3508,7 +3508,7 @@ BIN_OP_FOR_NULLARY(%)
 template <typename T, typename BodyBaker>
 constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker const& bodyBaker)
 {
-    return [&](T const& t)
+    return [=](T const& t)
     {
         // bind before baking body.
         param.get().bind(t);
