@@ -1670,16 +1670,16 @@ TEST(do_, z)
     EXPECT_EQ(result, expected);
 }
 
-// TEST(do_, range)
-// {
-//     doN::Id<int> i;
-//     auto const result = toVector | doN::do_(
-//         i <= (take | enumFrom(1) | 4U),
-//         return_ | i
-//     );
-//     auto const expected = std::vector{1, 2, 3, 4};
-//     EXPECT_EQ(result, expected);
-// }
+TEST(do_, range)
+{
+    doN::Id<int> i;
+    auto const result = toVector | doN::do_(
+        i <= ownedRange(SingleView{1}),
+        return_ | i
+    );
+    auto const expected = std::vector{1};
+    EXPECT_EQ(result, expected);
+}
 
 TEST(do_, vector)
 {
@@ -1750,16 +1750,34 @@ TEST(do_, comprehension)
     Id<int> i;
     Id<int> j;
     auto const result =
-        _(return_ | (i * j), i <= std::vector{1, 2}, j <= std::vector{3, 4}, if_ | (i + j == 5));
+        _(i * j, i <= std::vector{1, 2}, j <= std::vector{3, 4}, if_ | (i + j == 5));
     auto const expected = std::vector{4, 6};
     EXPECT_EQ(result, expected);
 }
 
-// TEST(do_, comprehension2)
-// {
-//     doN::Id<int> i;
-//     doN::Id<int> j;
-//     auto const result = toVector | doN::_(return_ | (i * j), i <= ownedRange(IotaView{1, 10}), j <= ownedRange(IotaView{1, 10}), guard | (i + j == 5));
-//     auto const expected = std::vector{4, 6};
-//     EXPECT_EQ(result, expected);
-// }
+TEST(do_, comprehension2)
+{
+    doN::Id<int> i;
+    doN::Id<int> j;
+    auto const result = toVector | doN::_(i * j, i <= ownedRange(IotaView{1, 10}), j <= ownedRange(IotaView{1, 10}), guard | (i + j == 5));
+    auto const expected = std::vector{4, 6, 6, 4};
+    EXPECT_EQ(result, expected);
+}
+
+TEST(do_, comprehension3)
+{
+    using namespace hspp::doN;
+    Id<int> i;
+    Id<int> j;
+    Id<int> k;
+    auto const result = toVector |
+    _(
+        makeTuple<3> | i | j | k,
+        i <= ownedRange(IotaView{1, 20}),
+        j <= ownedRange(IotaView{1, 20}),
+        k <= ownedRange(IotaView{1, 20}),
+        if_ || (i < j) && (i*i + j*j == k*k)
+    );
+    auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 5, 12, 13 }, { 6, 8, 10 }, { 8, 15, 17 }, { 9, 12, 15 } };
+    EXPECT_EQ(result, expected);
+}
