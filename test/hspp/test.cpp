@@ -1670,16 +1670,16 @@ TEST(do_, z)
     EXPECT_EQ(result, expected);
 }
 
-// TEST(do_, range)
-// {
-//     doN::Id<int> i;
-//     auto const result = toVector | doN::do_(
-//         i <= (take | enumFrom(1) | 4U),
-//         return_ | i
-//     );
-//     auto const expected = std::vector{1, 2, 3, 4};
-//     EXPECT_EQ(result, expected);
-// }
+TEST(do_, range)
+{
+    doN::Id<int> i;
+    auto const result = toVector | doN::do_(
+        i <= ownedRange(SingleView{1}),
+        return_ | i
+    );
+    auto const expected = std::vector{1};
+    EXPECT_EQ(result, expected);
+}
 
 TEST(do_, vector)
 {
