@@ -1421,12 +1421,12 @@ constexpr auto isSpace = toFunc<> | [](char c)
 
 const auto space = many || sat | isSpace;
 
-// This will fail some tests.
+// // This will fail some tests.
 // constexpr auto token = toGFunc<1> | [](auto p)
 // {
 //     using A = DataType<decltype(p)>;
-//     do_::Id<A> a;
-//     return do_::do_(
+//     doN::Id<A> a;
+//     return doN::do_(
 //         a <= p,
 //         space,
 //         return_ | a
@@ -1637,7 +1637,7 @@ TEST(Parser, expr)
 
 TEST(do_, x)
 {
-    auto const result = do_::do_(
+    auto const result = doN::do_(
         just | 1,
         return_ | 2
     );
@@ -1647,8 +1647,8 @@ TEST(do_, x)
 
 TEST(do_, y)
 {
-    do_::Id<int> i;
-    auto const result = do_::do_(
+    doN::Id<int> i;
+    auto const result = doN::do_(
         i <= (just | 1),
         return_ | i
     );
@@ -1658,9 +1658,9 @@ TEST(do_, y)
 
 TEST(do_, z)
 {
-    do_::Id<int> i;
-    do_::Id<int> j;
-    auto const result = do_::do_(
+    doN::Id<int> i;
+    doN::Id<int> j;
+    auto const result = doN::do_(
         j <= (just | 2),
         just(4),
         i <= (just | 1),
@@ -1670,24 +1670,47 @@ TEST(do_, z)
     EXPECT_EQ(result, expected);
 }
 
+// TEST(do_, range)
+// {
+//     doN::Id<int> i;
+//     auto const result = toVector | doN::do_(
+//         i <= (take | enumFrom(1) | 4U),
+//         return_ | i
+//     );
+//     auto const expected = std::vector{1, 2, 3, 4};
+//     EXPECT_EQ(result, expected);
+// }
+
 TEST(do_, vector)
 {
-    do_::Id<int> i;
-    auto const result = do_::do_(
+    doN::Id<int> i;
+    auto const result = doN::do_(
         i <= std::vector{1, 2, 3, 4},
-        Monad<std::vector>::return_ | i
+        return_ | i
     );
     auto const expected = std::vector{1, 2, 3, 4};
     EXPECT_EQ(result, expected);
 }
 
+TEST(do_, list)
+{
+    doN::Id<int> i;
+    auto const result = doN::do_(
+        i <= std::list{1, 2, 3, 4},
+        return_ | i
+    );
+    auto const expected = std::list{1, 2, 3, 4};
+    EXPECT_EQ(result, expected);
+}
+
 TEST(do_, vector0)
 {
-    do_::Id<int> i;
-    auto const result = do_::do_(
+    using namespace hspp::doN;
+    Id<int> i;
+    auto const result = do_(
         i <= std::vector{1, 2, 3, 4},
         guard | (i % 2 == 0),
-        Monad<std::vector>::return_ | i
+        return_ | i
     );
     auto const expected = std::vector{2, 4};
     EXPECT_EQ(result, expected);
@@ -1695,8 +1718,9 @@ TEST(do_, vector0)
 
 TEST(do_, vector1)
 {
-    do_::Id<int> i;
-    auto const result = do_::do_(
+    using namespace hspp::doN;
+    Id<int> i;
+    auto const result = do_(
         i <= std::vector{1, 2, 3, 4},
         guard | (i % 2 == 0),
         return_ | (i * 3)
@@ -1707,9 +1731,10 @@ TEST(do_, vector1)
 
 TEST(do_, vector2)
 {
-    do_::Id<int> i;
-    do_::Id<int> j;
-    auto const result = do_::do_(
+    using namespace hspp::doN;
+    Id<int> i;
+    Id<int> j;
+    auto const result = do_(
         i <= std::vector{1, 2},
         j <= std::vector{3, 4},
         guard | (i + j == 5),
@@ -1721,11 +1746,20 @@ TEST(do_, vector2)
 
 TEST(do_, comprehension)
 {
-    do_::Id<int> i;
-    do_::Id<int> j;
+    using namespace hspp::doN;
+    Id<int> i;
+    Id<int> j;
     auto const result =
-    do_::_(return_ | (i * j), i <= std::vector{1, 2}, j <= std::vector{3, 4}, guard | (i + j == 5));
+        _(return_ | (i * j), i <= std::vector{1, 2}, j <= std::vector{3, 4}, if_ | (i + j == 5));
     auto const expected = std::vector{4, 6};
     EXPECT_EQ(result, expected);
 }
 
+// TEST(do_, comprehension2)
+// {
+//     doN::Id<int> i;
+//     doN::Id<int> j;
+//     auto const result = toVector | doN::_(return_ | (i * j), i <= ownedRange(IotaView{1, 10}), j <= ownedRange(IotaView{1, 10}), guard | (i + j == 5));
+//     auto const expected = std::vector{4, 6};
+//     EXPECT_EQ(result, expected);
+// }
