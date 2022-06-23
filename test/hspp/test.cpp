@@ -1755,11 +1755,11 @@ TEST(do_, comprehension)
     EXPECT_EQ(result, expected);
 }
 
-// TEST(do_, comprehension2)
-// {
-//     doN::Id<int> i;
-//     doN::Id<int> j;
-//     auto const result = toVector | doN::_(return_ | (i * j), i <= ownedRange(IotaView{1, 10}), j <= ownedRange(IotaView{1, 10}), guard | (i + j == 5));
-//     auto const expected = std::vector{4, 6};
-//     EXPECT_EQ(result, expected);
-// }
+TEST(do_, comprehension2)
+{
+    doN::Id<int> i;
+    doN::Id<int> j;
+    auto const result = toVector | doN::_(return_ | (i * j), i <= ownedRange(IotaView{1, 10}), j <= ownedRange(IotaView{1, 10}), guard | (i + j == 5));
+    auto const expected = std::vector{4, 6};
+    EXPECT_EQ(result, expected);
+}
