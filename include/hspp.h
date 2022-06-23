@@ -3504,6 +3504,8 @@ BIN_OP_FOR_NULLARY(*)
 BIN_OP_FOR_NULLARY(+)
 BIN_OP_FOR_NULLARY(==)
 BIN_OP_FOR_NULLARY(%)
+BIN_OP_FOR_NULLARY(<)
+BIN_OP_FOR_NULLARY(&&)
 
 template <typename T, typename BodyBaker>
 constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker const& bodyBaker)
@@ -3525,7 +3527,7 @@ constexpr auto doImpl(Head const& head)
 template <typename MClass, typename... Rest>
 constexpr auto doImpl(DeMonad<MClass> const& dm, Rest const&... rest)
 {
-    auto const bodyBaker = [&] { return doImpl<MClass>(rest...);};
+    auto const bodyBaker = [=] { return doImpl<MClass>(rest...);};
     return dm.m().get() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
@@ -3605,7 +3607,7 @@ constexpr auto do_(Head const& head, Rest const&... rest)
 template <typename Head, typename... Rest>
 constexpr auto _(Head const& head, Rest const&... rest)
 {
-    return do_(rest..., head);
+    return do_(rest..., return_ | head);
 }
 
 constexpr auto if_ = guard;
