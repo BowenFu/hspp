@@ -42,11 +42,12 @@ auto overload(Ts&&... ts)
     return Overload<Ts...>{std::forward<Ts>(ts)...};
 }
 
-namespace do_
+namespace doN
 {
 template <typename T>
 class Id
 {
+    // should be std::shared_ptr<std::optional<T>>
     std::shared_ptr<T> mT = std::make_shared<T>();
 public:
     constexpr Id() = default;
@@ -95,7 +96,8 @@ class IsNullaryOrId<Nullary<T>> : public std::true_type
 template <typename T>
 constexpr auto isNullaryOrIdV = IsNullaryOrId<std::decay_t<T>>::value;
 
-} // namespace do_
+} // namespace doN
+
 namespace impl
 {
     template <typename T>
@@ -274,19 +276,19 @@ template <typename F>
 class CallViaPipe
 {
 public:
-    template <typename Arg, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg>>>
+    template <typename Arg, typename = std::enable_if_t<!doN::isNullaryOrIdV<Arg>>>
     constexpr auto operator|(Arg&& arg) const
     {
         return static_cast<F const&>(*this).operator()(std::forward<Arg>(arg));
     }
 
-    template <typename Arg, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg>>>
+    template <typename Arg, typename = std::enable_if_t<!doN::isNullaryOrIdV<Arg>>>
     constexpr auto operator||(Arg&& arg) const
     {
         return operator|(arg);
     }
 };
-template <typename Arg, typename F, typename = std::enable_if_t<!do_::isNullaryOrIdV<Arg> && !do_::isNullaryOrIdV<F>>>
+template <typename Arg, typename F, typename = std::enable_if_t<!doN::isNullaryOrIdV<Arg> && !doN::isNullaryOrIdV<F>>>
 constexpr auto operator&(Arg&& arg, CallViaPipe<F> const& func)
 {
     return func | arg;
@@ -436,13 +438,13 @@ public:
     Left left;
 };
 
-template <typename Left, typename Func, typename = std::enable_if_t<(isFunctionV<Func> || isGenericFunctionV<Func>) && !do_::isNullaryOrIdV<Left>, bool>>
+template <typename Left, typename Func, typename = std::enable_if_t<(isFunctionV<Func> || isGenericFunctionV<Func>) && !doN::isNullaryOrIdV<Left>, bool>>
 constexpr auto operator<(Left&& left, Func&& func)
 {
     return LeftClosedFunc<std::decay_t<Func>, std::decay_t<Left>>{std::forward<Func>(func), std::forward<Left>(left)};
 }
 
-template <typename Left, typename Func, typename Right, typename = std::enable_if_t<!do_::isNullaryOrIdV<Right>, bool>>
+template <typename Left, typename Func, typename Right, typename = std::enable_if_t<!doN::isNullaryOrIdV<Right>, bool>>
 constexpr auto operator>(LeftClosedFunc<Func, Left> const& lcFunc, Right&& right)
 {
     return lcFunc.func | lcFunc.left | right;
@@ -1679,6 +1681,12 @@ struct DataTrait<data::Parser<A, Repr>>
     using Type = A;
 };
 
+template <typename A, typename Repr>
+struct DataTrait<data::Range<A, Repr>>
+{
+    using Type = A;
+};
+
 template <typename T>
 using DataType = typename DataTrait<std::decay_t<T>>::Type;
 
@@ -1690,10 +1698,40 @@ using ReplaceDataTypeWith = typename DataTrait<std::decay_t<T>>::template Replac
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT,  typename T>
 struct TypeClassTrait;
 
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, template <typename...> class C, typename... Args>
-struct TypeClassTrait<TypeClassT, C<Args...>>
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, std::vector<Args...>>
 {
-    using Type = TypeClassT<C>;
+    using Type = TypeClassT<std::vector>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, std::list<Args...>>
+{
+    using Type = TypeClassT<std::list>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, std::basic_string<Args...>>
+{
+    using Type = TypeClassT<std::basic_string>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, data::Range<Args...>>
+{
+    using Type = TypeClassT<data::Range>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, data::Maybe<Args...>>
+{
+    using Type = TypeClassT<data::Maybe>;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, data::IO<Args...>>
+{
+    using Type = TypeClassT<data::IO>;
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Repr, typename Ret, typename Arg, typename... Rest>
@@ -1888,7 +1926,7 @@ template <template<typename...> typename Type, typename... Args>
 class MonoidBase{};
 
 template <template<typename...> typename Type, typename... Args>
-class MonoidBaseImpl
+class ContainerMonoidBase
 {
 public:
     const static Type<Args...> mempty;
@@ -1906,16 +1944,16 @@ public:
 };
 
 template <template<typename...> typename Type, typename... Args>
-const Type<Args...> MonoidBaseImpl<Type, Args...>::mempty{};
+const Type<Args...> ContainerMonoidBase<Type, Args...>::mempty{};
 
 template <typename... Args>
-class MonoidBase<std::vector, Args...> : public MonoidBaseImpl<std::vector, Args...>{};
+class MonoidBase<std::vector, Args...> : public ContainerMonoidBase<std::vector, Args...>{};
 
 template <typename... Args>
-class MonoidBase<std::list, Args...> : public MonoidBaseImpl<std::list, Args...>{};
+class MonoidBase<std::list, Args...> : public ContainerMonoidBase<std::list, Args...>{};
 
 template <typename... Args>
-class MonoidBase<std::basic_string, Args...> : public MonoidBaseImpl<std::basic_string, Args...>{};
+class MonoidBase<std::basic_string, Args...> : public ContainerMonoidBase<std::basic_string, Args...>{};
 
 template <typename Data>
 class Product : public data::DataHolder<Data>
@@ -2516,7 +2554,7 @@ public:
 /////////// Functor ///////////
 
 template <template<typename...> typename Type, typename... Ts>
-class Functor
+class ContainerFunctor
 {
 public:
     template <typename Func, typename Arg, typename... Rest>
@@ -2528,6 +2566,21 @@ public:
         return result;
     }
 };
+
+template <template<typename...> typename Type, typename... Ts>
+class Functor;
+
+template <typename... Ts>
+class Functor<std::vector, Ts...> : public ContainerFunctor<std::vector, Ts...>
+{};
+
+template <typename... Ts>
+class Functor<std::list, Ts...> : public ContainerFunctor<std::list, Ts...>
+{};
+
+template <typename... Ts>
+class Functor<data::Parser, Ts...>
+{};
 
 template <>
 class Functor<data::Range>
@@ -2619,7 +2672,14 @@ public:
 };
 
 template <template<typename...> class Type, typename... Ts>
-class Applicative : public Functor<Type, Ts...>
+class ApplicativeBase;
+
+template <template<typename...> class Type, typename... Ts>
+class Applicative : public Functor<Type, Ts...>, public ApplicativeBase<Type, Ts...>
+{};
+
+template <template<typename...> class Type, typename... Ts>
+class ContainerApplicativeBase
 {
 public:
     constexpr static auto pure = toGFunc<1> | [](auto in)
@@ -2642,8 +2702,20 @@ public:
     }
 };
 
+template <typename... Ts>
+class ApplicativeBase<std::vector, Ts...> : public ContainerApplicativeBase<std::vector, Ts...>
+{};
+
+template <typename... Ts>
+class ApplicativeBase<std::list, Ts...> : public ContainerApplicativeBase<std::list, Ts...>
+{};
+
+template <typename... Ts>
+class ApplicativeBase<std::basic_string, Ts...> : public ContainerApplicativeBase<std::basic_string, Ts...>
+{};
+
 template <>
-class Applicative<data::Range> : public Functor<data::Range>
+class Applicative<data::Range>
 {
 public:
     constexpr static auto pure = toGFunc<1> | [](auto&& in)
@@ -2809,10 +2881,6 @@ public:
     Data mData;
 };
 
-// Delete template.
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Data>
-struct TypeClassTrait<TypeClassT, DeferredPure<Data>>;
-
 template <typename Data>
 constexpr auto pureImpl(Data const& data)
 {
@@ -2891,7 +2959,7 @@ public:
 };
 
 template <template<typename...> class Type, typename... Ts>
-class MonadBase
+class ContainerMonadBase
 {
 public:
     template <typename... Args, typename Func>
@@ -2900,6 +2968,22 @@ public:
         return mconcat || fmap | func | arg;
     }
 };
+
+template <typename... Ts>
+class MonadBase<std::vector, Ts...> : public ContainerMonadBase<std::vector, Ts...>
+{};
+
+template <typename... Ts>
+class MonadBase<std::list, Ts...> : public ContainerMonadBase<std::list, Ts...>
+{};
+
+template <typename... Ts>
+class MonadBase<std::basic_string, Ts...> : public ContainerMonadBase<std::basic_string, Ts...>
+{};
+
+template <typename... Ts>
+class MonadBase<data::Range, Ts...> : public ContainerMonadBase<data::Range, Ts...>
+{};
 
 template <>
 class MonadBase<data::Maybe>
@@ -3245,21 +3329,21 @@ constexpr auto evalDeferred = toGFunc<1>([](auto&& d)
 
 // >>= is right-assocative in C++, have to add some parens when chaining the calls.
 template <typename Arg, typename Func, typename Ret = std::invoke_result_t<Func, Arg>,
-    typename = std::enable_if_t<!do_::isNullaryOrIdV<Func> && !do_::isNullaryOrIdV<Arg>, bool>>
+    typename = std::enable_if_t<!doN::isNullaryOrIdV<Func> && !doN::isNullaryOrIdV<Arg>, bool>>
 constexpr auto operator>>=(DeferredPure<Arg> const& arg, Func const& func)
 {
     using MType = MonadType<Ret>;
     return MType::bind(evalDeferred<Ret> | arg, func);
 }
 
-template <typename MonadData, typename Func, typename = std::enable_if_t<!do_::isNullaryOrIdV<MonadData> && !do_::isNullaryOrIdV<Func>, bool>>
+template <typename MonadData, typename Func, typename = std::enable_if_t<!doN::isNullaryOrIdV<MonadData> && !doN::isNullaryOrIdV<Func>, bool>>
 constexpr auto operator>>=(MonadData const& data, Func const& func)
 {
     using MType = MonadType<MonadData>;
     return MType::bind(data, evalDeferred<MonadData> <o> func);
 }
 
-template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred> && !do_::isNullaryOrIdV<MonadData>, bool>>
+template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred> && !doN::isNullaryOrIdV<MonadData>, bool>>
 constexpr auto operator>>(Deferred const& arg, MonadData const& data)
 {
     using MType = MonadType<MonadData>;
@@ -3268,7 +3352,7 @@ constexpr auto operator>>(Deferred const& arg, MonadData const& data)
 
 template <typename MonadData1, typename MonadData2,
     std::enable_if_t<std::is_same_v<MonadType<MonadData1>, MonadType<MonadData2>>
-    && !do_::isNullaryOrIdV<MonadData1> && !do_::isNullaryOrIdV<MonadData2>, bool*> = nullptr>
+    && !doN::isNullaryOrIdV<MonadData1> && !doN::isNullaryOrIdV<MonadData2>, bool*> = nullptr>
 constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     using MType = MonadType<MonadData1>;
@@ -3316,7 +3400,7 @@ constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
     };
 };
 
-namespace do_
+namespace doN
 {
 
 template <typename M>
@@ -3518,26 +3602,15 @@ constexpr auto do_(Head const& head, Rest const&... rest)
     return doImpl<MClass>(head, rest...);
 }
 
-
 template <typename Head, typename... Rest>
 constexpr auto _(Head const& head, Rest const&... rest)
 {
     return do_(rest..., head);
 }
 
-} // namespace do_
+constexpr auto if_ = guard;
 
-// Delete template.
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename Data>
-struct TypeClassTrait<TypeClassT, do_::DeMonad<Data>>;
-
-// Delete template.
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename T>
-struct TypeClassTrait<TypeClassT, do_::Nullary<T>>;
-
-// Delete template.
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename T>
-struct TypeClassTrait<TypeClassT, do_::Id<T>>;
+} // namespace doN
 
 } // namespace hspp
 
