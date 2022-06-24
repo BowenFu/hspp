@@ -15,9 +15,9 @@ Sample 1
     Id<int> k;
     auto result = _(
         makeTuple<3> | i | j | k,
-        i <= iota(1, 20),
-        j <= iota(1, 20),
-        k <= iota(1, 20),
+        i <= (iota | 1 | 20),
+        j <= (iota | 1 | 20),
+        k <= (iota | 1 | 20),
         if_ || (i < j) && (i*i + j*j == k*k)
     );
 ```
