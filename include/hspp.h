@@ -44,24 +44,37 @@ auto overload(Ts&&... ts)
 
 namespace doN
 {
+// make sure Id is not a const obj.
 template <typename T>
 class Id
 {
-    // should be std::shared_ptr<std::optional<T>>
-    std::shared_ptr<T> mT = std::make_shared<T>();
+    using OptT = std::optional<T>;
+    std::shared_ptr<OptT> mT = std::make_shared<OptT>();
 public:
     constexpr Id() = default;
     constexpr auto const& value() const
     {
         if (!mT)
         {
+            throw std::runtime_error{"Invalid id!"};
+        }
+        if (!mT->has_value())
+        {
             throw std::runtime_error{"Id has no binding!"};
         }
-        return *mT;
+        return mT->value();
     }
-    constexpr void bind(T v)
+    constexpr void bind(T v) const
     {
-        *mT = std::move(v);
+        // if (mT->has_value())
+        // {
+        //     throw std::runtime_error{"Id already has a binding!"};
+        // }
+        const_cast<OptT&>(*mT) = std::move(v);
+    }
+    constexpr void reset() const
+    {
+        const_cast<OptT&>(*mT) = OptT{};
     }
 };
 
@@ -3251,7 +3264,7 @@ public:
     {
         constexpr auto sizeMinusOne = std::tuple_size_v<std::decay_t<decltype(in)>> - 1;
         auto last = std::get<sizeMinusOne>(in);
-        auto const func = toGFunc<1>([in=std::move(in)](auto&& lastElem)
+        auto const func = toGFunc<1>([in=std::forward<decltype(in)>(in)](auto&& lastElem)
         {
             constexpr auto sizeMinusOne = std::tuple_size_v<std::decay_t<decltype(in)>> - 1;
             return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(lastElem));
@@ -3417,14 +3430,14 @@ public:
     {
         return mM;
     }
-    constexpr auto id() const -> std::reference_wrapper<Id<T>>
+    constexpr auto id() const -> Id<T>
     {
         return mId;
     }
 
 private:
     std::reference_wrapper<M const> mM;
-    std::reference_wrapper<Id<T>> mId;
+    Id<T> mId;
 };
 
 template <typename... Ts>
@@ -3508,13 +3521,15 @@ BIN_OP_FOR_NULLARY(<)
 BIN_OP_FOR_NULLARY(&&)
 
 template <typename T, typename BodyBaker>
-constexpr auto funcWithParams(std::reference_wrapper<Id<T>> const& param, BodyBaker const& bodyBaker)
+constexpr auto funcWithParams(Id<T> const& param, BodyBaker const& bodyBaker)
 {
     return [=](T const& t)
     {
         // bind before baking body.
-        param.get().bind(t);
-        return evaluate_(bodyBaker());
+        const_cast<Id<T>&>(param).bind(t);
+        auto result = evaluate_(bodyBaker());
+        // const_cast<Id<T>&>(param).reset();
+        return result;
     };
 }
 
