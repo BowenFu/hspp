@@ -1,7 +1,38 @@
 # hspp
 
-hspp: Haskell Style Programming in cpp.
+hspp: Haskell Style Programming brought to Cpp.
 
+Mom, can we have monadic do notation / monad comprehension in C++?
+
+Here you are!
+
+Sample 1
+
+```c++
+    using namespace hspp::doN;
+    Id<int> i;
+    Id<int> j;
+    Id<int> k;
+    auto result = _(
+        makeTuple<3> | i | j | k,
+        i <= iota(1, 20),
+        j <= iota(1, 20),
+        k <= iota(1, 20),
+        if_ || (i < j) && (i*i + j*j == k*k)
+    );
+```
+
+Sample 2
+
+```c++
+    using namespace hspp::doN;
+    Id<int> i;
+    auto const result = do_(
+        i <= std::vector{1, 2, 3, 4},
+        guard | (i % 2 == 0),
+        return_ | i
+    );
+```
 
 ![Standard](https://img.shields.io/badge/c%2B%2B-17/20-blue.svg)
 

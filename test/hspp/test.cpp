@@ -1765,9 +1765,9 @@ TEST(do_, comprehension3)
     auto const result = toVector |
     _(
         makeTuple<3> | i | j | k,
-        i <= ownedRange(IotaView{1, 20}),
-        j <= ownedRange(IotaView{1, 20}),
-        k <= ownedRange(IotaView{1, 20}),
+        i <= iota(1, 20),
+        j <= iota(1, 20),
+        k <= iota(1, 20),
         if_ || (i < j) && (i*i + j*j == k*k)
     );
     auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 5, 12, 13 }, { 6, 8, 10 }, { 8, 15, 17 }, { 9, 12, 15 } };
