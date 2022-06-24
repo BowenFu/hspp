@@ -1421,24 +1421,16 @@ constexpr auto isSpace = toFunc<> | [](char c)
 
 const auto space = many || sat | isSpace;
 
-// // This will fail some tests.
-// constexpr auto token = toGFunc<1> | [](auto p)
-// {
-//     using A = DataType<decltype(p)>;
-//     doN::Id<A> a;
-//     return doN::do_(
-//         a <= p,
-//         space,
-//         return_ | a
-//     );
-// };
-
+// This will fail some tests.
 constexpr auto token = toGFunc<1> | [](auto p)
 {
-    return p >>= [](auto a) { return
-        space >>
-        (return_ | a);
-    };
+    using A = DataType<std::decay_t<decltype(p)>>;
+    doN::Id<A> a;
+    return doN::do_(
+        a <= p,
+        space,
+        return_ | a
+    );
 };
 
 constexpr auto symb = token <o> string;
