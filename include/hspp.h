@@ -66,15 +66,7 @@ public:
     }
     constexpr void bind(T v) const
     {
-        // if (mT->has_value())
-        // {
-        //     throw std::runtime_error{"Id already has a binding!"};
-        // }
         const_cast<OptT&>(*mT) = std::move(v);
-    }
-    constexpr void reset() const
-    {
-        const_cast<OptT&>(*mT) = OptT{};
     }
 };
 
@@ -1517,6 +1509,11 @@ constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
 constexpr inline auto enumFrom = toGFunc<1>([](auto start)
 {
     return ownedRange(IotaView{start});
+});
+
+constexpr inline auto iota = toGFunc<2>([](auto start, auto end)
+{
+    return ownedRange(IotaView{start, end});
 });
 
 constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
@@ -3496,7 +3493,7 @@ constexpr decltype(auto) evaluate_(T const &t)
     template <typename T, std::enable_if_t<isNullaryOrIdV<T>, bool> = true> \
     constexpr auto operator op(T&&t)                                  \
     {                                                                       \
-        return nullary([&] { return op evaluate_(t); });                    \
+        return nullary([=] { return op evaluate_(t); });                    \
     }
 
 #define BIN_OP_FOR_NULLARY(op)                                                  \
@@ -3526,9 +3523,8 @@ constexpr auto funcWithParams(Id<T> const& param, BodyBaker const& bodyBaker)
     return [=](T const& t)
     {
         // bind before baking body.
-        const_cast<Id<T>&>(param).bind(t);
+        param.bind(t);
         auto result = evaluate_(bodyBaker());
-        // const_cast<Id<T>&>(param).reset();
         return result;
     };
 }
