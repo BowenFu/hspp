@@ -767,6 +767,7 @@ constexpr auto toState = toGFunc<1>([](auto func)
 
 constexpr auto runState = from;
 
+// TODO: in param can be std::string const&
 template <typename A, typename Repr>
 class Parser : public DataHolder<Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>
 {

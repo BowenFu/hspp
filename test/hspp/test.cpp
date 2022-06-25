@@ -1331,44 +1331,6 @@ TEST(Parser, apply)
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
-TEST(Parser, ops)
-{
-    auto const result = apply || addOp || " +  * /-";
-    EXPECT_EQ(std::get<0>(result.at(0))| 1 | 2, 3);
-
-    auto const result2 = apply || mulOp || "   * /-";
-    EXPECT_EQ(std::get<0>(result2.at(0))|1 | 2, 2);
-}
-
-TEST(Parser, digit)
-{
-    auto const result = apply || many | digit || " 1  2 34";
-    auto const expected = std::vector{1, 2, 3, 4};
-    EXPECT_EQ(std::get<0>(result.at(0)), expected);
-}
-
-TEST(Parser, chainl1)
-{
-    auto const p = digit <chainl1> addOp;
-    auto const result = runParser | p | "1 + 2";
-    auto const expected = 3;
-    EXPECT_EQ(std::get<0>(result.at(0)), expected);
-    (void)chainl;
-}
-TEST(Parser, factor)
-{
-    auto const result = apply || many | digit || " 1  2 34";
-    auto const expected = std::vector{1, 2, 3, 4};
-    EXPECT_EQ(std::get<0>(result.at(0)), expected);
-}
-
-TEST(Parser, expr)
-{
-    auto const result = apply | getExpr() | "1 - 2 * 3 + 4";
-    auto const expected = -1;
-    EXPECT_EQ(std::get<0>(result.at(0)), expected);
-}
-
 TEST(do_, x)
 {
     auto const result = doN::do_(
