@@ -78,12 +78,14 @@ constexpr auto isDigit = toFunc<> | [](char x)
 
 extern TEParser<int> const expr;
 
-auto const digit = (token || sat | isDigit)
-                    >>= [](char x) { return
-                    return_ | (x - '0');
-                };
-
 using namespace hspp::doN;
+
+Id<char> x;
+auto const digit = do_(
+    x <= (token || sat | isDigit),
+    return_ | (x - '0')
+);
+
 using namespace std::literals;
 
 Id<int> n;
