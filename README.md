@@ -2,10 +2,6 @@
 
 hspp: Haskell Style Programming brought to Cpp.
 
-Mom, can we have monadic do notation / monad comprehension in C++?
-
-Here you are!
-
 ![Standard](https://img.shields.io/badge/c%2B%2B-17/20-blue.svg)
 
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
@@ -16,6 +12,11 @@ Here you are!
 [![CMake](https://github.com/BowenFu/hspp/actions/workflows/sanitizers.yml/badge.svg)](https://github.com/BowenFu/hspp/actions/workflows/sanitizers.yml)
 ![GitHub license](https://img.shields.io/github/license/BowenFu/hspp.svg)
 [![codecov](https://codecov.io/gh/BowenFu/hspp/branch/main/graph/badge.svg)](https://codecov.io/gh/BowenFu/hspp)
+
+
+## Mom, can we have monadic do notation / monad comprehension in C++?
+
+Here you are!
 
 Sample 1
 
@@ -86,3 +87,16 @@ auto const term = factor <chainl1> mulOp;
 
 extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
+
+## Why bother?
+
+The library is 
+
+1. for fun,
+2. to explore the interesting features of Haskell,
+3. to explore the boundary of C++,
+4. to facilitate the translation of some interesting Haskell codes to C++.
+
+This library is still in active development and not production ready.
+
+Discussions / issues / PRs are welcome.
