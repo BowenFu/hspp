@@ -1,6 +1,6 @@
 # hspp
 
-## hspp: Haskell Style Programming brought to Cpp.
+## hspp: Haskell Style Programming brought to C++.
 
 ![Standard](https://img.shields.io/badge/c%2B%2B-17/20-blue.svg)
 
