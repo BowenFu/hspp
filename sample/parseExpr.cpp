@@ -20,8 +20,11 @@ auto expectEq(T const& l, T const& r)
     }
 }
 
-using namespace hspp::parser;
 using namespace hspp;
+using namespace hspp::parser;
+using namespace hspp::doN;
+using namespace std::literals;
+
 
 enum class Op
 {
@@ -64,8 +67,8 @@ static_assert((sub | 1 | 2) == -1);
 static_assert((mul | 1 | 2) == 2);
 static_assert((div | 4 | 2) == 2);
 
-auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
-auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
+auto const addOp = do_(symb | "+", return_ | add) <triPlus> do_(symb | "-", return_ | sub);
+auto const mulOp = do_(symb | "*", return_ | mul) <triPlus> do_(symb | "/", return_ | div);
 } // namespace op
 
 using op::addOp;
@@ -76,20 +79,23 @@ constexpr auto isDigit = toFunc<> | [](char x)
     return isdigit(x);
 };
 
+Id<char> x;
+auto const digit = do_(
+    x <= (token || sat | isDigit),
+    return_ | (x - '0')
+);
+
 extern TEParser<int> const expr;
 
-auto const digit = (token || sat | isDigit)
-                    >>= [](char x) { return
-                    return_ | (x - '0');
-                };
-
-using namespace std::literals;
+Id<int> n;
 auto const factor =
     digit <triPlus>
-        (((symb | "("s) >> expr) >>= [](auto n){ return
-                (symb | ")"s) >>
-                    (return_ | n);
-    });
+        do_(
+            symb | "("s,
+            n <= expr,
+            symb | ")"s,
+            return_ | n
+        );
 
 auto const term = factor <chainl1> mulOp;
 
