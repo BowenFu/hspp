@@ -623,14 +623,14 @@ TEST(Monad, return_)
     EXPECT_EQ(y("true"), true);
 }
 
-TEST(FunctionOp, bar)
+TEST(FunctionOp, pipe)
 {
     constexpr auto f = toFunc<>(std::multiplies<int>{});
     constexpr auto r = f | 2 | 5;
     EXPECT_EQ(r, 10);
 }
 
-TEST(FunctionOp, bars)
+TEST(FunctionOp, pipes)
 {
     constexpr auto f = toFunc<>(std::multiplies<int>{});
     constexpr auto g = toFunc<>(std::negate<int>{});
@@ -638,14 +638,14 @@ TEST(FunctionOp, bars)
     EXPECT_EQ(r, -10);
 }
 
-TEST(FunctionOp, flipBar)
+TEST(FunctionOp, flipPipe)
 {
     constexpr auto f = toFunc<>(std::minus<int>{});
     constexpr auto r = 5 & (2 & f);
     EXPECT_EQ(r, -3);
 }
 
-TEST(FunctionOp, flipBar2)
+TEST(FunctionOp, flipPipe2)
 {
     constexpr auto f = toFunc<>(std::negate<int>{});
     constexpr auto g = toFunc<>([](int x) { return x + 1; });
