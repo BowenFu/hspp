@@ -20,8 +20,10 @@ auto expectEq(T const& l, T const& r)
     }
 }
 
-using namespace hspp::parser;
 using namespace hspp;
+using namespace hspp::parser;
+using namespace hspp::doN;
+
 
 enum class Op
 {
@@ -64,8 +66,8 @@ static_assert((sub | 1 | 2) == -1);
 static_assert((mul | 1 | 2) == 2);
 static_assert((div | 4 | 2) == 2);
 
-auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
-auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
+auto const addOp = do_(symb | "+", return_ | add) <triPlus> do_(symb | "-", return_ | sub);
+auto const mulOp = do_(symb | "*", return_ | mul) <triPlus> do_(symb | "/", return_ | div);
 } // namespace op
 
 using op::addOp;
@@ -77,8 +79,6 @@ constexpr auto isDigit = toFunc<> | [](char x)
 };
 
 extern TEParser<int> const expr;
-
-using namespace hspp::doN;
 
 Id<char> x;
 auto const digit = do_(
