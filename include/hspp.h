@@ -2592,17 +2592,25 @@ constexpr auto nullary(T const &t)
 }
 
 template <typename T>
-class IsNullaryOrId : public std::false_type
+class IsNullary : public std::false_type
+{
+};
+
+template <typename T>
+class IsNullary<Nullary<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isNullary = IsNullary<std::decay_t<T>>::value;
+
+template <typename T>
+class IsNullaryOrId : public IsNullary<T>
 {
 };
 
 template <typename T>
 class IsNullaryOrId<Id<T>> : public std::true_type
-{
-};
-
-template <typename T>
-class IsNullaryOrId<Nullary<T>> : public std::true_type
 {
 };
 
@@ -2741,7 +2749,7 @@ constexpr auto doImpl(Head const& head)
 }
 
 template <typename MClass, typename N, typename... Rest, typename = std::enable_if_t<isDeMonadV<std::invoke_result_t<Nullary<N>>>, void>>
-constexpr auto doImpl(Nullary<N> const& dmN, Rest const&... rest)
+constexpr auto doImplNullaryDeMonad(Nullary<N> const& dmN, Rest const&... rest)
 {
     return doImpl<MClass>(dmN(), rest...);
 }
@@ -2756,7 +2764,21 @@ constexpr auto doImpl(DeMonad<MClass> const& dm, Rest const&... rest)
 template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head>, void>>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
-    return (evalDeferred<MClass> | head) >> doImpl<MClass>(rest...);
+    if constexpr (isNullaryOrIdV<Head>)
+    {
+        if constexpr (isDeMonadV<std::invoke_result_t<Head>>)
+        {
+            return doImplNullaryDeMonad<MClass>(head, rest...);
+        }
+        else
+        {
+            return (evalDeferred<MClass> | head) >> doImpl<MClass>(rest...);
+        }
+    }
+    else
+    {
+        return (evalDeferred<MClass> | head) >> doImpl<MClass>(rest...);
+    }
 }
 
 // Get class type that is a monad.
