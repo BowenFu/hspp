@@ -6,6 +6,8 @@
 #ifndef HSPP_RANGE_H
 #define HSPP_RANGE_H
 
+#include <stdexcept>
+
 namespace hspp
 {
 namespace data
