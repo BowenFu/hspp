@@ -1,6 +1,6 @@
 # hspp
 
-hspp: Haskell Style Programming brought to Cpp.
+## hspp: Haskell Style Programming brought to Cpp.
 
 ![Standard](https://img.shields.io/badge/c%2B%2B-17/20-blue.svg)
 
@@ -88,9 +88,30 @@ auto const term = factor <chainl1> mulOp;
 extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
+## Haskell vs Hspp (Incomplete list)
+
+| Haskell       | Hspp |
+| -------       | ---- |
+| function      | Function / GenericFunction |
+| f x y         | f \| x \| y |
+| f $ g x       | f \|\| g \| x|
+| f . g $ x     | f \<o\> g \|\| x|
+| a \`f\` b     | a \<f\> b |
+|[f x \| x <- xs, p x]| \_(f \| x, x <= xs, if\_ \|\| p \| x) |
+| list (lazy)   | range |
+| list (strict) | std::vector/list/forward_list|
+| do {patA <- action1; action2} | do_(patA <= action1, action2) |
+| f <$> v       | f \<fmap\> v |
+| f <*> v       | f \<ap\> v |
+| pure a        | pure \| a |
+| m1 >> m2      | m1 >> m2 |
+| m1 >>= f      | m1 >>= f |
+| return a      | return_ \| a |
+
+
 ## Why bother?
 
-The library is 
+The library is
 
 1. for fun,
 2. to explore the interesting features of Haskell,
@@ -100,3 +121,7 @@ The library is
 This library is still in active development and not production ready.
 
 Discussions / issues / PRs are welcome.
+
+## Related
+
+Haskell pattern matching is not covered in this repo. You may be interested in [matchit(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.

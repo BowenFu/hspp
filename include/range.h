@@ -7,6 +7,8 @@
 #define HSPP_RANGE_H
 
 #include <stdexcept>
+#include <limits>
+#include <memory>
 
 namespace hspp
 {

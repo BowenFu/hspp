@@ -6,7 +6,9 @@
 #ifndef HSPP_PARSER_H
 #define HSPP_PARSER_H
 
-#include "hspp.h"
+#include "data.h"
+#include "typeclass.h"
+#include "doNotation.h"
 
 namespace hspp
 {
@@ -18,6 +20,21 @@ using data::runParser;
 
 using data::TEParser;
 using data::toTEParser;
+
+constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
+{
+    return data::toParser <o> data::toFunc<> | [=](std::string cs)
+    {
+        auto const tmp = data::runParser | (p <mplus> q) | cs;
+        if (tmp.empty())
+        {
+            return tmp;
+        }
+        std::remove_const_t<decltype(tmp)> tmp2;
+        tmp2.push_back(tmp.front());
+        return tmp2;
+    };
+};
 
 constexpr auto item = toParser | toFunc<>([](std::string cs) -> std::vector<std::tuple<char, std::string>>
 {
