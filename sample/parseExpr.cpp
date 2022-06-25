@@ -45,8 +45,8 @@ static_assert((sub | 1 | 2) == -1);
 static_assert((mul | 1 | 2) == 2);
 static_assert((div | 4 | 2) == 2);
 
-inline auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
-inline auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
+auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
+auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
 } // namespace op
 
 using op::addOp;
@@ -57,33 +57,24 @@ constexpr auto isDigit = toFunc<> | [](char x)
     return isdigit(x);
 };
 
-inline TEParser<int> const getExpr();
+extern TEParser<int> const expr;
 
-inline const auto digit = (token || sat | isDigit)
+auto const digit = (token || sat | isDigit)
                     >>= [](char x) { return
                     return_ | (x - '0');
                 };
 
 using namespace std::literals;
-inline const auto factor =
+auto const factor =
     digit <triPlus>
-        (((symb | "("s) >> getExpr()) >>= [](auto n){ return
+        (((symb | "("s) >> expr) >>= [](auto n){ return
                 (symb | ")"s) >>
                     (return_ | n);
     });
 
-inline const auto term = factor <chainl1> mulOp;
+auto const term = factor <chainl1> mulOp;
 
-
-inline TEParser<int> const getExpr()
-{
-    return toTEParser || (term <chainl1> addOp);
-}
-
-
-// inline const auto term = getTerm();
-// inline const auto factor = getFactor();
-// inline const auto expr = getExpr();
+extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 
 int main()
 {
@@ -110,7 +101,7 @@ int main()
     }
 
     {
-        auto const result = apply | getExpr() | "1 - 2 * 3 + 4";
+        auto const result = apply | expr | "1 - 2 * 3 + 4";
         auto const expected = -1;
         assert(std::get<0>(result.at(0)) == expected);
     }
