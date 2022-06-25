@@ -110,11 +110,10 @@ constexpr auto manyImpl(Parser<A, Repr> p)
 
 constexpr auto many1 = toGFunc<1> | [](auto p)
 {
-    using data::cons;
     return
     p >>= [=](auto a) { return
        manyImpl(p) >>= [=](auto as) { return
-        return_ | (a <cons> as);
+        return_ | (a <data::cons> as);
         };
        };
 };
@@ -133,12 +132,11 @@ constexpr auto many = toGFunc<1> | [](auto p)
 
 constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 {
-    using data::cons;
     return p
     >>= [=](auto a) { return
         (many | (sep >> p))
         >>= [=](auto as) { return
-            return_ || a <cons>  as;
+            return_ || a <data::cons>  as;
         };
     };
 };
