@@ -23,6 +23,22 @@ Sample 1
 ```c++
     using namespace hspp::doN;
     Id<int> i;
+    auto const result = do_(
+        i <= std::vector{1, 2, 3, 4},
+        guard | (i % 2 == 0),
+        return_ | i
+    );
+```
+
+[badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
+[Try it on godbolt]: https://godbolt.org/z/ejfE9TWe8
+
+
+Sample 2
+
+```c++
+    using namespace hspp::doN;
+    Id<int> i;
     Id<int> j;
     Id<int> k;
     auto result = _(
@@ -31,18 +47,6 @@ Sample 1
         j <= (iota | i | 20),
         k <= (iota | j | 20),
         if_ || (i*i + j*j == k*k))
-    );
-```
-
-Sample 2
-
-```c++
-    using namespace hspp::doN;
-    Id<int> i;
-    auto const result = do_(
-        i <= std::vector{1, 2, 3, 4},
-        guard | (i % 2 == 0),
-        return_ | i
     );
 ```
 
