@@ -1364,7 +1364,7 @@ TEST(Parser, factor)
 
 TEST(Parser, expr)
 {
-    auto const result = apply | expr | "1 - 2 * 3 + 4";
+    auto const result = apply | getExpr() | "1 - 2 * 3 + 4";
     auto const expected = -1;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }

@@ -186,7 +186,7 @@ constexpr auto isSpace = toFunc<> | [](char c)
     return isspace(c);
 };
 
-const auto space = many || sat | isSpace;
+inline const auto space = many || sat | isSpace;
 
 // This will fail some tests.
 constexpr auto token = toGFunc<1> | [](auto p)
@@ -248,8 +248,8 @@ static_assert((sub | 1 | 2) == -1);
 static_assert((mul | 1 | 2) == 2);
 static_assert((div | 4 | 2) == 2);
 
-auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
-auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
+inline auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
+inline auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
 } // namespace op
 
 using op::addOp;
@@ -260,24 +260,29 @@ constexpr auto isDigit = toFunc<> | [](char x)
     return isdigit(x);
 };
 
-extern const TEParser<int> expr;
+inline TEParser<int> const& getExpr();
 
-const auto digit = (token || sat | isDigit)
+inline const auto digit = (token || sat | isDigit)
                     >>= [](char x) { return
                     return_ | (x - '0');
                 };
 
 using namespace std::literals;
-const auto factor =
+inline const auto factor =
     digit <triPlus>
-        (((symb | "("s) >> expr) >>= [](auto n){ return
+        (((symb | "("s) >> getExpr()) >>= [](auto n){ return
                 (symb | ")"s) >>
                     (return_ | n);
     });
 
-const auto term = factor <chainl1> mulOp;
+inline const auto term = factor <chainl1> mulOp;
 
-const TEParser<int> expr = toTEParser || (term <chainl1> addOp);
+static inline const TEParser<int> expr = toTEParser || (term <chainl1> addOp);
+
+inline TEParser<int> const& getExpr()
+{
+    return expr;
+}
 
 } // namespace parser
 
