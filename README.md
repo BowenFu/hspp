@@ -44,3 +44,45 @@ Sample 2
         return_ | i
     );
 ```
+
+Sample 3 (Parser Combinator)
+
+Original haskell version (Monadic Parsing in Haskell)
+
+```haskell
+expr, term, factor, digit :: Parser Int
+
+digit  = do {x <- token (sat isDigit); return (ord x - ord '0')}
+
+factor = digit +++ do {symb "("; n <- expr; symbol ")"; return n}
+
+term   = factor `chainl1` mulop
+
+expr   = term   `chainl1` addop
+```
+
+C++ version
+
+```c++
+Id<char> x;
+auto const digit = do_(
+    x <= (token || sat | isDigit),
+    return_ | (x - '0')
+);
+
+extern TEParser<int> const expr;
+
+Id<int> n;
+auto const factor =
+    digit <triPlus>
+        do_(
+            symb | "("s,
+            n <= expr,
+            symb | ")"s,
+            return_ | n
+        );
+
+auto const term = factor <chainl1> mulOp;
+
+extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
+```

@@ -23,6 +23,7 @@ auto expectEq(T const& l, T const& r)
 using namespace hspp;
 using namespace hspp::parser;
 using namespace hspp::doN;
+using namespace std::literals;
 
 
 enum class Op
@@ -78,18 +79,15 @@ constexpr auto isDigit = toFunc<> | [](char x)
     return isdigit(x);
 };
 
-extern TEParser<int> const expr;
-
 Id<char> x;
 auto const digit = do_(
     x <= (token || sat | isDigit),
     return_ | (x - '0')
 );
 
-using namespace std::literals;
+extern TEParser<int> const expr;
 
 Id<int> n;
-
 auto const factor =
     digit <triPlus>
         do_(
