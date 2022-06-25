@@ -83,13 +83,19 @@ auto const digit = (token || sat | isDigit)
                     return_ | (x - '0');
                 };
 
+using namespace hspp::doN;
 using namespace std::literals;
+
+Id<int> n;
+
 auto const factor =
     digit <triPlus>
-        (((symb | "("s) >> expr) >>= [](auto n){ return
-                (symb | ")"s) >>
-                    (return_ | n);
-    });
+        do_(
+            symb | "("s,
+            n <= expr,
+            symb | ")"s,
+            return_ | n
+        );
 
 auto const term = factor <chainl1> mulOp;
 

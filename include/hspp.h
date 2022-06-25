@@ -2755,10 +2755,11 @@ constexpr auto doImplNullaryDeMonad(Nullary<N> const& dmN, Rest const&... rest)
     return doImpl<MClass>(dmN(), rest...);
 }
 
-template <typename MClass, typename... Rest>
-constexpr auto doImpl(DeMonad<MClass> const& dm, Rest const&... rest)
+template <typename MClass1, typename MClass2, typename... Rest>
+constexpr auto doImpl(DeMonad<MClass2> const& dm, Rest const&... rest)
 {
-    auto const bodyBaker = [=] { return doImpl<MClass>(rest...);};
+    static_assert(std::is_same_v<MonadType<MClass1>, MonadType<MClass2>>);
+    auto const bodyBaker = [=] { return doImpl<MClass2>(rest...);};
     return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
