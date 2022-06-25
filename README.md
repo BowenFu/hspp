@@ -18,7 +18,11 @@
 
 Here you are!
 
-Sample 1
+Sample 1 for monadic do notation
+
+[badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
+[godbolt]: https://godbolt.org/z/ejfE9TWe8
+[![Try it on godbolt][badge.godbolt]][godbolt]
 
 ```c++
     using namespace hspp::doN;
@@ -30,11 +34,7 @@ Sample 1
     );
 ```
 
-[badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
-[Try it on godbolt]: https://godbolt.org/z/ejfE9TWe8
-
-
-Sample 2
+Sample 2 for monad comprehension
 
 ```c++
     using namespace hspp::doN;
@@ -50,7 +50,7 @@ Sample 2
     );
 ```
 
-Sample 3 (Parser Combinator)
+Sample 3 for parser combinator
 
 Original haskell version (Monadic Parsing in Haskell)
 
