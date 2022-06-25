@@ -1,4 +1,5 @@
 #include "hspp.h"
+#include "parser.h"
 #include <vector>
 #include <list>
 #include <gtest/gtest.h>
@@ -7,6 +8,7 @@
 
 using namespace hspp;
 using namespace hspp::data;
+using namespace hspp::parser;
 using namespace std::literals;
 
 constexpr auto toVector = data::to<std::vector>;
@@ -1254,192 +1256,6 @@ TEST(const_, x)
     EXPECT_EQ(foldr | const_ | 0 | v, 1);
 }
 
-constexpr auto item = toParser | toFunc<>([](std::string cs) -> std::vector<std::tuple<char, std::string>>
-{
-    if (cs.empty())
-    {
-        return {};
-    }
-    return {{cs.front(), cs.substr(1)}};
-});
-
-constexpr auto sat = toGFunc<1> | [](auto p)
-{
-    return item >>= toFunc<> | [=](char c) { return
-        toParser || toFunc<> | [flag = p | c, posParser = Monad<Parser>::return_ | c, negParser = MonadZero<Parser, char>::mzero]
-        (std::string cs) -> std::vector<std::tuple<char, std::string>>
-        {
-            return flag ? (runParser | posParser | cs) : (runParser | negParser | cs);
-        };
-    };
-};
-
-constexpr auto char_ = toFunc<> | [](char c)
-{
-    return sat | (equalTo | c);
-};
-
-template <typename Func>
-class YCombinator
-{
-    Func mFunc;
-public:
-    constexpr YCombinator(Func func)
-    : mFunc{std::move(func)}
-    {}
-    template <typename... Args>
-    constexpr auto operator()(Args&&... args) const
-    {
-        return mFunc(*this, args...);
-    }
-};
-
-constexpr auto yCombinator = toGFunc<1> | [](auto func)
-{
-    return YCombinator<decltype(func)>{std::move(func)};
-};
-
-class StringParser;
-
-auto stringImpl(std::string const& cs)
-    -> Parser<std::string, StringParser>;
-
-class StringParser
-{
-    std::string mCs;
-public:
-    StringParser(std::string cs)
-    : mCs{std::move(cs)}
-    {}
-    auto operator()(std::string str) const -> std::vector<std::tuple<std::string, std::string>>
-    {
-        if (mCs.empty())
-        {
-            auto const p1 = Monad<Parser>::return_ | ""s;
-            return runParser | p1 | str;
-        }
-        auto const c = mCs.front();
-        auto const cr = mCs.substr(1);
-        auto const p2 =
-            (char_ | c)
-                >> stringImpl(cr)
-                >> (return_ | mCs);
-        return runParser | p2 | str;
-    }
-};
-
-auto stringImpl(std::string const& cs)
-    -> Parser<std::string, StringParser>
-{
-    return toParser || toFunc<> | StringParser{cs};
-}
-
-constexpr auto string = toFunc<> || [](std::string const& cs)
-{
-    return stringImpl(cs);
-};
-
-template <typename A, typename Repr>
-constexpr auto manyImpl(Parser<A, Repr> p)
-    -> TEParser<std::vector<A>>;
-
-constexpr auto many1 = toGFunc<1> | [](auto p)
-{
-    return
-    p >>= [=](auto a) { return
-       manyImpl(p) >>= [=](auto as) { return
-        return_ | (a <cons> as);
-        };
-       };
-};
-
-template <typename A, typename Repr>
-constexpr auto manyImpl(Parser<A, Repr> p)
-    -> TEParser<std::vector<A>>
-{
-    return toTEParser || triPlus | (many1 | p) | (Monad<Parser>::return_ | std::vector<A>{});
-}
-
-constexpr auto many = toGFunc<1> | [](auto p)
-{
-    return manyImpl(p);
-};
-
-constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
-{
-    return p
-    >>= [=](auto a) { return
-        (many | (sep >> p))
-        >>= [=](auto as) { return
-            return_ || a <cons>  as;
-        };
-    };
-};
-
-template <typename A, typename Repr, typename B, typename Repr1>
-constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
-{
-    return (triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{}));
-}
-
-constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
-{
-    return sepByImpl(p, sep);
-};
-
-template <typename A, typename Repr, typename Op>
-constexpr auto chainl1Impl(Parser<A, Repr> p, Op op)
-{
-    auto const rest = toGFunc<1> | yCombinator | [=](auto const& self, auto a) -> TEParser<A>
-    {
-        auto const lhs =
-            op >>= [=](auto f) { return
-                p >>= [=](auto b) { return
-                    self(f | a | b);
-                };
-            };
-        auto const rhs = Monad<Parser>::return_ | a;
-        return toTEParser || (lhs <triPlus> rhs);
-    };
-    return (p >>= rest);
-}
-
-constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
-{
-    return chainl1Impl(p, op);
-};
-
-constexpr auto chainl = toGFunc<3> | [](auto p, auto op, auto a)
-{
-    return (p <chainl1> op) <triPlus> (Monad<Parser>::return_ | a);
-};
-
-constexpr auto isSpace = toFunc<> | [](char c)
-{
-    return isspace(c);
-};
-
-const auto space = many || sat | isSpace;
-
-// This will fail some tests.
-constexpr auto token = toGFunc<1> | [](auto p)
-{
-    using A = DataType<std::decay_t<decltype(p)>>;
-    doN::Id<A> a;
-    return doN::do_(
-        a <= p,
-        space,
-        return_ | a
-    );
-};
-
-constexpr auto symb = token <o> string;
-
-constexpr auto apply = toGFunc<1> | [](auto p)
-{
-    return runParser | (space >> p);
-};
-
 
 TEST(Parser, item)
 {
@@ -1458,8 +1274,6 @@ TEST(Parser, item)
 
 TEST(Parser, string)
 {
-    (void)yCombinator;
-
     auto const result = runParser | (string | ""s) | "123";
     auto const expected = ""s;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
@@ -1517,77 +1331,6 @@ TEST(Parser, apply)
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
 
-enum class Op
-{
-    kADD,
-    kSUB,
-    kMUL,
-    kDIV
-};
-
-class OpFunc
-{
-    Op mOp;
-public:
-    constexpr OpFunc(Op op)
-    : mOp{op}
-    {}
-    template <typename T>
-    constexpr auto operator()(T x, T y) const
-    {
-        switch (mOp)
-        {
-            case Op::kADD: return x + y;
-            case Op::kSUB: return x - y;
-            case Op::kMUL: return x * y;
-            case Op::kDIV: return x / y;
-        }
-        throw std::runtime_error{"Never reach here!"};
-    }
-};
-
-namespace op
-{
-constexpr auto add = toGFunc<2> | OpFunc{Op::kADD};
-constexpr auto sub = toGFunc<2> | OpFunc{Op::kSUB};
-constexpr auto mul = toGFunc<2> | OpFunc{Op::kMUL};
-constexpr auto div = toGFunc<2> | OpFunc{Op::kDIV};
-
-static_assert((add | 1 | 2) == 3);
-static_assert((sub | 1 | 2) == -1);
-static_assert((mul | 1 | 2) == 2);
-static_assert((div | 4 | 2) == 2);
-
-auto const addOp = ((symb | "+") >> (return_ | add)) <triPlus> ((symb | "-") >> (return_ | sub));
-auto const mulOp = ((symb | "*") >> (return_ | mul)) <triPlus> ((symb | "/") >> (return_ | div));
-} // namespace op
-
-using op::addOp;
-using op::mulOp;
-
-constexpr auto isDigit = toFunc<> | [](char x)
-{
-    return isdigit(x);
-};
-
-extern const TEParser<int> expr;
-
-const auto digit = (token || sat | isDigit)
-                    >>= [](char x) { return
-                    return_ | (x - '0');
-                };
-
-const auto factor =
-    digit <triPlus>
-        (((symb | "("s) >> expr) >>= [](auto n){ return
-                (symb | ")"s) >>
-                    (return_ | n);
-    });
-
-const auto term = factor <chainl1> mulOp;
-
-const TEParser<int> expr = toTEParser || (term <chainl1> addOp);
-
 TEST(Parser, ops)
 {
     auto const result = apply || addOp || " +  * /-";
@@ -1612,7 +1355,6 @@ TEST(Parser, chainl1)
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
     (void)chainl;
 }
-
 TEST(Parser, factor)
 {
     auto const result = apply || many | digit || " 1  2 34";
@@ -1622,7 +1364,7 @@ TEST(Parser, factor)
 
 TEST(Parser, expr)
 {
-    auto const result = apply | expr | "1 - 2 * 3 + 4";
+    auto const result = apply | getExpr() | "1 - 2 * 3 + 4";
     auto const expected = -1;
     EXPECT_EQ(std::get<0>(result.at(0)), expected);
 }
@@ -1766,9 +1508,9 @@ TEST(do_, comprehension3)
     _(
         makeTuple<3> | i | j | k,
         i <= (iota | 1 | 20),
-        j <= (iota | 1 | 20),
-        k <= (iota | 1 | 20),
-        if_ || (i < j) && (i*i + j*j == k*k)
+        j <= (iota | i | 20),
+        k <= (iota | j | 20),
+        if_ || (i*i + j*j == k*k)
     );
     auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 5, 12, 13 }, { 6, 8, 10 }, { 8, 15, 17 }, { 9, 12, 15 } };
     EXPECT_EQ(result, expected);
