@@ -29,7 +29,6 @@ public:
         {
             throw std::runtime_error{"Id has no binding!"};
         }
-        std::cout << "value " << mT.get() << " " << mT->value() << std::endl;
         return mT->value();
     }
     constexpr void bind(T v) const
