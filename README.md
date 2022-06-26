@@ -88,7 +88,7 @@ extern TEParser<int> const expr;
 
 Id<int> n;
 auto const factor =
-    digit <triPlus>
+    digit <alt>
         do_(
             symb | "("s,
             n <= expr,

@@ -67,8 +67,8 @@ static_assert((sub | 1 | 2) == -1);
 static_assert((mul | 1 | 2) == 2);
 static_assert((div | 4 | 2) == 2);
 
-auto const addOp = do_(symb | "+", return_ | add) <triPlus> do_(symb | "-", return_ | sub);
-auto const mulOp = do_(symb | "*", return_ | mul) <triPlus> do_(symb | "/", return_ | div);
+auto const addOp = do_(symb | "+", return_ | add) <alt> do_(symb | "-", return_ | sub);
+auto const mulOp = do_(symb | "*", return_ | mul) <alt> do_(symb | "/", return_ | div);
 } // namespace op
 
 using op::addOp;
@@ -89,7 +89,7 @@ extern TEParser<int> const expr;
 
 Id<int> n;
 auto const factor =
-    digit <triPlus>
+    digit <alt>
         do_(
             symb | "("s,
             n <= expr,
