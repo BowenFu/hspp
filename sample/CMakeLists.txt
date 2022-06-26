@@ -1,5 +1,5 @@
 set(hspp_SAMPLES
-parseExpr
+parse_expr
 )
 
 foreach(sample ${hspp_SAMPLES})
