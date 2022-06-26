@@ -21,7 +21,7 @@ Here you are!
 Sample 1 for monadic do notation
 
 [badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
-[godbolt]: https://godbolt.org/z/M8hWb99Kf
+[godbolt]: https://godbolt.org/z/7fTvTd3hT
 [![Try it on godbolt][badge.godbolt]][godbolt]
 
 ```c++
