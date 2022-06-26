@@ -6,10 +6,6 @@
 #ifndef HSPP_PARSER_H
 #define HSPP_PARSER_H
 
-#include "data.h"
-#include "typeclass.h"
-#include "doNotation.h"
-
 namespace hspp
 {
 namespace parser

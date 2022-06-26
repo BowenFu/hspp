@@ -3,8 +3,8 @@
  *  Distributed Under The Apache-2.0 License
  */
 
-#ifndef HSPP_H
-#define HSPP_H
+#ifndef HSPP_DO_NOTATION_H
+#define HSPP_DO_NOTATION_H
 
 namespace hspp
 {
@@ -322,4 +322,4 @@ constexpr auto if_ = guard;
 
 } // namespace hspp
 
-#endif // HSPP_H
+#endif // HSPP_DO_NOTATION_H

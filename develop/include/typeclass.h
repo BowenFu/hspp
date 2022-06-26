@@ -3,8 +3,8 @@
  *  Distributed Under The Apache-2.0 License
  */
 
-#ifndef HSPP_TYPECLASSES_H
-#define HSPP_TYPECLASSES_H
+#ifndef HSPP_TYPECLASS_H
+#define HSPP_TYPECLASS_H
 
 #include <optional>
 #include <functional>
@@ -15,8 +15,6 @@
 #include <sstream>
 #include <numeric>
 #include <type_traits>
-#include "data.h"
-#include "range.h"
 
 namespace hspp
 {
@@ -1743,4 +1741,4 @@ constexpr inline auto length = getSum <o> (foldMap || data::const_ | (toSum | 1)
 
 } // namespace hspp
 
-#endif // HSPP_TYPECLASSES_H
+#endif // HSPP_TYPECLASS_H

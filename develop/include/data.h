@@ -14,7 +14,6 @@
 #include <tuple>
 #include <iostream>
 #include <functional>
-#include "range.h"
 
 namespace hspp
 {
