@@ -18,13 +18,15 @@
 
 Here you are!
 
+[badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
+
 Sample 1 for monadic do notation
 
-[badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
-[godbolt]: https://godbolt.org/z/7fTvTd3hT
-[![Try it on godbolt][badge.godbolt]][godbolt]
+[godbolt1]: https://godbolt.org/z/7fTvTd3hT
+[![Try it on godbolt][badge.godbolt]][godbolt1]
 
 ```c++
+    using namespace hspp;
     using namespace hspp::doN;
     Id<int> i;
     auto const result = do_(
@@ -36,8 +38,14 @@ Sample 1 for monadic do notation
 
 Sample 2 for monad comprehension
 
+
+[godbolt2]: https://godbolt.org/z/5oG8zGhTf
+
+[![Try it on godbolt][badge.godbolt]][godbolt2]
+
 ```c++
     using namespace hspp::doN;
+    using namespace hspp::data;
     Id<int> i;
     Id<int> j;
     Id<int> k;
@@ -46,13 +54,13 @@ Sample 2 for monad comprehension
         i <= (iota | 1 | 20),
         j <= (iota | i | 20),
         k <= (iota | j | 20),
-        if_ || (i*i + j*j == k*k))
+        if_ || (i*i + j*j == k*k)
     );
 ```
 
 Sample 3 for parser combinator
 
-Original haskell version (Monadic Parsing in Haskell)
+Original haskell version [Monadic Parsing in Haskell](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/monadic-parsing-in-haskell/E557DFCCE00E0D4B6ED02F3FB0466093)
 
 ```haskell
 expr, term, factor, digit :: Parser Int
@@ -67,6 +75,7 @@ expr   = term   `chainl1` addop
 ```
 
 C++ version
+[parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
 ```c++
 Id<char> x;
