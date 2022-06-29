@@ -39,21 +39,19 @@ Sample 1 for monadic do notation
 Sample 2 for monad comprehension
 
 
-[godbolt2]: https://godbolt.org/z/5oG8zGhTf
+[godbolt2]: https://godbolt.org/z/M8Ynjvr3x
 
 [![Try it on godbolt][badge.godbolt]][godbolt2]
 
 ```c++
     using namespace hspp::doN;
     using namespace hspp::data;
-    Id<int> i;
-    Id<int> j;
-    Id<int> k;
-    auto result = _(
+    Id<int> i, j, k;
+    auto const rng = _(
         makeTuple<3> | i | j | k,
-        i <= (iota | 1 | 20),
-        j <= (iota | i | 20),
-        k <= (iota | j | 20),
+        k <= (enumFrom | 1),
+        i <= (iota | 1 | k),
+        j <= (iota | i | k),
         if_ || (i*i + j*j == k*k)
     );
 ```
