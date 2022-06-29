@@ -1462,17 +1462,15 @@ TEST(do_, comprehension2)
 TEST(do_, comprehension3)
 {
     using namespace hspp::doN;
-    Id<int> i;
-    Id<int> j;
-    Id<int> k;
-    auto const result = toVector |
-    _(
+    Id<int> i, j, k;
+    auto const rng = _(
         makeTuple<3> | i | j | k,
-        i <= (iota | 1 | 20),
-        j <= (iota | i | 20),
-        k <= (iota | j | 20),
+        k <= (enumFrom | 1),
+        i <= (iota | 1 | k),
+        j <= (iota | i | k),
         if_ || (i*i + j*j == k*k)
     );
-    auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 5, 12, 13 }, { 6, 8, 10 }, { 8, 15, 17 }, { 9, 12, 15 } };
+    auto const result = toVector || take | rng | 5U;
+    auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 6, 8, 10 }, { 5, 12, 13 }, { 9, 12, 15 }, { 8, 15, 17 } };
     EXPECT_EQ(result, expected);
 }

@@ -17,7 +17,7 @@ using data::runParser;
 using data::TEParser;
 using data::toTEParser;
 
-constexpr auto triPlus = toGFunc<2> | [](auto p, auto q)
+constexpr auto alt = toGFunc<2> | [](auto p, auto q)
 {
     return data::toParser <o> data::toFunc<> | [=](std::string cs)
     {
@@ -135,7 +135,7 @@ template <typename A, typename Repr>
 constexpr auto manyImpl(Parser<A, Repr> p)
     -> TEParser<std::vector<A>>
 {
-    return toTEParser || triPlus | (many1 | p) | (Monad<Parser>::return_ | std::vector<A>{});
+    return toTEParser || alt | (many1 | p) | (Monad<Parser>::return_ | std::vector<A>{});
 }
 
 constexpr auto many = toGFunc<1> | [](auto p)
@@ -157,7 +157,7 @@ constexpr auto sepBy1 = toGFunc<2> | [](auto p, auto sep)
 template <typename A, typename Repr, typename B, typename Repr1>
 constexpr auto sepByImpl(Parser<A, Repr> p, Parser<B, Repr1> sep)
 {
-    return (triPlus | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{}));
+    return (alt | (p <sepBy1> sep) | (Monad<Parser>::return_ | std::vector<A>{}));
 }
 
 constexpr auto sepBy = toGFunc<2> | [](auto p, auto sep)
@@ -177,7 +177,7 @@ constexpr auto chainl1Impl(Parser<A, Repr> p, Op op)
                 };
             };
         auto const rhs = Monad<Parser>::return_ | a;
-        return toTEParser || (lhs <triPlus> rhs);
+        return toTEParser || (lhs <alt> rhs);
     };
     return (p >>= rest);
 }
@@ -189,7 +189,7 @@ constexpr auto chainl1 = toGFunc<2> | [](auto p, auto op)
 
 constexpr auto chainl = toGFunc<3> | [](auto p, auto op, auto a)
 {
-    return (p <chainl1> op) <triPlus> (Monad<Parser>::return_ | a);
+    return (p <chainl1> op) <alt> (Monad<Parser>::return_ | a);
 };
 
 constexpr auto isSpace = toFunc<> | [](char c)
