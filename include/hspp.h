@@ -3778,7 +3778,7 @@ constexpr auto yCombinator = toGFunc<1> | [](auto func)
 
 class StringParser;
 
-auto stringImpl(std::string const& cs)
+inline auto stringImpl(std::string const& cs)
     -> Parser<std::string, StringParser>;
 
 class StringParser
@@ -3805,7 +3805,7 @@ public:
     }
 };
 
-auto stringImpl(std::string const& cs)
+inline auto stringImpl(std::string const& cs)
     -> Parser<std::string, StringParser>
 {
     return toParser || toFunc<> | StringParser{cs};
