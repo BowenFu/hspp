@@ -10,6 +10,7 @@ using namespace hspp;
 using namespace hspp::data;
 using namespace hspp::parser;
 using namespace std::literals;
+using namespace hspp::doN;
 
 template <typename Func>
 auto forkIOImpl(IO<_O_, Func> io_)
@@ -30,14 +31,56 @@ constexpr auto forkIO = toGFunc<1> | [](auto io_){
     return forkIOImpl(io_);
 };
 
+constexpr auto threadDelay = toFunc<> | [](size_t microseconds)
+{
+    return io(
+        [microseconds]{
+            std::this_thread::sleep_for(std::chrono::microseconds{microseconds});
+            return _o_;
+        }
+    );
+};
+
 TEST(forkIO, 1)
 {
-    using namespace hspp::doN;
     auto io_ = do_(
         forkIO | (replicateM_ | 10000U | (putChar | 'A')),
         (replicateM_ | 10000U | (putChar | 'B'))
     );
     io_.run();
+}
+
+TEST(forkIO, 2)
+{
+    auto setReminder = toFunc<> | [](std::string const& s)
+    {
+        Id<size_t> n;
+        return do_(
+            putStr | "Ok, I'll remind you in ",
+            print | s,
+            putStrLn | " seconds",
+            threadDelay | (1000000U * (hspp::read<size_t> | s)),
+            print | s,
+            putStrLn | " seconds is up! BING!BEL"
+        );
+        // return do_(
+        //     n = (hspp::read<size_t> | s),
+        //     putStr | "Ok, I'll remind you in ",
+        //     print | n,
+        //     putStrLn | " seconds",
+        //     threadDelay | (1000000U * n),
+        //     print | n,
+        //     putStrLn | " seconds is up! BING!BEL"
+        // );
+    };
+
+    Id<std::string> s;
+    // std::string s = "1";
+    auto io = forever || do_(
+        s <= getLine,
+        forkIO || setReminder | s
+    );
+    // io.run();
 }
 
 template <typename A>

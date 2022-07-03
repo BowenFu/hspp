@@ -1252,6 +1252,15 @@ private:
     Func mFunc;
 };
 
+template <typename... Ts>
+class IsIO : public std::false_type
+{};
+template <typename... Ts>
+class IsIO<IO<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isIOV = IsIO<std::decay_t<T>>::value;
+
 template <typename Func>
 auto io(Func func)
 {
@@ -1271,6 +1280,17 @@ constexpr auto putChar = toFunc<> | [](char c)
         [c]
         {
             std::cout << c << std::flush;
+            return _o_;
+        }
+    );
+};
+
+constexpr auto putStr = toFunc<> | [](std::string str)
+{
+    return io(
+        [str=std::move(str)]
+        {
+            std::cout << str << std::flush;
             return _o_;
         }
     );
@@ -3168,6 +3188,27 @@ public:
 template <template<typename...> typename Type, typename... Args>
 const decltype(Monoid<Type, Args...>::mempty) MonadZero<Type, Args...>::mzero = Monoid<Type, Args...>::mempty;
 
+constexpr auto failIO = toFunc<> | [](std::string s)
+{
+    return data::io(
+        [=]{
+            throw std::runtime_error{s};
+        }
+    );
+};
+
+inline const auto failIOMZero = failIO | "mzero";
+
+template <typename A>
+class MonadZero<data::IO, A>
+{
+public:
+    const static decltype(failIOMZero) mzero;
+};
+
+template <typename A>
+const decltype(failIOMZero) MonadZero<data::IO, A>::mzero = failIOMZero;
+
 template <typename A>
 class MonadZero<data::Parser, A>
 {
@@ -3184,6 +3225,14 @@ class MonadPlus : public MonadZero<Type, Ts...>
 public:
     constexpr static auto mplus = Monoid<Type, Ts...>::mappend;
 };
+
+template <typename A>
+class MonadPlus<data::IO, A> : public MonadZero<data::IO, A>
+{
+public:
+    // constexpr static auto mplus;
+};
+
 
 template <typename A>
 class MonadPlus<data::Parser, A>
@@ -3279,7 +3328,20 @@ constexpr auto guardImpl(bool b)
     }
     else
     {
-        return b ? MonadType<ClassT>::return_( _o_) : MonadPlusType<ReplaceDataTypeWith<ClassT, _O_>>::mzero;
+        if constexpr (data::isIOV<ClassT>)
+        {
+            return data::io([=]{
+                if (!b)
+                {
+                    failIOMZero.run();
+                }
+                return _o_;
+            });
+        }
+        else
+        {
+            return b ? MonadType<ClassT>::return_( _o_) : MonadPlusType<ReplaceDataTypeWith<ClassT, _O_>>::mzero;
+        }
     }
 }
 
@@ -3362,6 +3424,7 @@ constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
     return MType::rshift | lhs || evalDeferred<MonadData1> | rhs;
 }
 
+// for IO
 template <typename MData>
 constexpr inline auto replicateM_Impl (size_t times, MData const& mdata)
 {
@@ -3381,6 +3444,21 @@ constexpr inline auto replicateM_Impl (size_t times, MData const& mdata)
 constexpr inline auto replicateM_ = toGFunc<2>([](size_t times, auto mdata)
 {
     return replicateM_Impl(times, mdata);
+});
+
+constexpr inline auto forever = toGFunc<1>([](auto io_)
+{
+    static_assert(isMonadV<decltype(io_)>);
+    return data::io(
+        [=]
+        {
+            while (true)
+            {
+                io_.run();
+            }
+            return _o_;
+        }
+    );
 });
 
 
@@ -3419,6 +3497,9 @@ namespace hspp
 
 namespace doN
 {
+template <typename T>
+class Nullary;
+
 // make sure Id is not a const obj.
 template <typename T>
 class Id
@@ -3443,6 +3524,25 @@ public:
     {
         const_cast<OptT&>(*mT) = std::move(v);
     }
+
+    constexpr auto operator=(T const& d)
+    {
+        bind(d);
+        return guard | true;
+    }
+
+    template <typename F>
+    constexpr auto operator=(Nullary<F> const& f)
+    {
+        static_assert(std::is_same_v<T, std::invoke_result_t<Nullary<F>>>);
+        return guard | nullary(
+            [=]{
+                bind(f());
+                return true;
+            }
+        );
+    }
+
 };
 
 template <typename T>
@@ -3518,7 +3618,6 @@ class IsDeMonad<DeMonad<Ts...>> : public std::true_type
 {};
 template <typename T>
 constexpr static auto isDeMonadV = IsDeMonad<std::decay_t<T>>::value;
-
 
 
 template <typename M, typename = MonadType<M>>
@@ -3724,6 +3823,12 @@ constexpr auto _(Head const& head, Rest const&... rest)
 }
 
 constexpr auto if_ = guard;
+
+// used for doN, so that Id/Nullary can be used with ifThenElse.
+constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then, auto else_)
+{
+    return nullary([=] { return evaluate_(pred) ? evaluate_(then) : evaluate_(else_); });
+};
 
 } // namespace doN
 
