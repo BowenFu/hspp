@@ -1265,6 +1265,17 @@ auto ioData(Data data)
     return io([data=std::move(data)] { return data; });
 }
 
+constexpr auto putChar = toFunc<> | [](char c)
+{
+    return io(
+        [c]
+        {
+            std::cout << c << std::flush;
+            return _o_;
+        }
+    );
+};
+
 constexpr auto putStrLn = toFunc<> | [](std::string str)
 {
     return io(
@@ -3350,6 +3361,28 @@ constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     return MType::rshift | lhs || evalDeferred<MonadData1> | rhs;
 }
+
+template <typename MData>
+constexpr inline auto replicateM_Impl (size_t times, MData const& mdata)
+{
+    static_assert(isMonadV<MData>);
+    return data::io(
+        [=]
+        {
+            for (size_t i = 0; i < times; ++i)
+            {
+                mdata.run();
+            }
+            return _o_;
+        }
+    );
+}
+
+constexpr inline auto replicateM_ = toGFunc<2>([](size_t times, auto mdata)
+{
+    return replicateM_Impl(times, mdata);
+});
+
 
 constexpr auto all = toGFunc<1>([](auto p)
 {

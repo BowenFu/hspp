@@ -4,11 +4,41 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <cctype>
+#include <thread>
 
 using namespace hspp;
 using namespace hspp::data;
 using namespace hspp::parser;
 using namespace std::literals;
+
+template <typename Func>
+auto forkIOImpl(IO<_O_, Func> io_)
+{
+    return io(
+        [io_]
+        {
+            std::thread t{[io_]{
+                io_.run();
+            }};
+            t.detach();
+            return t.get_id();
+        }
+    );
+}
+
+constexpr auto forkIO = toGFunc<1> | [](auto io_){
+    return forkIOImpl(io_);
+};
+
+TEST(forkIO, 1)
+{
+    using namespace hspp::doN;
+    auto io_ = do_(
+        forkIO | (replicateM_ | 10000U | (putChar | 'A')),
+        (replicateM_ | 10000U | (putChar | 'B'))
+    );
+    io_.run();
+}
 
 template <typename A>
 struct IORef
@@ -28,6 +58,7 @@ auto atomCAS(IORef<A>& ptr, A& old, A new_)
 }
 
 #if 0
+using Integer = int64_t;
 using ID = Integer;
 
 template <typename A>
@@ -40,7 +71,12 @@ struct TVar
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
-using WriteSet = std::map<ID, 
+// optimize me later
+using ReadSet = std::map<ID, std::any>;
+using WriteSet = std::map<ID, std::any>;
+
+using TId = Integer;
+using Stamp = Integer;
 
 struct TState
 {
