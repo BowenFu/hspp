@@ -56,31 +56,22 @@ TEST(forkIO, 2)
     {
         Id<size_t> n;
         return do_(
+            n = (hspp::read<size_t> | s),
             putStr | "Ok, I'll remind you in ",
-            print | s,
+            print | n,
             putStrLn | " seconds",
-            threadDelay | (1000000U * (hspp::read<size_t> | s)),
-            print | s,
+            threadDelay | (1000000U * n),
+            print | n,
             putStrLn | " seconds is up! BING!BEL"
         );
-        // return do_(
-        //     n = (hspp::read<size_t> | s),
-        //     putStr | "Ok, I'll remind you in ",
-        //     print | n,
-        //     putStrLn | " seconds",
-        //     threadDelay | (1000000U * n),
-        //     print | n,
-        //     putStrLn | " seconds is up! BING!BEL"
-        // );
     };
 
     Id<std::string> s;
-    // std::string s = "1";
     auto io = forever || do_(
         s <= getLine,
         forkIO || setReminder | s
     );
-    // io.run();
+    io.run();
 }
 
 template <typename A>

@@ -3500,6 +3500,10 @@ namespace doN
 template <typename T>
 class Nullary;
 
+class LetExpr
+{};
+constexpr LetExpr letExpr{};
+
 // make sure Id is not a const obj.
 template <typename T>
 class Id
@@ -3528,19 +3532,16 @@ public:
     constexpr auto operator=(T const& d)
     {
         bind(d);
-        return guard | true;
+        return letExpr;
     }
 
+    // return let expr
     template <typename F>
     constexpr auto operator=(Nullary<F> const& f)
     {
         static_assert(std::is_same_v<T, std::invoke_result_t<Nullary<F>>>);
-        return guard | nullary(
-            [=]{
-                bind(f());
-                return true;
-            }
-        );
+        bind(f());
+        return letExpr;
     }
 
 };
@@ -3719,6 +3720,12 @@ template <typename MClass, typename N, typename... Rest, typename = std::enable_
 constexpr auto doImplNullaryDeMonad(Nullary<N> const& dmN, Rest const&... rest)
 {
     return doImpl<MClass>(dmN(), rest...);
+}
+
+template <typename MClass1, typename... Rest>
+constexpr auto doImpl(LetExpr, Rest const&... rest)
+{
+    return evaluate_(doImpl<MClass1>(rest...));
 }
 
 template <typename MClass1, typename MClass2, typename... Rest>
