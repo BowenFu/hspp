@@ -67,11 +67,12 @@ TEST(forkIO, 2)
     };
 
     Id<std::string> s;
-    auto io = forever || do_(
+    auto io_ = forever || do_(
         s <= getLine,
         forkIO || setReminder | s
     );
-    io.run();
+    // io.run();
+    (void)io_;
 }
 
 template <typename A>
