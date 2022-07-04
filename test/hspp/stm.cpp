@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cctype>
 #include <thread>
+#include <atomic>
 
 using namespace hspp;
 using namespace hspp::data;
