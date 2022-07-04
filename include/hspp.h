@@ -3358,6 +3358,11 @@ constexpr auto read = data::toFunc<>([](std::string const& d)
     std::stringstream is{d};
     T t;
     is >> t;
+
+    if (is.bad())
+    {
+        throw std::runtime_error{"Invalid read!"};
+    }
     return t;
 });
 
@@ -3736,7 +3741,7 @@ constexpr auto doImpl(DeMonad<MClass2> const& dm, Rest const&... rest)
     return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
-template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head>, void>>
+template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head> && !std::is_same_v<Head, LetExpr>, void>>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
     if constexpr (isNullaryOrIdV<Head>)
