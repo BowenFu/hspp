@@ -22,6 +22,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         std: [17, 20]
+        exclude: # Skip win + std20 due to out of heap memory
+          - os: windows-latest
+            std: 20
 
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +36,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel 1
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
 
     - name: Test
       working-directory: ${{github.workspace}}/build
