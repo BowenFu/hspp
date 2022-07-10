@@ -205,15 +205,28 @@ class Stop : public MVar<_O_>{};
 using LogCommand = std::variant<Message, Stop>;
 class Logger : public MVar<LogCommand>{};
 
-constexpr auto logger(Logger& l)
+
+auto logger(Logger& m)
 {
-    auto loop = 
-    where
-    loop = do_(
+    IO<_O_> loop0 = []{ return _o_; };
+    auto loop = loop0;
+
+    auto const dispatchCmd = toFunc<> | [&loop](LogCommand const& lc)
+    {
+        return std::visit(overload(
+            [&](Message const& msg){
+                return toTEIO | do_(print | msg, loop);
+            },
+            [](Stop s){
+                return toTEIO | do_(putStrLn | "logger: stop", putMVar | s | _o_);
+            }
+        ), lc);
+    };
+
+    Id<LogCommand> cmd;
+    loop = toTEIO | do_(
         cmd <= (takeMVar | m),
-        case cmd of
-            Message msg -> doInner(putStrLn | msg, loop),
-            Stop s -> doInner(putStrLn | "logger: stop", putMVar | s | _o_)
+        dispatchCmd | cmd
     );
 }
 
@@ -222,7 +235,7 @@ constexpr auto initLoggerImpl()
     Id<LogCommand> m;
     Id<Logger> l;
     return do_(
-        m <= newEmptyMVar,
+        m <= newEmptyMVar<LogCommand>,
         l = (Logger | m),
         forkIO | (logger | l),
         return_ | l

@@ -3579,6 +3579,17 @@ constexpr auto nullary(T const &t)
 }
 
 template <typename T>
+constexpr auto toTENullaryImpl(Nullary<T> const &t)
+{
+    return nullary(std::function<std::invoke_result_t<T>>{t});
+}
+
+constexpr auto toTENullary = toGFunc<1> | [](auto const& t)
+{
+    return toTENullaryImpl(t);
+};
+
+template <typename T>
 class IsNullary : public std::false_type
 {
 };
