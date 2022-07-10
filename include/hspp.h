@@ -1262,17 +1262,31 @@ template <typename T>
 constexpr static auto isIOV = IsIO<std::decay_t<T>>::value;
 
 template <typename Func>
-auto io(Func func)
+constexpr auto io(Func func)
 {
     using Data = std::invoke_result_t<Func>;
-    return IO<Data, Func>{func};
+    return IO<Data, Func>{std::move(func)};
 }
 
 template <typename Data>
-auto ioData(Data data)
+constexpr auto ioData(Data data)
 {
     return io([data=std::move(data)] { return data; });
 }
+
+template <typename Data, typename Func>
+constexpr auto toTEIOImpl(IO<Data, Func> const& p)
+{
+    return IO<Data>{[p]{
+        return p.run();
+    }};
+}
+
+constexpr auto toTEIO = toGFunc<1> | [](auto p)
+{
+    return toTEIOImpl(p);
+};
+
 
 constexpr auto putChar = toFunc<> | [](char c)
 {
@@ -2663,7 +2677,7 @@ public:
     template <typename Func, typename Repr, typename Ret, typename... Args>
     constexpr static auto fmap(Func&& func, data::Reader<FirstArg, Ret, Repr> const& in)
     {
-        return data::toReader | func <o> (data::runReader | in);
+        return data::toReader || func <o> (data::runReader | in);
     }
 };
 
@@ -2832,12 +2846,12 @@ class Applicative<data::Reader, FirstArg> : public Functor<data::Reader, FirstAr
 public:
     constexpr static auto pure = toGFunc<1> | [](auto ret)
     {
-        return data::toReader | data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
+        return data::toReader || data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
     };
     template <typename Reader1, typename Reader2>
     constexpr static auto ap(Reader1 func, Reader1 in)
     {
-        return data::toReader | data::toFunc<>(
+        return data::toReader || data::toFunc<>(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return data::runReader | func | arg || data::runReader | in | arg;
@@ -3565,6 +3579,17 @@ constexpr auto nullary(T const &t)
 }
 
 template <typename T>
+constexpr auto toTENullaryImpl(Nullary<T> const &t)
+{
+    return nullary(std::function<std::invoke_result_t<T>>{t});
+}
+
+constexpr auto toTENullary = toGFunc<1> | [](auto const& t)
+{
+    return toTENullaryImpl(t);
+};
+
+template <typename T>
 class IsNullary : public std::false_type
 {
 };
@@ -3576,6 +3601,13 @@ class IsNullary<Nullary<T>> : public std::true_type
 
 template <typename T>
 constexpr auto isNullary = IsNullary<std::decay_t<T>>::value;
+
+template <typename ClassT, typename T , typename = std::enable_if_t<isNullary<T>, void>>
+constexpr auto evalDeferredImpl(T&& t)
+{
+    static_assert(std::is_same_v<MonadType<ClassT>, MonadType<std::invoke_result_t<T>>>);
+    return t();
+}
 
 template <typename T>
 class IsNullaryOrId : public IsNullary<T>
@@ -3825,7 +3857,15 @@ template <typename Head, typename... Rest>
 constexpr auto do_(Head const& head, Rest const&... rest)
 {
     using MClass = MonadClassType<Head, Rest...>;
-    return doImpl<MClass>(head, rest...);
+    auto result = doImpl<MClass>(head, rest...);
+    static_assert(!isNullaryOrIdV<decltype(result)>);
+    return result;
+}
+
+template <typename... Args>
+constexpr auto doInner(Args&&... args)
+{
+    return nullary([=] { return do_(evaluate_(args)...); });
 }
 
 template <typename Head, typename... Rest>

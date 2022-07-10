@@ -1,6 +1,5 @@
 add_executable(unittests test.cpp stm.cpp)
 target_include_directories(unittests PRIVATE)
-target_compile_options(unittests PRIVATE ${BASE_COMPILE_FLAGS})
-target_link_libraries(unittests PRIVATE hspp gtest_main)
+target_link_libraries(unittests PRIVATE hspp gtest_main ${BASE_ADDITIONAL_LIBS})
 set_target_properties(unittests PROPERTIES CXX_EXTENSIONS OFF)
 gtest_discover_tests(unittests)
