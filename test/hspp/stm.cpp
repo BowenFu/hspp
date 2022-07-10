@@ -128,7 +128,6 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
     {
         while (true)
         {
-            if (a.data->first.has_value())
             {
                 std::unique_lock lock{a.data->second};
                 if (a.data->first.has_value())
@@ -155,7 +154,6 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
     {
         while (true)
         {
-            if (!a.data->first.has_value())
             {
                 std::unique_lock lock{a.data->second};
                 if (!a.data->first.has_value())
