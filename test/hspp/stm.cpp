@@ -6,6 +6,7 @@
 #include <cctype>
 #include <thread>
 #include <atomic>
+#include <shared_mutex>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -98,7 +99,7 @@ TEST(forkIO, 3)
 template <typename A>
 struct MVar
 {
-    using T = std::pair<std::optional<A>, std::mutex>;
+    using T = std::pair<std::optional<A>, std::shared_mutex>;
     std::shared_ptr<T> data = std::make_shared<T>();
     MVar() = default;
     MVar(A a)
