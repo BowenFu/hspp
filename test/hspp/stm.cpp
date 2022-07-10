@@ -51,22 +51,22 @@ TEST(forkIO, 1)
     io_.run();
 }
 
+constexpr auto setReminder = toFunc<> | [](std::string const& s)
+{
+    Id<size_t> n;
+    return do_(
+        n = (hspp::read<size_t> | s), // let expression.
+        putStr | "Ok, I'll remind you in ",
+        print | n,
+        putStrLn | " seconds",
+        threadDelay | (1000000U * n),
+        print | n,
+        putStrLn | " seconds is up! BING!BEL"
+    );
+};
+
 TEST(forkIO, 2)
 {
-    auto setReminder = toFunc<> | [](std::string const& s)
-    {
-        Id<size_t> n;
-        return do_(
-            n = (hspp::read<size_t> | s),
-            putStr | "Ok, I'll remind you in ",
-            print | n,
-            putStrLn | " seconds",
-            threadDelay | (1000000U * n),
-            print | n,
-            putStrLn | " seconds is up! BING!BEL"
-        );
-    };
-
     Id<std::string> s;
     auto io_ = forever || do_(
         s <= getLine,
@@ -74,7 +74,129 @@ TEST(forkIO, 2)
     );
     // io.run();
     (void)io_;
+
 }
+
+TEST(forkIO, 3)
+{
+    IO<_O_> loop0 = []{ return _o_; };
+    auto loop = loop0;
+
+    Id<std::string> s;
+    loop = toTEIO | do_(
+        s <= getLine,
+        ifThenElse(s == "exit")
+            || loop0
+            || toTEIO | (doInner(forkIO || setReminder | s,
+                nullary([&]{ return loop;}))) // capturing by ref is important, so that loop is not fixed to loop0.
+    );
+
+    loop.run();
+}
+
+template <typename A>
+struct MVar
+{
+    std::shared_ptr<std::atomic<std::optional<A>>> data = std::make_shared<std::atomic<std::optional<A>>>();
+};
+
+template <typename A>
+constexpr auto newEmptyMVar = io([]{ return MVar<A>{}; });
+
+template <typename A>
+constexpr auto newMVarImpl(A a)
+{
+    return io([&]{ return MVar<A>{std::move(a)}; });
+}
+
+constexpr auto newMVar = toGFunc<1> | [](auto a)
+{
+    return newMVarImpl(a);
+};
+
+template <typename A>
+constexpr auto takeMVarImpl(MVar<A> const& a)
+{
+    return io([a]
+    {
+        std::optional<A> result{};
+        do {
+            std::this_thread::yield();
+            result = a.data->exchange(std::optional<A>{});
+        } while(!result.has_value());
+        return result.value();
+    });
+}
+
+constexpr auto takeMVar = toGFunc<1> | [](auto a)
+{
+    return takeMVarImpl(a);
+};
+
+template <typename A>
+constexpr auto putMVarImpl(MVar<A>& a, A new_)
+{
+    return io([a, new_=std::make_optional(std::move(new_))]
+    {
+        std::optional<A> old{};
+        while (!a.data->compare_exchange_weak(old, new_))
+        {
+            std::this_thread::yield();
+        }
+        return _o_;
+    });
+}
+
+constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
+{
+    return putMVarImpl(a, new_);
+};
+
+TEST(MVar, 1)
+{
+    (void)newMVar;
+
+    Id<MVar<char>> m;
+    Id<char> r;
+    auto const io_ = do_(
+        m <= newEmptyMVar<char>,
+        forkIO || putMVar | m | 'x',
+        r <= (takeMVar | m),
+        print | r
+    );
+    io_.run();
+}
+
+TEST(MVar, 2)
+{
+    Id<MVar<char>> m;
+    Id<char> r;
+    auto io_ = do_(
+        m <= newEmptyMVar<char>,
+        forkIO || doInner(
+            putMVar | m | 'x',
+            putMVar | m | 'y'
+        ),
+        r <= (takeMVar | m),
+        print | r,
+        r <= (takeMVar | m),
+        print | r
+    );
+    io_.run();
+}
+
+// stuck
+#if 0
+TEST(MVar, 3)
+{
+    Id<MVar<char>> m;
+    auto io_ = do_(
+        m <= newEmptyMVar<char>,
+        takeMVar | m
+    );
+    io_.run();
+}
+#endif
 
 template <typename A>
 struct IORef
