@@ -20,6 +20,11 @@ list(APPEND
     "$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-Wall;-Wextra;-pedantic;-Werror;-Wno-parentheses;-Wno-shadow;-Wconversion;-Wsign-conversion>"
         "$<$<CXX_COMPILER_ID:MSVC>:/W4>") # /WX for -Werror
 
+# Fix atomic lib linking for gcc.
+list(APPEND
+    BASE_COMPILE_FLAGS
+    "$<$<OR:$<CXX_COMPILER_ID:GNU>>:-latomic>")
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
