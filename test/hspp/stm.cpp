@@ -107,8 +107,6 @@ struct MVar
     {}
 };
 
-static_assert(std::atomic<std::optional<int64_t>>::is_always_lock_free);
-
 template <typename A>
 constexpr auto newEmptyMVar = io([]{ return MVar<A>{}; });
 
