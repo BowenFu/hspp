@@ -98,8 +98,15 @@ TEST(forkIO, 3)
 template <typename A>
 struct MVar
 {
-    std::shared_ptr<std::atomic<std::optional<A>>> data = std::make_shared<std::atomic<std::optional<A>>>();
+    using T = std::pair<std::optional<A>, std::mutex>;
+    std::shared_ptr<T> data = std::make_shared<T>();
+    MVar() = default;
+    MVar(A a)
+    : data{std::make_shared<T>(a, {})}
+    {}
 };
+
+static_assert(std::atomic<std::optional<int64_t>>::is_always_lock_free);
 
 template <typename A>
 constexpr auto newEmptyMVar = io([]{ return MVar<A>{}; });
@@ -120,12 +127,20 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
 {
     return io([a]
     {
-        std::optional<A> result{};
-        do {
+        while (true)
+        {
+            if (a.data->first.has_value())
+            {
+                std::unique_lock lock{a.data->second};
+                if (a.data->first.has_value())
+                {
+                    auto result = std::move(a.data->first.value());
+                    a.data->first.reset();
+                    return result;
+                }
+            }
             std::this_thread::yield();
-            result = a.data->exchange(std::optional<A>{});
-        } while(!result.has_value());
-        return result.value();
+        }
     });
 }
 
@@ -137,14 +152,21 @@ constexpr auto takeMVar = toGFunc<1> | [](auto a)
 template <typename A>
 constexpr auto putMVarImpl(MVar<A>& a, A new_)
 {
-    return io([a, new_=std::make_optional(std::move(new_))]
+    return io([a, new_]
     {
-        std::optional<A> old{};
-        while (!a.data->compare_exchange_weak(old, new_))
+        while (true)
         {
+            if (!a.data->first.has_value())
+            {
+                std::unique_lock lock{a.data->second};
+                if (!a.data->first.has_value())
+                {
+                    a.data->first = new_;
+                    return _o_;
+                }
+            }
             std::this_thread::yield();
         }
-        return _o_;
     });
 }
 
