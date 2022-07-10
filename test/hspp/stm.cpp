@@ -300,7 +300,11 @@ TEST(MVar, logger)
         logMessage | l | "bye",
         logStop | l
     );
+
+    testing::internal::CaptureStdout();
     io_.run();
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "hello\nbye\nlogger: stop\n");
 }
 
 
