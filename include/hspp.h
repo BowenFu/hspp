@@ -3519,9 +3519,27 @@ namespace doN
 template <typename T>
 class Nullary;
 
-class LetExpr
-{};
-constexpr LetExpr letExpr{};
+template <typename F>
+class LetExpr : public F
+{
+public:
+    LetExpr(F f)
+    : F{std::move(f)}
+    {}
+};
+
+template <typename T>
+class IsLetExpr : public std::false_type
+{
+};
+
+template <typename T>
+class IsLetExpr<LetExpr<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isLetExprV = IsLetExpr<std::decay_t<T>>::value;
 
 // make sure Id is not a const obj.
 template <typename T>
@@ -3551,7 +3569,7 @@ public:
     constexpr auto operator=(T const& d)
     {
         bind(d);
-        return letExpr;
+        return LetExpr([]{});
     }
 
     // return let expr
@@ -3559,8 +3577,7 @@ public:
     constexpr auto operator=(Nullary<F> const& f)
     {
         static_assert(std::is_same_v<T, std::invoke_result_t<Nullary<F>>>);
-        bind(f());
-        return letExpr;
+        return LetExpr([*this, f]{ bind(f()); });
     }
 
 };
@@ -3600,9 +3617,9 @@ class IsNullary<Nullary<T>> : public std::true_type
 };
 
 template <typename T>
-constexpr auto isNullary = IsNullary<std::decay_t<T>>::value;
+constexpr auto isNullaryV = IsNullary<std::decay_t<T>>::value;
 
-template <typename ClassT, typename T , typename = std::enable_if_t<isNullary<T>, void>>
+template <typename ClassT, typename T , typename = std::enable_if_t<isNullaryV<T>, void>>
 constexpr auto evalDeferredImpl(T&& t)
 {
     static_assert(std::is_same_v<MonadType<ClassT>, MonadType<std::invoke_result_t<T>>>);
@@ -3759,9 +3776,10 @@ constexpr auto doImplNullaryDeMonad(Nullary<N> const& dmN, Rest const&... rest)
     return doImpl<MClass>(dmN(), rest...);
 }
 
-template <typename MClass1, typename... Rest>
-constexpr auto doImpl(LetExpr, Rest const&... rest)
+template <typename MClass1, typename F, typename... Rest>
+constexpr auto doImpl(LetExpr<F> const& le, Rest const&... rest)
 {
+    le();
     return evaluate_(doImpl<MClass1>(rest...));
 }
 
@@ -3773,7 +3791,7 @@ constexpr auto doImpl(DeMonad<MClass2> const& dm, Rest const&... rest)
     return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
-template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head> && !std::is_same_v<Head, LetExpr>, void>>
+template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head> && !isLetExprV<Head>, void>>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
     if constexpr (isNullaryOrIdV<Head>)
