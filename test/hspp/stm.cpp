@@ -217,24 +217,34 @@ TEST(MVar, 3)
     // io_.run();
 }
 
-#if 0
 class Message : public std::string{};
 class Stop : public MVar<_O_>{};
 
 using LogCommand = std::variant<Message, Stop>;
 class Logger : public MVar<LogCommand>{};
 
-
-auto logger(Logger& m)
+constexpr auto toStop = toFunc<> | [](MVar<_O_> mo)
 {
-    IO<_O_> loop0 = []{ return _o_; };
-    auto loop = loop0;
+    return Stop{std::move(mo)};
+};
 
-    auto const dispatchCmd = toFunc<> | [&loop](LogCommand const& lc)
+constexpr auto toLogCommnad = toGFunc<1> | [](auto l)
+{
+    return LogCommand{std::move(l)};
+};
+
+constexpr auto toLogger = toFunc<> | [](MVar<LogCommand> mlc)
+{
+    return Logger{std::move(mlc)};
+};
+
+const auto logger = toFunc<> | [] (Logger m)
+{
+    auto const dispatchCmd = toGFunc<2> | [](LogCommand const& lc, auto const& loop)
     {
         return std::visit(overload(
             [&](Message const& msg){
-                return toTEIO | do_(print | msg, loop);
+                return toTEIO | do_(print | msg, loop());
             },
             [](Stop s){
                 return toTEIO | do_(putStrLn | "logger: stop", putMVar | s | _o_);
@@ -242,25 +252,57 @@ auto logger(Logger& m)
         ), lc);
     };
 
-    Id<LogCommand> cmd;
-    loop = toTEIO | do_(
-        cmd <= (takeMVar | m),
-        dispatchCmd | cmd
-    );
-}
 
-constexpr auto initLoggerImpl()
+    auto loop = yCombinator | [=](auto const& self) -> IO<_O_>
+    {
+        Id<LogCommand> cmd;
+        return toTEIO | do_(
+            cmd <= (takeMVar | m),
+            dispatchCmd | cmd | self
+        );
+    };
+    return loop();
+};
+
+auto initLogger()
 {
-    Id<LogCommand> m;
+    Id<MVar<LogCommand>> m;
     Id<Logger> l;
     return do_(
         m <= newEmptyMVar<LogCommand>,
-        l = (Logger | m),
+        l = (toLogger | m),
         forkIO | (logger | l),
         return_ | l
     );
 }
-#endif // 0
+
+constexpr auto logMessage = toFunc<> | [](Logger m, std::string s)
+{
+    return putMVar | m | LogCommand{Message{s}};
+};
+
+constexpr auto logStop = toFunc<> | [](Logger m)
+{
+    Id<MVar<_O_>> s;
+    return do_(
+        s <= newEmptyMVar<_O_>,
+        putMVar | m || (toLogCommnad || toStop | s),
+        takeMVar | s
+    );
+};
+
+TEST(MVar, logger)
+{
+    Id<Logger> l;
+    auto io_ = do_(
+        l <= initLogger(),
+        logMessage | l | "hello",
+        logMessage | l | "bye",
+        logStop | l
+    );
+    io_.run();
+}
+
 
 template <typename A>
 struct IORef
