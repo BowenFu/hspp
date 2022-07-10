@@ -23,7 +23,7 @@ list(APPEND
 # Fix atomic lib linking for gcc.
 list(APPEND
     BASE_COMPILE_FLAGS
-    "$<$<OR:$<CXX_COMPILER_ID:GNU>>:-latomic>")
+    "$<$<OR:$<CXX_COMPILER_ID:Clang>:$<CXX_COMPILER_ID:GNU>>:-latomic>")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
