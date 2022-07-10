@@ -2677,7 +2677,7 @@ public:
     template <typename Func, typename Repr, typename Ret, typename... Args>
     constexpr static auto fmap(Func&& func, data::Reader<FirstArg, Ret, Repr> const& in)
     {
-        return data::toReader | func <o> (data::runReader | in);
+        return data::toReader || func <o> (data::runReader | in);
     }
 };
 
@@ -2846,12 +2846,12 @@ class Applicative<data::Reader, FirstArg> : public Functor<data::Reader, FirstAr
 public:
     constexpr static auto pure = toGFunc<1> | [](auto ret)
     {
-        return data::toReader | data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
+        return data::toReader || data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
     };
     template <typename Reader1, typename Reader2>
     constexpr static auto ap(Reader1 func, Reader1 in)
     {
-        return data::toReader | data::toFunc<>(
+        return data::toReader || data::toFunc<>(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return data::runReader | func | arg || data::runReader | in | arg;
