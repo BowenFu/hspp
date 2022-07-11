@@ -336,7 +336,7 @@ constexpr auto async = toGFunc<1> | [](auto action){
     Id<A> r;
     return do_(
         var <= newEmptyMVar<A>,
-        forkIO || doInner(
+        forkIO || do_( // why doInner does not work here?
             r <= action,
             putMVar | var | r),
         return_ | (toAsync | var)
@@ -351,14 +351,22 @@ constexpr auto wait = toGFunc<1> | [](auto aVar)
 TEST(Async, 1)
 {
     Id<Async<std::string>> a1;
+    Id<Async<std::string>> a2;
     Id<std::string> r1;
+    Id<std::string> r2;
     auto io_ = do_(
         a1 <= (async | ioData("12345"s)),
-        // r1 <= (wait | a1),
-        r1 <= (readMVar | a1),
-        print | r1
+        a2 <= (async | ioData("67890"s)),
+        r1 <= (wait | a1),
+        r2 <= (wait | a2),
+        print | r1,
+        print | r2
     );
+
+    testing::internal::CaptureStdout();
     io_.run();
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "12345\n67890\n");
 }
 
 template <typename A>
