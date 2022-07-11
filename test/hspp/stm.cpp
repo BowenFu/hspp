@@ -14,6 +14,9 @@ using namespace hspp::parser;
 using namespace std::literals;
 using namespace hspp::doN;
 
+namespace concurrent
+{
+
 template <typename Func>
 auto forkIOImpl(IO<_O_, Func> io_)
 {
@@ -99,6 +102,7 @@ TEST(forkIO, 3)
 template <typename A>
 struct MVar
 {
+    using Data = A;
     using T = std::pair<std::optional<A>, std::shared_mutex>;
     std::shared_ptr<T> data = std::make_shared<T>();
     MVar() = default;
@@ -170,6 +174,16 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
 constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
 {
     return putMVarImpl(a, new_);
+};
+
+constexpr auto readMVar = toGFunc<1> | [](auto m){
+    using T = std::decay_t<decltype((takeMVar | m).run())>;
+    Id<T> a;
+    return do_(
+        a <= (takeMVar | m),
+        putMVar | m | a,
+        return_ | a
+    );
 };
 
 TEST(MVar, 1)
@@ -307,6 +321,53 @@ TEST(MVar, logger)
     EXPECT_EQ(output, "hello\nbye\nlogger: stop\n");
 }
 
+template <typename A>
+class Async : public MVar<A>
+{};
+
+constexpr auto toAsync = toGFunc<1> | [](auto a)
+{
+    return Async<typename decltype(a)::Data>{a};
+};
+
+constexpr auto async = toGFunc<1> | [](auto action){
+    using A = std::decay_t<decltype(action.run())>;
+    Id<MVar<A>> var;
+    Id<A> r;
+    return do_(
+        var <= newEmptyMVar<A>,
+        forkIO || do_( // why doInner does not work here?
+            r <= action,
+            putMVar | var | r),
+        return_ | (toAsync | var)
+    );
+};
+
+constexpr auto wait = toGFunc<1> | [](auto aVar)
+{
+    return readMVar | aVar;
+};
+
+TEST(Async, 1)
+{
+    Id<Async<std::string>> a1;
+    Id<Async<std::string>> a2;
+    Id<std::string> r1;
+    Id<std::string> r2;
+    auto io_ = do_(
+        a1 <= (async | ioData("12345"s)),
+        a2 <= (async | ioData("67890"s)),
+        r1 <= (wait | a1),
+        r2 <= (wait | a2),
+        print | r1,
+        print | r2
+    );
+
+    testing::internal::CaptureStdout();
+    io_.run();
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "12345\n67890\n");
+}
 
 template <typename A>
 struct IORef
@@ -367,3 +428,5 @@ TEST(atomCAS, integer)
     EXPECT_TRUE(result);
     EXPECT_EQ(a.a.load(), 2);
 }
+
+} // namespace concurrent
