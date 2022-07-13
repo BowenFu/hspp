@@ -7,6 +7,7 @@
 #include <thread>
 #include <atomic>
 #include <shared_mutex>
+#include <any>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -176,6 +177,7 @@ constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
     return putMVarImpl(a, new_);
 };
 
+// can be optimized to use shared_lock.
 constexpr auto readMVar = toGFunc<1> | [](auto m){
     using T = std::decay_t<decltype((takeMVar | m).run())>;
     Id<T> a;
@@ -386,9 +388,12 @@ auto atomCAS(IORef<A>& ptr, A& old, A new_)
     );
 }
 
-#if 0
 using Integer = int64_t;
 using ID = Integer;
+
+// Integer => locked : even transaction id or odd, free : odd write stamp
+class Lock : public IORef<Integer>
+{};
 
 template <typename A>
 struct TVar
@@ -397,7 +402,7 @@ struct TVar
     ID id;
     IORef<Integer> writeStamp;
     IORef<A> content;
-    IORef<std::vector<MVar<_O_>>> waitQueue;
+    // IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
 // optimize me later
@@ -409,13 +414,12 @@ using Stamp = Integer;
 
 struct TState
 {
+    // A transaction id is always the standard thread id.
     TId transId;
     Integer readStamp;
     ReadSet readSet;
     WriteSet writeSet;
 };
-
-#endif // 0
 
 TEST(atomCAS, integer)
 {
