@@ -470,4 +470,12 @@ TEST(atomCAS, integer)
     EXPECT_EQ(a.data->load(), 2);
 }
 
+TEST(atomCAS, clock)
+{
+    auto io_ = increamentGlobalClock;
+    EXPECT_EQ(globalClock.data->load(), 1);
+    io_.run();
+    EXPECT_EQ(globalClock.data->load(), 3);
+}
+
 } // namespace concurrent
