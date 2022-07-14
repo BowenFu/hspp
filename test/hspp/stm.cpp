@@ -7,6 +7,7 @@
 #include <thread>
 #include <atomic>
 #include <shared_mutex>
+#include <any>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -176,6 +177,7 @@ constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
     return putMVarImpl(a, new_);
 };
 
+// can be optimized to use shared_lock.
 constexpr auto readMVar = toGFunc<1> | [](auto m){
     using T = std::decay_t<decltype((takeMVar | m).run())>;
     Id<T> a;
@@ -372,23 +374,39 @@ TEST(Async, 1)
 template <typename A>
 struct IORef
 {
-    std::atomic<A> a;
+    using T = std::atomic<A>;
+    std::shared_ptr<T> data = std::make_shared<T>();
 };
 
 template <typename A>
-auto atomCAS(IORef<A>& ptr, A& old, A new_)
+auto initIORef(A a)
+{
+    return std::make_shared<typename IORef<A>::T>(std::move(a));
+}
+
+template <typename A>
+auto atomCASImpl(IORef<A> ptr, A old, A new_)
 {
     return io(
-        [&ptr, &old, new_]
+        [ptr, old, new_]
         {
-            return ptr.a.compare_exchange_strong(old, new_);
+            auto old_ = old;
+            return ptr.data->compare_exchange_strong(old_, new_);
         }
     );
 }
 
-#if 0
+constexpr auto atomCAS = toGFunc<3> | [](auto const& ptr, auto const& old, auto const& new_)
+{
+    return atomCASImpl(ptr, old, new_);
+};
+
 using Integer = int64_t;
 using ID = Integer;
+
+// Integer => locked : even transaction id or odd, free : odd write stamp
+class Lock : public IORef<Integer>
+{};
 
 template <typename A>
 struct TVar
@@ -397,7 +415,7 @@ struct TVar
     ID id;
     IORef<Integer> writeStamp;
     IORef<A> content;
-    IORef<std::vector<MVar<_O_>>> waitQueue;
+    // IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
 // optimize me later
@@ -409,24 +427,103 @@ using Stamp = Integer;
 
 struct TState
 {
+    // A transaction id is always the standard thread id.
     TId transId;
     Integer readStamp;
     ReadSet readSet;
     WriteSet writeSet;
 };
 
-#endif // 0
+IORef<Integer> globalClock{initIORef<Integer>(1)};
+
+constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
+{
+    return io([&ioRef]{
+        return ioRef.data->load();
+    });
+};
+
+constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> IO<Integer>
+{
+    Id<Integer> ov;
+    Id<bool> changed;
+    return toTEIO | do_(
+        ov <= (readIORef | globalClock),
+        changed <= (atomCAS | globalClock | ov | (ov+2)),
+        ifThenElse || changed
+                   || (toTEIO || hspp::Monad<IO>::return_ | (ov+2))
+                   || nullary(self)
+    );
+};
+
+const auto increamentGlobalClock = incrementGlobalClockImpl();
 
 TEST(atomCAS, integer)
 {
-    auto a  = IORef<int>{1};
+    auto a  = IORef<int>{initIORef(1)};
     auto old = 1;
     auto new_ = 2;
-    auto io_ = atomCAS(a, old, new_);
-    EXPECT_EQ(a.a.load(), 1);
+    auto io_ = atomCAS | a | old | new_;
+    EXPECT_EQ(a.data->load(), 1);
     auto result = io_.run();
     EXPECT_TRUE(result);
-    EXPECT_EQ(a.a.load(), 2);
+    EXPECT_EQ(a.data->load(), 2);
+}
+
+TEST(atomCAS, clock)
+{
+    auto io_ = increamentGlobalClock;
+    EXPECT_EQ(globalClock.data->load(), 1);
+    io_.run();
+    EXPECT_EQ(globalClock.data->load(), 3);
+}
+
+template <typename A>
+class Valid : public std::pair<TState, A>
+{};
+
+class Retry : public TState
+{};
+
+class Invalid : public TState
+{};
+
+template <typename A>
+class TResult : public std::variant<Valid<A>, Retry, Invalid>
+{
+public:
+    using DataT = A;
+};
+
+template <typename A, typename Func>
+class STM
+{
+    static_assert(std::is_invocable_v<Func, TState>);
+    using RetT = std::invoke_result_t<Func, TState>;
+    static_assert(isIOV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, TResult<A>>);
+public:
+    constexpr STM(Func func)
+    : mFunc{std::move(func)}
+    {}
+private:
+    Func mFunc;
+};
+
+template <typename Func>
+constexpr auto toSTM(Func func)
+{
+    using RetT = std::invoke_result_t<Func, TState>;
+    static_assert(isIOV<RetT>);
+    using A = typename DataType<RetT>::DataT;
+    return STM<A, Func>{func};
+}
+
+
+template <typename A>
+constexpr auto writeTVar(TVar<A> const& tvar, A const& a)
+{
+    return toSTM([]{return ioData(_o_);});
 }
 
 } // namespace concurrent
