@@ -479,13 +479,51 @@ TEST(atomCAS, clock)
 }
 
 template <typename A>
-class STM
+class Valid : public std::pair<TState, A>
+{};
+
+class Retry : public TState
+{};
+
+class Invalid : public TState
 {};
 
 template <typename A>
-constexpr auto writeTVar(TVar<A> const& tvar, A const& a) -> STM<_O_>
+class TResult : public std::variant<Valid<A>, Retry, Invalid>
 {
-    return {};
+public:
+    using DataT = A;
+};
+
+template <typename A, typename Func>
+class STM
+{
+    static_assert(std::is_invocable_v<Func, TState>);
+    using RetT = std::invoke_result_t<Func, TState>;
+    static_assert(isIOV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, TResult<A>>);
+public:
+    constexpr STM(Func func)
+    : mFunc{std::move(func)}
+    {}
+private:
+    Func mFunc;
+};
+
+template <typename Func>
+constexpr auto toSTM(Func func)
+{
+    using RetT = std::invoke_result_t<Func, TState>;
+    static_assert(isIOV<RetT>);
+    using A = typename DataType<RetT>::DataT;
+    return STM<A, Func>{func};
+}
+
+
+template <typename A>
+constexpr auto writeTVar(TVar<A> const& tvar, A const& a)
+{
+    return toSTM([]{return ioData(_o_);});
 }
 
 } // namespace concurrent
