@@ -478,4 +478,14 @@ TEST(atomCAS, clock)
     EXPECT_EQ(globalClock.data->load(), 3);
 }
 
+template <typename A>
+class STM
+{};
+
+template <typename A>
+constexpr auto writeTVar(TVar<A> const& tvar, A const& a) -> STM<_O_>
+{
+    return {};
+}
+
 } // namespace concurrent
