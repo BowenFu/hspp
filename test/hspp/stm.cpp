@@ -447,14 +447,13 @@ constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> 
 {
     Id<Integer> ov;
     Id<bool> changed;
-    // return toTEIO | do_(
-    //     ov <= (readIORef | globalClock),
-    //     changed <= (atomCAS | globalClock | ov | (ov+2)),
-    //     ifThenElse || changed
-    //                || (toTEIO || hspp::Monad<IO>::return_ | (ov+2))
-    //                || self()
-    // );
-    return toTEIO | ioData<Integer>(1);
+    return toTEIO | do_(
+        ov <= (readIORef | globalClock),
+        changed <= (atomCAS | globalClock | ov | (ov+2)),
+        ifThenElse || changed
+                   || (toTEIO || hspp::Monad<IO>::return_ | (ov+2))
+                   || nullary(self)
+    );
 };
 
 const auto increamentGlobalClock = incrementGlobalClockImpl();
