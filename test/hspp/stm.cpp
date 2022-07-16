@@ -415,12 +415,33 @@ struct TVar
     ID id;
     IORef<Integer> writeStamp;
     IORef<A> content;
-    // IORef<std::vector<MVar<_O_>>> waitQueue;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+};
+
+template <typename A>
+struct WSE
+{
+    Lock lock;
+    IORef<Integer> writeStamp;
+    IORef<A> content;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+    A newValue;
+};
+
+constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, auto content, IORef<std::vector<MVar<_O_>>> waitQueue, auto newValue)
+{
+    return WSE{lock, writeStamp, content, waitQueue, newValue};
 };
 
 // optimize me later
-using ReadSet = std::map<ID, std::any>;
-using WriteSet = std::map<ID, std::any>;
+class ReadSet
+{
+    using T = std::map<ID, std::any>;
+public:
+    std::shared_ptr<T> data = std::make_shared<T>();
+};
+
+using WriteSet = ReadSet;
 
 using TId = Integer;
 using Stamp = Integer;
@@ -432,6 +453,11 @@ struct TState
     Integer readStamp;
     ReadSet readSet;
     WriteSet writeSet;
+};
+
+constexpr auto getWriteSet = toFunc<> | [](TState ts)
+{
+    return ts.writeSet;
 };
 
 IORef<Integer> globalClock{initIORef<Integer>(1)};
@@ -482,6 +508,11 @@ template <typename A>
 class Valid : public std::pair<TState, A>
 {};
 
+constexpr auto toValid = toGFunc<2> | [](TState ts, auto a)
+{
+    return Valid{ts, a};
+};
+
 class Retry : public TState
 {};
 
@@ -511,7 +542,7 @@ private:
 };
 
 template <typename Func>
-constexpr auto toSTM(Func func)
+constexpr auto toSTMImpl(Func func)
 {
     using RetT = std::invoke_result_t<Func, TState>;
     static_assert(isIOV<RetT>);
@@ -519,11 +550,42 @@ constexpr auto toSTM(Func func)
     return STM<A, Func>{func};
 }
 
+constexpr auto toSTM = toGFunc<1> | [](auto func)
+{
+    return toSTMImpl(func);
+};
+
+constexpr auto castToPtr = toGFunc<1> | [](auto obj)
+{
+    return ioData(std::any{obj});
+};
+
+constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
+{
+    return io([=]
+    {
+        ws.data->emplace(id, ptr);
+        return _o_;
+    });
+};
 
 template <typename A>
-constexpr auto writeTVar(TVar<A> const& tvar, A const& a)
+constexpr auto writeTVar(TVar<A> const& tvar, A const& newValue)
 {
-    return toSTM([]{return ioData(_o_);});
+    return toSTM | [=](auto tState)
+    {
+        auto lock = tvar.lock;
+        auto wstamp = tvar.wstamp;
+        auto content = tvar.content;
+        auto queue = tvar.queue;
+        auto id = tvar.id;
+        Id<std::any> ptr;
+        return do_(
+            ptr <= (castToPtr | (toWSE | lock | wstamp | content | queue | newValue)),
+            putWS | (getWriteSet | tState) | id | ptr,
+            return_ | (toValid | tState | _o_)
+        );
+    };
 }
 
 } // namespace concurrent
