@@ -587,7 +587,7 @@ constexpr auto putRS = putWS;
 
 constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
 {
-    return io([=]() -> Maybe<std::any>
+    return io([=]() -> std::optional<std::any>
     {
         auto iter = ws.data->find(id);
         if (iter == ws.data->end())
@@ -623,12 +623,12 @@ constexpr auto readTVarImpl(TVar<A> const tvar)
 {
     return toSTM | [=](TState tState)
     {
-        Id<Maybe<std::any>> mptr;
-        auto const handleMPtr = toFunc<> | [=](TState tState, Maybe<std::any> mptr_)
+        Id<std::optional<std::any>> mptr;
+        auto const handleMPtr = toFunc<> | [=](TState tState, std::optional<std::any> mptr_)
         {
             return io([=]() -> TResult<A>
             {
-                if (mptr_.hasValue())
+                if (mptr_.has_value())
                 {
                     auto const& value = mptr_.value();
                     auto const& wse = std::any_cast<WSE<A> const&>(value);
