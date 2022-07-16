@@ -8,6 +8,7 @@
 #include <atomic>
 #include <shared_mutex>
 #include <any>
+#include <type_traits>
 
 using namespace hspp;
 using namespace hspp::data;
