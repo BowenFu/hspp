@@ -546,6 +546,10 @@ public:
     constexpr STM(Func func)
     : mFunc{std::move(func)}
     {}
+    auto run(TState tState) const
+    {
+        return mFunc(tState);
+    }
 private:
     Func mFunc;
 };
@@ -664,3 +668,60 @@ constexpr auto readTVar = toGFunc<1> | [](auto tvar)
 };
 
 } // namespace concurrent
+
+namespace hspp
+{
+    using namespace concurrent;
+template <>
+class Applicative<STM>
+{
+public:
+    template <typename A, typename Repr>
+    constexpr static auto pure(A x)
+    {
+        return toSTM | [=](auto tState) { return ioData<TResult<A>>(toValid | tState | x); };
+    }
+};
+
+
+template <>
+class MonadBase<STM>
+{
+public:
+    template <typename A, typename Repr, typename Func>
+    constexpr static auto bind(STM<A, Repr> const& t1, Func const& f)
+    {
+        return toSTM || [=](TState tState)
+        {
+            Id<TResult<A>> tRes;
+            auto const dispatchResult = toFunc<> | [=](TResult<A> tResult)
+            {
+                return io([=]
+                {
+                    return std::visit(overload(
+                        [=](Valid<A> const& v_) -> TResult<A>
+                        {
+                            auto [nTState, v] = v_;
+                            auto t2 = func(v);
+                            return t2(nTState).run();
+                        },
+                        [=](Retry const&)
+                        {
+                            return tResult;
+                        },
+                        [=](Invalid const&)
+                        {
+                            return tResult;
+                        }
+                    ), tResult);
+                });
+            };
+            return do_(
+                tRes <= t1(tState),
+                dispatchResult | tRes
+            );
+        };
+    }
+};
+
+} // namespace hspp
