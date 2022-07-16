@@ -419,6 +419,15 @@ struct TVar
 };
 
 template <typename A>
+struct RSE
+{
+    ID id;
+    Lock lock;
+    IORef<Integer> writeStamp;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+};
+
+template <typename A>
 struct WSE
 {
     Lock lock;
@@ -569,6 +578,8 @@ constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
     });
 };
 
+constexpr auto putRS = putWS;
+
 constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
 {
     return io([=]() -> Maybe<std::any>
@@ -607,15 +618,49 @@ constexpr auto readTVarImpl(TVar<A> const tvar)
 {
     return toSTM | [=](TState tState)
     {
-        auto [lock, id, wstamp, content, queue] = tvar;
         Id<Maybe<std::any>> mptr;
+        auto const handleMPtr = toFunc<> | [=](TState tState, Maybe<std::any> mptr_)
+        {
+            return io([=]() -> TResult<A>
+            {
+                if (mptr_.hasValue())
+                {
+                    auto const& value = mptr_.value();
+                    auto const& wse = std::any_cast<WSE<A> const&>(value);
+                    return toValid | tState | wse.newValue;
+                }
+                else
+                {
+                    auto [lock, id, wstamp, content, queue] = tvar;
+
+                    auto const lockVal = lock.data.get();
+                    auto const isLocked = (lockVal % 2 == 0);
+                    if (isLocked)
+                    {
+                        return Invalid{tState};
+                    }
+                    auto const result = content.data.get();
+                    auto const lockVal2 = lock.data.get();
+                    if ((lockVal != lockVal2) || (lockVal > (tState.readStamp)))
+                    {
+                        return Invalid{tState};
+                    }
+                    auto io_ = putRS | tState.readSet | RSE{id, lock, wstamp, queue};
+                    io_.run();
+                    return toValid | tState | result;
+                }
+            });
+        };
         return do_(
-            mptr <= (lookUpWS | (getWriteSet | tState) | id),
-            return_ | _o_
-            // case mptr of
-            // Just ptr -> do (WSE _ _ _ _ v)<- castFromPtr ptr return (Valid tState v)
+            mptr <= (lookUpWS | (getWriteSet | tState) | tvar.id),
+            handleMPtr | tState | mptr
         );
     };
 }
+
+constexpr auto readTVar = toGFunc<1> | [](auto tvar)
+{
+    return readTVarImpl(tvar);
+};
 
 } // namespace concurrent
