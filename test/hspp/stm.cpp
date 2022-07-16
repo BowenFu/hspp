@@ -592,9 +592,9 @@ constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
         auto iter = ws.data->find(id);
         if (iter == ws.data->end())
         {
-            return nothing;
+            return {};
         }
-        return just | iter->second;
+        return iter->second;
     });
 };
 
