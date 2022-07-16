@@ -452,7 +452,7 @@ public:
 
 using WriteSet = ReadSet;
 
-using TId = Integer;
+using TId = std::thread::id;
 using Stamp = Integer;
 
 struct TState
@@ -725,3 +725,49 @@ public:
 };
 
 } // namespace hspp
+
+namespace concurrent
+{
+
+constexpr auto newTState = io([]
+{
+    return TState{std::this_thread::get_id(), {}, {}, {}};
+});
+
+template <typename A, typename Func>
+auto atomicallyImpl(STM<A, Func> const& stmac)
+{
+    Id<TState> ts;
+    Id<TResult<A>> r;
+    auto const dispatchResult = toFunc<> | [=](TResult<A> tResult)
+    {
+        return io([=]
+        {
+            return std::visit(overload(
+                [=](Valid<A> const& v_) -> A
+                {
+                    (void)v_;
+                    // auto [nts, a] = v_;
+                    // auto transid = nts.transId;
+                    // auto writeSet = nts.writeSet;
+                    return A{};
+                },
+                [=](Retry const&)
+                {
+                    return A{};
+                },
+                [=](Invalid const& nts)
+                {
+                    return atomicallyImpl(stmac).run();
+                }
+            ), tResult);
+        });
+    };
+    return do_(
+        ts <= newTState,
+        r <= stmac.run(ts),
+        dispatchResult | r
+    );
+}
+
+} // namespace concurrent
