@@ -11,6 +11,31 @@ namespace hspp
 
 namespace doN
 {
+template <typename T>
+class Nullary;
+
+template <typename F>
+class LetExpr : public F
+{
+public:
+    LetExpr(F f)
+    : F{std::move(f)}
+    {}
+};
+
+template <typename T>
+class IsLetExpr : public std::false_type
+{
+};
+
+template <typename T>
+class IsLetExpr<LetExpr<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isLetExprV = IsLetExpr<std::decay_t<T>>::value;
+
 // make sure Id is not a const obj.
 template <typename T>
 class Id
@@ -27,6 +52,7 @@ public:
         }
         if (!mT->has_value())
         {
+            std::cerr << "mT : " << mT.get() << std::endl;
             throw std::runtime_error{"Id has no binding!"};
         }
         return mT->value();
@@ -35,6 +61,21 @@ public:
     {
         const_cast<OptT&>(*mT) = std::move(v);
     }
+
+    constexpr auto operator=(T const& d)
+    {
+        bind(d);
+        return LetExpr([]{});
+    }
+
+    // return let expr
+    template <typename F>
+    constexpr auto operator=(Nullary<F> const& f)
+    {
+        static_assert(std::is_same_v<T, std::invoke_result_t<Nullary<F>>>);
+        return LetExpr([*this, f]{ bind(f()); });
+    }
+
 };
 
 template <typename T>
@@ -51,6 +92,17 @@ constexpr auto nullary(T const &t)
 }
 
 template <typename T>
+constexpr auto toTENullaryImpl(Nullary<T> const &t)
+{
+    return nullary(std::function<std::invoke_result_t<T>>{t});
+}
+
+constexpr auto toTENullary = toGFunc<1> | [](auto const& t)
+{
+    return toTENullaryImpl(t);
+};
+
+template <typename T>
 class IsNullary : public std::false_type
 {
 };
@@ -61,7 +113,14 @@ class IsNullary<Nullary<T>> : public std::true_type
 };
 
 template <typename T>
-constexpr auto isNullary = IsNullary<std::decay_t<T>>::value;
+constexpr auto isNullaryV = IsNullary<std::decay_t<T>>::value;
+
+template <typename ClassT, typename T , typename = std::enable_if_t<isNullaryV<T>, void>>
+constexpr auto evalDeferredImpl(T&& t)
+{
+    static_assert(std::is_same_v<MonadType<ClassT>, MonadType<std::invoke_result_t<T>>>);
+    return t();
+}
 
 template <typename T>
 class IsNullaryOrId : public IsNullary<T>
@@ -110,7 +169,6 @@ class IsDeMonad<DeMonad<Ts...>> : public std::true_type
 {};
 template <typename T>
 constexpr static auto isDeMonadV = IsDeMonad<std::decay_t<T>>::value;
-
 
 
 template <typename M, typename = MonadType<M>>
@@ -214,6 +272,13 @@ constexpr auto doImplNullaryDeMonad(Nullary<N> const& dmN, Rest const&... rest)
     return doImpl<MClass>(dmN(), rest...);
 }
 
+template <typename MClass1, typename F, typename... Rest>
+constexpr auto doImpl(LetExpr<F> const& le, Rest const&... rest)
+{
+    le();
+    return evaluate_(doImpl<MClass1>(rest...));
+}
+
 template <typename MClass1, typename MClass2, typename... Rest>
 constexpr auto doImpl(DeMonad<MClass2> const& dm, Rest const&... rest)
 {
@@ -222,7 +287,7 @@ constexpr auto doImpl(DeMonad<MClass2> const& dm, Rest const&... rest)
     return dm.m() >>= funcWithParams(dm.id(), bodyBaker);
 }
 
-template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head>, void>>
+template <typename MClass, typename Head, typename... Rest, typename = std::enable_if_t<!isDeMonadV<Head> && !isLetExprV<Head>, void>>
 constexpr auto doImpl(Head const& head, Rest const&... rest)
 {
     if constexpr (isNullaryOrIdV<Head>)
@@ -306,7 +371,15 @@ template <typename Head, typename... Rest>
 constexpr auto do_(Head const& head, Rest const&... rest)
 {
     using MClass = MonadClassType<Head, Rest...>;
-    return doImpl<MClass>(head, rest...);
+    auto result = doImpl<MClass>(head, rest...);
+    static_assert(!isNullaryOrIdV<decltype(result)>);
+    return result;
+}
+
+template <typename... Args>
+constexpr auto doInner(Args&&... args)
+{
+    return nullary([=] { return do_(evaluate_(args)...); });
 }
 
 template <typename Head, typename... Rest>
@@ -316,6 +389,12 @@ constexpr auto _(Head const& head, Rest const&... rest)
 }
 
 constexpr auto if_ = guard;
+
+// used for doN, so that Id/Nullary can be used with ifThenElse.
+constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then, auto else_)
+{
+    return nullary([=] { return evaluate_(pred) ? evaluate_(then) : evaluate_(else_); });
+};
 
 } // namespace doN
 

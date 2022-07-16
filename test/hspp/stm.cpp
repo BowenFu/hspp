@@ -8,6 +8,7 @@
 #include <atomic>
 #include <shared_mutex>
 #include <any>
+#include <type_traits>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -415,14 +416,44 @@ struct TVar
     ID id;
     IORef<Integer> writeStamp;
     IORef<A> content;
-    // IORef<std::vector<MVar<_O_>>> waitQueue;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+};
+
+template <typename A>
+struct RSE
+{
+    ID id;
+    Lock lock;
+    IORef<Integer> writeStamp;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+};
+
+template <typename A>
+struct WSE
+{
+    Lock lock;
+    IORef<Integer> writeStamp;
+    IORef<A> content;
+    IORef<std::vector<MVar<_O_>>> waitQueue;
+    A newValue;
+};
+
+constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, auto content, IORef<std::vector<MVar<_O_>>> waitQueue, auto newValue)
+{
+    return WSE{lock, writeStamp, content, waitQueue, newValue};
 };
 
 // optimize me later
-using ReadSet = std::map<ID, std::any>;
-using WriteSet = std::map<ID, std::any>;
+class ReadSet
+{
+    using T = std::map<ID, std::any>;
+public:
+    std::shared_ptr<T> data = std::make_shared<T>();
+};
 
-using TId = Integer;
+using WriteSet = ReadSet;
+
+using TId = std::thread::id;
 using Stamp = Integer;
 
 struct TState
@@ -432,6 +463,11 @@ struct TState
     Integer readStamp;
     ReadSet readSet;
     WriteSet writeSet;
+};
+
+constexpr auto getWriteSet = toFunc<> | [](TState ts)
+{
+    return ts.writeSet;
 };
 
 IORef<Integer> globalClock{initIORef<Integer>(1)};
@@ -482,6 +518,11 @@ template <typename A>
 class Valid : public std::pair<TState, A>
 {};
 
+constexpr auto toValid = toGFunc<2> | [](TState ts, auto a)
+{
+    return Valid{ts, a};
+};
+
 class Retry : public TState
 {};
 
@@ -506,12 +547,16 @@ public:
     constexpr STM(Func func)
     : mFunc{std::move(func)}
     {}
+    auto run(TState tState) const
+    {
+        return mFunc(tState);
+    }
 private:
     Func mFunc;
 };
 
 template <typename Func>
-constexpr auto toSTM(Func func)
+constexpr auto toSTMImpl(Func func)
 {
     using RetT = std::invoke_result_t<Func, TState>;
     static_assert(isIOV<RetT>);
@@ -519,11 +564,211 @@ constexpr auto toSTM(Func func)
     return STM<A, Func>{func};
 }
 
+constexpr auto toSTM = toGFunc<1> | [](auto func)
+{
+    return toSTMImpl(func);
+};
+
+constexpr auto castToPtr = toGFunc<1> | [](auto obj)
+{
+    return ioData(std::any{obj});
+};
+
+constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
+{
+    return io([=]
+    {
+        ws.data->emplace(id, ptr);
+        return _o_;
+    });
+};
+
+constexpr auto putRS = putWS;
+
+constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
+{
+    return io([=]() -> std::optional<std::any>
+    {
+        auto iter = ws.data->find(id);
+        if (iter == ws.data->end())
+        {
+            return {};
+        }
+        return iter->second;
+    });
+};
 
 template <typename A>
-constexpr auto writeTVar(TVar<A> const& tvar, A const& a)
+constexpr auto writeTVarImpl(TVar<A> const& tvar, A const& newValue)
 {
-    return toSTM([]{return ioData(_o_);});
+    return toSTM | [=](auto tState)
+    {
+        auto [lock, id, wstamp, content, queue] = tvar;
+        Id<std::any> ptr;
+        return do_(
+            ptr <= (castToPtr | (toWSE | lock | wstamp | content | queue | newValue)),
+            putWS | (getWriteSet | tState) | id | ptr,
+            return_ | (toValid | tState | _o_)
+        );
+    };
+}
+
+constexpr auto writeTVar = toGFunc<2> | [](auto tvar, auto newValue)
+{
+    return writeTVarImpl(tvar, newValue);
+};
+
+template <typename A>
+constexpr auto readTVarImpl(TVar<A> const tvar)
+{
+    return toSTM | [=](TState tState)
+    {
+        Id<std::optional<std::any>> mptr;
+        auto const handleMPtr = toFunc<> | [=](TState tState, std::optional<std::any> mptr_)
+        {
+            return io([=]() -> TResult<A>
+            {
+                if (mptr_.has_value())
+                {
+                    auto const& value = mptr_.value();
+                    auto const& wse = std::any_cast<WSE<A> const&>(value);
+                    return toValid | tState | wse.newValue;
+                }
+                else
+                {
+                    auto [lock, id, wstamp, content, queue] = tvar;
+
+                    auto const lockVal = lock.data.get();
+                    auto const isLocked = (lockVal % 2 == 0);
+                    if (isLocked)
+                    {
+                        return Invalid{tState};
+                    }
+                    auto const result = content.data.get();
+                    auto const lockVal2 = lock.data.get();
+                    if ((lockVal != lockVal2) || (lockVal > (tState.readStamp)))
+                    {
+                        return Invalid{tState};
+                    }
+                    auto io_ = putRS | tState.readSet | RSE{id, lock, wstamp, queue};
+                    io_.run();
+                    return toValid | tState | result;
+                }
+            });
+        };
+        return do_(
+            mptr <= (lookUpWS | (getWriteSet | tState) | tvar.id),
+            handleMPtr | tState | mptr
+        );
+    };
+}
+
+constexpr auto readTVar = toGFunc<1> | [](auto tvar)
+{
+    return readTVarImpl(tvar);
+};
+
+} // namespace concurrent
+
+namespace hspp
+{
+    using namespace concurrent;
+template <>
+class Applicative<STM>
+{
+public:
+    template <typename A, typename Repr>
+    constexpr static auto pure(A x)
+    {
+        return toSTM | [=](auto tState) { return ioData<TResult<A>>(toValid | tState | x); };
+    }
+};
+
+
+template <>
+class MonadBase<STM>
+{
+public:
+    template <typename A, typename Repr, typename Func>
+    constexpr static auto bind(STM<A, Repr> const& t1, Func const& f)
+    {
+        return toSTM || [=](TState tState)
+        {
+            Id<TResult<A>> tRes;
+            auto const dispatchResult = toFunc<> | [=](TResult<A> tResult)
+            {
+                return io([=]
+                {
+                    return std::visit(overload(
+                        [=](Valid<A> const& v_) -> TResult<A>
+                        {
+                            auto [nTState, v] = v_;
+                            auto t2 = func(v);
+                            return t2(nTState).run();
+                        },
+                        [=](Retry const&)
+                        {
+                            return tResult;
+                        },
+                        [=](Invalid const&)
+                        {
+                            return tResult;
+                        }
+                    ), tResult);
+                });
+            };
+            return do_(
+                tRes <= t1(tState),
+                dispatchResult | tRes
+            );
+        };
+    }
+};
+
+} // namespace hspp
+
+namespace concurrent
+{
+
+constexpr auto newTState = io([]
+{
+    return TState{std::this_thread::get_id(), {}, {}, {}};
+});
+
+template <typename A, typename Func>
+auto atomicallyImpl(STM<A, Func> const& stmac)
+{
+    Id<TState> ts;
+    Id<TResult<A>> r;
+    auto const dispatchResult = toFunc<> | [=](TResult<A> tResult)
+    {
+        return io([=]
+        {
+            return std::visit(overload(
+                [=](Valid<A> const& v_) -> A
+                {
+                    (void)v_;
+                    // auto [nts, a] = v_;
+                    // auto transid = nts.transId;
+                    // auto writeSet = nts.writeSet;
+                    return A{};
+                },
+                [=](Retry const&)
+                {
+                    return A{};
+                },
+                [=](Invalid const& nts)
+                {
+                    return atomicallyImpl(stmac).run();
+                }
+            ), tResult);
+        });
+    };
+    return do_(
+        ts <= newTState,
+        r <= stmac.run(ts),
+        dispatchResult | r
+    );
 }
 
 } // namespace concurrent

@@ -1001,7 +1001,7 @@ public:
     template <typename Func, typename Repr, typename Ret, typename... Args>
     constexpr static auto fmap(Func&& func, data::Reader<FirstArg, Ret, Repr> const& in)
     {
-        return data::toReader | func <o> (data::runReader | in);
+        return data::toReader || func <o> (data::runReader | in);
     }
 };
 
@@ -1170,12 +1170,12 @@ class Applicative<data::Reader, FirstArg> : public Functor<data::Reader, FirstAr
 public:
     constexpr static auto pure = toGFunc<1> | [](auto ret)
     {
-        return data::toReader | data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
+        return data::toReader || data::toFunc<>([ret=std::move(ret)](FirstArg){ return ret; });
     };
     template <typename Reader1, typename Reader2>
     constexpr static auto ap(Reader1 func, Reader1 in)
     {
-        return data::toReader | data::toFunc<>(
+        return data::toReader || data::toFunc<>(
             [func=std::move(func), in=std::move(in)](FirstArg arg)
             {
                 return data::runReader | func | arg || data::runReader | in | arg;
@@ -1526,6 +1526,27 @@ public:
 template <template<typename...> typename Type, typename... Args>
 const decltype(Monoid<Type, Args...>::mempty) MonadZero<Type, Args...>::mzero = Monoid<Type, Args...>::mempty;
 
+constexpr auto failIO = toFunc<> | [](std::string s)
+{
+    return data::io(
+        [=]{
+            throw std::runtime_error{s};
+        }
+    );
+};
+
+inline const auto failIOMZero = failIO | "mzero";
+
+template <typename A>
+class MonadZero<data::IO, A>
+{
+public:
+    const static decltype(failIOMZero) mzero;
+};
+
+template <typename A>
+const decltype(failIOMZero) MonadZero<data::IO, A>::mzero = failIOMZero;
+
 template <typename A>
 class MonadZero<data::Parser, A>
 {
@@ -1542,6 +1563,14 @@ class MonadPlus : public MonadZero<Type, Ts...>
 public:
     constexpr static auto mplus = Monoid<Type, Ts...>::mappend;
 };
+
+template <typename A>
+class MonadPlus<data::IO, A> : public MonadZero<data::IO, A>
+{
+public:
+    // constexpr static auto mplus;
+};
+
 
 template <typename A>
 class MonadPlus<data::Parser, A>
@@ -1637,7 +1666,20 @@ constexpr auto guardImpl(bool b)
     }
     else
     {
-        return b ? MonadType<ClassT>::return_( _o_) : MonadPlusType<ReplaceDataTypeWith<ClassT, _O_>>::mzero;
+        if constexpr (data::isIOV<ClassT>)
+        {
+            return data::io([=]{
+                if (!b)
+                {
+                    failIOMZero.run();
+                }
+                return _o_;
+            });
+        }
+        else
+        {
+            return b ? MonadType<ClassT>::return_( _o_) : MonadPlusType<ReplaceDataTypeWith<ClassT, _O_>>::mzero;
+        }
     }
 }
 
@@ -1654,6 +1696,11 @@ constexpr auto read = data::toFunc<>([](std::string const& d)
     std::stringstream is{d};
     T t;
     is >> t;
+
+    if (is.bad())
+    {
+        throw std::runtime_error{"Invalid read!"};
+    }
     return t;
 });
 
@@ -1719,6 +1766,44 @@ constexpr auto operator>>(MonadData1 const& lhs, MonadData2 const& rhs)
 {
     return MType::rshift | lhs || evalDeferred<MonadData1> | rhs;
 }
+
+// for IO
+template <typename MData>
+constexpr inline auto replicateM_Impl (size_t times, MData const& mdata)
+{
+    static_assert(isMonadV<MData>);
+    return data::io(
+        [=]
+        {
+            for (size_t i = 0; i < times; ++i)
+            {
+                mdata.run();
+            }
+            return _o_;
+        }
+    );
+}
+
+constexpr inline auto replicateM_ = toGFunc<2>([](size_t times, auto mdata)
+{
+    return replicateM_Impl(times, mdata);
+});
+
+constexpr inline auto forever = toGFunc<1>([](auto io_)
+{
+    static_assert(isMonadV<decltype(io_)>);
+    return data::io(
+        [=]
+        {
+            while (true)
+            {
+                io_.run();
+            }
+            return _o_;
+        }
+    );
+});
+
 
 constexpr auto all = toGFunc<1>([](auto p)
 {
