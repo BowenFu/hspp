@@ -569,21 +569,51 @@ constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
     });
 };
 
+constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
+{
+    return io([=]() -> Maybe<std::any>
+    {
+        auto iter = ws.data->find(id);
+        if (iter == ws.data->end())
+        {
+            return nothing;
+        }
+        return just | iter->second;
+    });
+};
+
 template <typename A>
-constexpr auto writeTVar(TVar<A> const& tvar, A const& newValue)
+constexpr auto writeTVarImpl(TVar<A> const& tvar, A const& newValue)
 {
     return toSTM | [=](auto tState)
     {
-        auto lock = tvar.lock;
-        auto wstamp = tvar.wstamp;
-        auto content = tvar.content;
-        auto queue = tvar.queue;
-        auto id = tvar.id;
+        auto [lock, id, wstamp, content, queue] = tvar;
         Id<std::any> ptr;
         return do_(
             ptr <= (castToPtr | (toWSE | lock | wstamp | content | queue | newValue)),
             putWS | (getWriteSet | tState) | id | ptr,
             return_ | (toValid | tState | _o_)
+        );
+    };
+}
+
+constexpr auto writeTVar = toGFunc<2> | [](auto tvar, auto newValue)
+{
+    return writeTVarImpl(tvar, newValue);
+};
+
+template <typename A>
+constexpr auto readTVarImpl(TVar<A> const tvar)
+{
+    return toSTM | [=](TState tState)
+    {
+        auto [lock, id, wstamp, content, queue] = tvar;
+        Id<Maybe<std::any>> mptr;
+        return do_(
+            mptr <= (lookUpWS | (getWriteSet | tState) | id),
+            return_ | _o_
+            // case mptr of
+            // Just ptr -> do (WSE _ _ _ _ v)<- castFromPtr ptr return (Valid tState v)
         );
     };
 }
