@@ -835,6 +835,7 @@ constexpr auto nonOwnedRange(Repr const& repr)
 #include <tuple>
 #include <iostream>
 #include <functional>
+#include <type_traits>
 
 namespace hspp
 {

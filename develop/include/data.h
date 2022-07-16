@@ -14,6 +14,7 @@
 #include <tuple>
 #include <iostream>
 #include <functional>
+#include <type_traits>
 
 namespace hspp
 {
@@ -431,18 +432,63 @@ private:
     Func mFunc;
 };
 
+template <typename... Ts>
+class IsIO : public std::false_type
+{};
+template <typename... Ts>
+class IsIO<IO<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isIOV = IsIO<std::decay_t<T>>::value;
+
 template <typename Func>
-auto io(Func func)
+constexpr auto io(Func func)
 {
     using Data = std::invoke_result_t<Func>;
-    return IO<Data, Func>{func};
+    return IO<Data, Func>{std::move(func)};
 }
 
 template <typename Data>
-auto ioData(Data data)
+constexpr auto ioData(Data data)
 {
     return io([data=std::move(data)] { return data; });
 }
+
+template <typename Data, typename Func>
+constexpr auto toTEIOImpl(IO<Data, Func> const& p)
+{
+    return IO<Data>{[p]{
+        return p.run();
+    }};
+}
+
+constexpr auto toTEIO = toGFunc<1> | [](auto p)
+{
+    return toTEIOImpl(p);
+};
+
+
+constexpr auto putChar = toFunc<> | [](char c)
+{
+    return io(
+        [c]
+        {
+            std::cout << c << std::flush;
+            return _o_;
+        }
+    );
+};
+
+constexpr auto putStr = toFunc<> | [](std::string str)
+{
+    return io(
+        [str=std::move(str)]
+        {
+            std::cout << str << std::flush;
+            return _o_;
+        }
+    );
+};
 
 constexpr auto putStrLn = toFunc<> | [](std::string str)
 {
