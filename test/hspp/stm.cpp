@@ -430,8 +430,7 @@ struct RSE
 
 bool operator<(RSE const& lhs, RSE const& rhs)
 {
-    auto result = (lhs.id <compare> rhs.id) <mappend> (lhs.lock.data->load() <compare> rhs.lock.data->load())
-                <mappend> (lhs.writeStamp.data->load() <compare> rhs.writeStamp.data->load());
+    auto result = (lhs.id <compare> rhs.id);
     return result == Ordering::kLT;
 }
 
@@ -450,7 +449,6 @@ constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, aut
     return WSE{lock, writeStamp, content, waitQueue, newValue};
 };
 
-// optimize me later
 class ReadSet
 {
     using T = std::set<RSE>;
