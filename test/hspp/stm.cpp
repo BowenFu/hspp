@@ -419,7 +419,6 @@ struct TVar
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
-template <typename A>
 struct RSE
 {
     ID id;
@@ -427,6 +426,12 @@ struct RSE
     IORef<Integer> writeStamp;
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
+
+bool operator<(RSE const& lhs, RSE const& rhs)
+{
+    auto result = (lhs.id <compare> rhs.id);
+    return result == Ordering::kLT;
+}
 
 template <typename A>
 struct WSE
@@ -443,15 +448,19 @@ constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, aut
     return WSE{lock, writeStamp, content, waitQueue, newValue};
 };
 
-// optimize me later
 class ReadSet
+{
+    using T = std::set<RSE>;
+public:
+    std::shared_ptr<T> data = std::make_shared<T>();
+};
+
+class WriteSet
 {
     using T = std::map<ID, std::any>;
 public:
     std::shared_ptr<T> data = std::make_shared<T>();
 };
-
-using WriteSet = ReadSet;
 
 using TId = std::thread::id;
 using Stamp = Integer;
@@ -474,7 +483,8 @@ IORef<Integer> globalClock{initIORef<Integer>(1)};
 
 constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
 {
-    return io([&ioRef]{
+    return io([&ioRef]
+    {
         return ioRef.data->load();
     });
 };
@@ -583,7 +593,14 @@ constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
     });
 };
 
-constexpr auto putRS = putWS;
+constexpr auto putRS = toFunc<> | [](ReadSet rs, RSE entry)
+{
+    return io([=]
+    {
+        rs.data->insert(entry);
+        return _o_;
+    });
+};
 
 constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
 {
@@ -730,9 +747,15 @@ public:
 namespace concurrent
 {
 
+constexpr auto myTId = io([]
+{
+    return 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+});
+
 constexpr auto newTState = io([]
 {
-    return TState{std::this_thread::get_id(), {}, {}, {}};
+    auto const readStamp = readIORef(globalClock).run();
+    return TState{std::this_thread::get_id(), readStamp, {}, {}};
 });
 
 template <typename A, typename Func>
@@ -747,10 +770,13 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
             return std::visit(overload(
                 [=](Valid<A> const& v_) -> A
                 {
-                    (void)v_;
-                    // auto [nts, a] = v_;
-                    // auto transid = nts.transId;
-                    // auto writeSet = nts.writeSet;
+                    auto [nts, a] = v_;
+                    auto ti = myTId.run();
+                    assert(ti == (nts.transId));
+                    (void)ti;
+                    (void)a;
+                    // auto ws = nts.writeSet;
+                    // tup = getLocks | nts.transId | wslist;
                     return A{};
                 },
                 [=](Retry const&)

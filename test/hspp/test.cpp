@@ -1474,3 +1474,20 @@ TEST(do_, comprehension3)
     auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 6, 8, 10 }, { 5, 12, 13 }, { 9, 12, 15 }, { 8, 15, 17 } };
     EXPECT_EQ(result, expected);
 }
+
+TEST(MapM_, IO)
+{
+    testing::internal::CaptureStdout();
+
+    const auto lst = std::vector{ioData("3"s), ioData("4"s)};
+    const auto func = putStrLn;
+    const auto mapM_result = mapM_ | func | lst;
+
+    std::string output0 = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output0, "");
+
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(mapM_result.run(), _o_);
+    std::string output1 = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output1, "3\n4\n");
+}
