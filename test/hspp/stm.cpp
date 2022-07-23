@@ -9,7 +9,6 @@
 #include <shared_mutex>
 #include <any>
 #include <type_traits>
-#include <unordered_set>
 
 using namespace hspp;
 using namespace hspp::data;
