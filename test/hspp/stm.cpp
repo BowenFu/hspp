@@ -771,10 +771,13 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
             return std::visit(overload(
                 [=](Valid<A> const& v_) -> A
                 {
-                    (void)v_;
-                    // auto [nts, a] = v_;
-                    // auto transid = nts.transId;
-                    // auto writeSet = nts.writeSet;
+                    auto [nts, a] = v_;
+                    auto ti = myTId.run();
+                    assert(ti == (nts.transId));
+                    (void)ti;
+                    (void)a;
+                    // auto ws = nts.writeSet;
+                    // tup = getLocks | nts.transId | wslist;
                     return A{};
                 },
                 [=](Retry const&)

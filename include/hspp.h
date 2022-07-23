@@ -4129,6 +4129,19 @@ constexpr auto apply = toGFunc<1> | [](auto p)
 
 } // namespace parser
 
+// For io
+constexpr auto mapM_ = toGFunc<2> | [](auto func, auto lst)
+{
+    return data::io([=]
+    {
+        for (auto e : lst)
+        {
+            (e >>= func).run();
+        }
+        return _o_;
+    });
+};
+
 } // namespace hspp
 
 #endif // HSPP_PARSER_H
