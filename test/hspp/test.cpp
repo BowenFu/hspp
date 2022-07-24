@@ -1491,3 +1491,9 @@ TEST(MapM_, IO)
     std::string output1 = testing::internal::GetCapturedStdout();
     EXPECT_EQ(output1, "3\n4\n");
 }
+
+TEST(even, 1)
+{
+    EXPECT_FALSE(even(3));
+    EXPECT_TRUE(even(4L));
+}

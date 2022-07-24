@@ -433,31 +433,38 @@ bool operator<(RSE const& lhs, RSE const& rhs)
     return result == Ordering::kLT;
 }
 
+
+
 template <typename A>
+struct WSEData
+{
+    IORef<A> content;
+    A newValue;
+};
+
 struct WSE
 {
     Lock lock;
     IORef<Integer> writeStamp;
-    IORef<A> content;
     IORef<std::vector<MVar<_O_>>> waitQueue;
-    A newValue;
+    std::any wseData;
 };
 
-constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, auto content, IORef<std::vector<MVar<_O_>>> waitQueue, auto newValue)
+constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, IORef<std::vector<MVar<_O_>>> waitQueue, auto content, auto newValue)
 {
-    return WSE{lock, writeStamp, content, waitQueue, newValue};
+    return WSE{lock, writeStamp, waitQueue, WSEData{content, newValue}};
 };
 
 class ReadSet
 {
-    using T = std::set<RSE>;
 public:
+    using T = std::set<RSE>;
     std::shared_ptr<T> data = std::make_shared<T>();
 };
 
 class WriteSet
 {
-    using T = std::map<ID, std::any>;
+    using T = std::map<ID, WSE>;
 public:
     std::shared_ptr<T> data = std::make_shared<T>();
 };
@@ -483,11 +490,13 @@ IORef<Integer> globalClock{initIORef<Integer>(1)};
 
 constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
 {
-    return io([&ioRef]
+    return io([ioRef]
     {
         return ioRef.data->load();
     });
 };
+
+constexpr auto readLock = readIORef;
 
 constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> IO<Integer>
 {
@@ -502,7 +511,7 @@ constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> 
     );
 };
 
-const auto increamentGlobalClock = incrementGlobalClockImpl();
+const auto incrementGlobalClock = incrementGlobalClockImpl();
 
 TEST(atomCAS, integer)
 {
@@ -518,7 +527,7 @@ TEST(atomCAS, integer)
 
 TEST(atomCAS, clock)
 {
-    auto io_ = increamentGlobalClock;
+    auto io_ = incrementGlobalClock;
     EXPECT_EQ(globalClock.data->load(), 1);
     io_.run();
     EXPECT_EQ(globalClock.data->load(), 3);
@@ -584,11 +593,11 @@ constexpr auto castToPtr = toGFunc<1> | [](auto obj)
     return ioData(std::any{obj});
 };
 
-constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, std::any ptr)
+constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
 {
     return io([=]
     {
-        ws.data->emplace(id, ptr);
+        ws.data->emplace(id, wse);
         return _o_;
     });
 };
@@ -604,7 +613,7 @@ constexpr auto putRS = toFunc<> | [](ReadSet rs, RSE entry)
 
 constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
 {
-    return io([=]() -> std::optional<std::any>
+    return io([=]() -> std::optional<WSE>
     {
         auto iter = ws.data->find(id);
         if (iter == ws.data->end())
@@ -621,10 +630,10 @@ constexpr auto writeTVarImpl(TVar<A> const& tvar, A const& newValue)
     return toSTM | [=](auto tState)
     {
         auto [lock, id, wstamp, content, queue] = tvar;
-        Id<std::any> ptr;
+        Id<WSE> wse;
         return do_(
-            ptr <= (castToPtr | (toWSE | lock | wstamp | content | queue | newValue)),
-            putWS | (getWriteSet | tState) | id | ptr,
+            wse <= (toWSE | lock | wstamp | queue | content | newValue),
+            putWS | (getWriteSet | tState) | id | wse,
             return_ | (toValid | tState | _o_)
         );
     };
@@ -635,29 +644,30 @@ constexpr auto writeTVar = toGFunc<2> | [](auto tvar, auto newValue)
     return writeTVarImpl(tvar, newValue);
 };
 
+constexpr auto isLocked = even;
+
 template <typename A>
 constexpr auto readTVarImpl(TVar<A> const tvar)
 {
     return toSTM | [=](TState tState)
     {
         Id<std::optional<std::any>> mptr;
-        auto const handleMPtr = toFunc<> | [=](TState tState, std::optional<std::any> mptr_)
+        auto const handleMPtr = toFunc<> | [=](TState tState, std::optional<WSE> mptr_)
         {
             return io([=]() -> TResult<A>
             {
                 if (mptr_.has_value())
                 {
-                    auto const& value = mptr_.value();
-                    auto const& wse = std::any_cast<WSE<A> const&>(value);
-                    return toValid | tState | wse.newValue;
+                    auto const& wse = mptr_.value();
+                    auto const& wseData = std::any_cast<WSEData<A> const&>(wse.wseData);
+                    return toValid | tState | wseData.newData;
                 }
                 else
                 {
                     auto [lock, id, wstamp, content, queue] = tvar;
 
                     auto const lockVal = lock.data.get();
-                    auto const isLocked = (lockVal % 2 == 0);
-                    if (isLocked)
+                    if (isLocked | lockVal)
                     {
                         return Invalid{tState};
                     }
@@ -758,6 +768,140 @@ constexpr auto newTState = io([]
     return TState{std::this_thread::get_id(), readStamp, {}, {}};
 });
 
+constexpr auto hassert = toFunc<> | [](bool result, std::string const& msg)
+{
+    return io([=]
+    {
+        if (!result)
+        {
+            throw std::runtime_error{msg};
+        }
+        return _o_;
+    });
+};
+
+constexpr auto unlock = toGFunc<1> | [](auto tid)
+{
+    return mapM_ | [=](auto pair)
+    {
+        auto [iows, lock] = pair;
+        Id<Integer> ws;
+        Id<bool> unlocked;
+        return do_(
+            ws <= (readIORef | iows),
+            unlocked <= (atomCAS | lock | tid | ws),
+            hassert | unlocked | "COULD NOT UNLOCK LOCK",
+            return_ | _o_
+        );
+    };
+};
+
+constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
+{
+    return io([=]() -> std::pair<bool, std::vector<std::pair<IORef<Integer>, Lock>>>
+    {
+        bool success = true;
+        std::vector<std::pair<IORef<Integer>, Lock>> locks;
+        for (auto [_, wse] : wsList)
+        {
+            auto lock = wse.lock;
+            auto iowstamp = wse.writeStamp;
+            auto lockValue = (readLock | lock).run();
+            if (isLocked | lockValue)
+            {
+                hassert | (lockValue != tid) | "Locking WS: lock already held by me!!";
+                return std::make_pair(false, locks);
+            }
+            else
+            {
+                auto r = (atomCAS | lock | lockValue | tid).run();
+                if (r)
+                {
+                    locks.emplace_back(iowstamp, lock);
+                    continue;
+                }
+                else
+                {
+                    return std::make_pair(false, locks);
+                }
+            }
+        }
+        return std::make_pair(true, locks);
+    });
+};
+
+auto validateReadSet2(typename ReadSet::T rseLst, Integer readStamp, Integer myid)
+{
+    return io([=]() -> bool
+    {
+        if (rseLst.empty())
+        {
+            return true;
+        }
+        for (RSE rse: rseLst)
+        {
+            auto lock = rse.lock;
+            auto iowstamp = rse.writeStamp;
+            auto lockValue = (readLock | lock).run();
+            if ((isLocked | lockValue) && (lockValue != myid))
+            {
+                return false;
+            }
+            else
+            {
+                if (lockValue != myid)
+                {
+                    if (lockValue > readStamp)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    auto wstamp = (readIORef | iowstamp).run();
+                    if (wstamp > readStamp)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+            }
+        }
+        return true;
+    });
+}
+
+constexpr auto validateReadSet = toGFunc<3> | [](auto ioReadSet, Integer readStamp, TId myId)
+{
+	auto readS = (readIORef | ioReadSet).run();
+	return validateReadSet2(readS, readStamp, myId);
+};
+
+// commitChangesToMemory :: Integer -> [(Integer,Ptr())] -> IO ()
+// auto commitChangesToMemory(Integer wstamp, WriteSet wset)
+// {
+//     commit :: Integer -> (Integer,Ptr())-> IO ()
+//     auto commit = [](auto wsePair)
+//     {
+//         auto [id, wse] = wsePair;
+//         iowstamp = wse.writeStamp;
+//         iocontent = wse.wseData;
+//         return 
+//             (WSE _ iowstamp iocontent v _) <- castFromPtr ptr
+//             writeIORef iowstamp wstamp 
+//             writeIORef iocontent v
+//     }
+
+//     return mapM_ (commit wstamp) wset;
+// }
+
 template <typename A, typename Func>
 auto atomicallyImpl(STM<A, Func> const& stmac)
 {
@@ -775,8 +919,33 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
                     assert(ti == (nts.transId));
                     (void)ti;
                     (void)a;
-                    // auto ws = nts.writeSet;
-                    // tup = getLocks | nts.transId | wslist;
+                    auto wslist = nts.writeSet;
+                    auto [success, locks] = getLocks | nts.transId | wslist;
+                    if (success)
+                    {
+						auto wstamp = incrementGlobalClock.run();
+						auto valid = validateReadSet | nts.readSet | nts.readStamp | nts.transId;
+						// if (valid)
+                        // {
+                        //     commitChangesToMemory | wstamp | wslist;
+                        //     wakeUpBQ | wslist;
+                        //     unlock | nts.transId | locks;
+                        //     return a;
+                        // }
+                        // else
+                        // {
+                        //     --cleanWriteSet nts
+                        //     --clean nts
+                        //     unlock (transId nts) locks
+                        //     clean nts
+                        //     atomically stmac
+                        // }
+                    }
+                    else
+                    {
+						unlock | nts.transId | locks;
+						return atomicallyImpl(stmac).run();
+                    }
                     return A{};
                 },
                 [=](Retry const&)
