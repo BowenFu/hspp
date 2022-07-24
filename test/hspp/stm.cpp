@@ -372,10 +372,24 @@ TEST(Async, 1)
     EXPECT_EQ(output, "12345\n67890\n");
 }
 
+using Integer = int64_t;
+
+template <typename A>
+struct IORefTrait
+{
+    constexpr static bool kSUPPORT_CAS = false;
+};
+
+template <>
+struct IORefTrait<Integer>
+{
+    constexpr static bool kSUPPORT_CAS = true;
+};
+
 template <typename A>
 struct IORef
 {
-    using T = std::atomic<A>;
+    using T = std::conditional_t<IORefTrait<A>::kSUPPORT_CAS, std::atomic<A>, A>;
     std::shared_ptr<T> data = std::make_shared<T>();
 };
 
@@ -402,7 +416,6 @@ constexpr auto atomCAS = toGFunc<3> | [](auto const& ptr, auto const& old, auto 
     return atomCASImpl(ptr, old, new_);
 };
 
-using Integer = int64_t;
 using ID = Integer;
 
 // Integer => locked : even transaction id or odd, free : odd write stamp
@@ -515,9 +528,9 @@ const auto incrementGlobalClock = incrementGlobalClockImpl();
 
 TEST(atomCAS, integer)
 {
-    auto a  = IORef<int>{initIORef(1)};
-    auto old = 1;
-    auto new_ = 2;
+    auto a  = IORef<Integer>{initIORef<Integer>(1)};
+    Integer old = 1;
+    Integer new_ = 2;
     auto io_ = atomCAS | a | old | new_;
     EXPECT_EQ(a.data->load(), 1);
     auto result = io_.run();
