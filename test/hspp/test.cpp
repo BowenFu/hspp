@@ -1479,7 +1479,7 @@ TEST(MapM_, IO)
 {
     testing::internal::CaptureStdout();
 
-    const auto lst = std::vector{ioData("3"s), ioData("4"s)};
+    const auto lst = std::vector{"3"s, "4"s};
     const auto func = putStrLn;
     const auto mapM_result = mapM_ | func | lst;
 

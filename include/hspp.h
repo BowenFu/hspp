@@ -4136,7 +4136,7 @@ constexpr auto mapM_ = toGFunc<2> | [](auto func, auto lst)
     {
         for (auto e : lst)
         {
-            (e >>= func).run();
+            func(e).run();
         }
         return _o_;
     });
