@@ -9,6 +9,8 @@
 #include <shared_mutex>
 #include <any>
 #include <type_traits>
+#include <map>
+#include <typeindex>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -176,6 +178,29 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
 constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
 {
     return putMVarImpl(a, new_);
+};
+
+template <typename A>
+constexpr auto tryPutMVarImpl(MVar<A>& a, A new_)
+{
+    return io([a, new_]
+    {
+        std::unique_lock lock{a.data->second, std::defer_lock};
+        if (lock.try_lock())
+        {
+            if (!a.data->first.has_value())
+            {
+                a.data->first = new_;
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
+constexpr auto tryPutMVar = toGFunc<2> | [](auto a, auto new_)
+{
+    return tryPutMVarImpl(a, new_);
 };
 
 // can be optimized to use shared_lock.
@@ -389,14 +414,15 @@ struct IORefTrait<Integer>
 template <typename A>
 struct IORef
 {
-    using T = std::conditional_t<IORefTrait<A>::kSUPPORT_CAS, std::atomic<A>, A>;
-    std::shared_ptr<T> data = std::make_shared<T>();
+    using Data = A;
+    using Repr = std::conditional_t<IORefTrait<A>::kSUPPORT_CAS, std::atomic<A>, A>;
+    std::shared_ptr<Repr> data = std::make_shared<Repr>();
 };
 
 template <typename A>
 auto initIORef(A a)
 {
-    return std::make_shared<typename IORef<A>::T>(std::move(a));
+    return std::make_shared<typename IORef<A>::Repr>(std::move(a));
 }
 
 template <typename A>
@@ -446,11 +472,43 @@ bool operator<(RSE const& lhs, RSE const& rhs)
     return result == Ordering::kLT;
 }
 
+constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
+{
+    return io([=]
+    {
+        *ioRef.data = data;
+    });
+};
 
+static std::map<const std::type_index, std::function<void(std::any)>> anyCommiters{};
+
+template <typename A>
+struct WSEData;
+
+template <typename A>
+class Commiter
+{
+public:
+    auto operator()(std::any wseData) const
+    {
+        auto [iocontent, v] = std::any_cast<WSEData<A> const&>(wseData);
+        writeIORef | iocontent | v;
+    }
+};
+
+template <typename T>
+class CommitterRegister
+{
+    CommitterRegister()
+    {
+        anyCommiters.emplace(std::type_index(typeid(T)), Commiter<T>{});
+    }
+};
 
 template <typename A>
 struct WSEData
 {
+    static const CommitterRegister<A> dummy{};
     IORef<A> content;
     A newValue;
 };
@@ -477,8 +535,8 @@ public:
 
 class WriteSet
 {
-    using T = std::map<ID, WSE>;
 public:
+    using T = std::map<ID, WSE>;
     std::shared_ptr<T> data = std::make_shared<T>();
 };
 
@@ -503,9 +561,9 @@ IORef<Integer> globalClock{initIORef<Integer>(1)};
 
 constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
 {
-    return io([ioRef]
+    return io([ioRef]() -> typename std::decay_t<decltype(ioRef)>::Data
     {
-        return ioRef.data->load();
+        return *ioRef.data;
     });
 };
 
@@ -897,23 +955,48 @@ constexpr auto validateReadSet = toGFunc<3> | [](auto ioReadSet, Integer readSta
 	return validateReadSet2(readS, readStamp, myId);
 };
 
-// commitChangesToMemory :: Integer -> [(Integer,Ptr())] -> IO ()
-// auto commitChangesToMemory(Integer wstamp, WriteSet wset)
-// {
-//     commit :: Integer -> (Integer,Ptr())-> IO ()
-//     auto commit = [](auto wsePair)
-//     {
-//         auto [id, wse] = wsePair;
-//         iowstamp = wse.writeStamp;
-//         iocontent = wse.wseData;
-//         return 
-//             (WSE _ iowstamp iocontent v _) <- castFromPtr ptr
-//             writeIORef iowstamp wstamp 
-//             writeIORef iocontent v
-//     }
+// https://en.cppreference.com/w/cpp/utility/any/type
+// any_committer
 
-//     return mapM_ (commit wstamp) wset;
-// }
+auto commitAny(std::any wseData)
+{
+    auto idx = std::type_index(wseData.type());
+    auto iter = anyCommiters.find(idx);
+    hassert | iter != anyCommiters.end() | "Cannot find commiter of this type!";
+    iter->second(wseData);
+}
+
+constexpr auto commitChangesToMemory = toFunc<> | [](Integer wstamp, typename WriteSet::T wset)
+{
+    auto commit = [wstamp](auto wsePair)
+    {
+        return io([=]() -> _O_
+        {
+            auto [id, wse] = wsePair;
+            auto iowstamp = wse.writeStamp;
+            (writeIORef | iowstamp | wstamp).run();
+            commitAny(wse.wseData);
+            return _o_;
+        });
+    };
+
+    return mapM_ | commit | wset;
+};
+
+constexpr auto unblockThreads = toFunc<> | [](std::pair<ID, WSE> const& pair)
+{
+    return io([=]() -> _O_
+    {
+        auto const& queue = pair.second.waitQueue;
+        auto listMVars = (readIORef | queue).run();
+        mapM_ | [](auto mvar) { return tryPutMVar | mvar | _o_; } | listMVars;
+        writeIORef | queue | std::vector<MVar<_O_>>{};
+        return _o_;
+    });
+};
+
+constexpr auto wakeUpBQ = mapM_ | unblockThreads;
+
 
 template <typename A, typename Func>
 auto atomicallyImpl(STM<A, Func> const& stmac)
@@ -932,19 +1015,19 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
                     assert(ti == (nts.transId));
                     (void)ti;
                     (void)a;
-                    auto wslist = nts.writeSet;
+                    auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = getLocks | nts.transId | wslist;
                     if (success)
                     {
 						auto wstamp = incrementGlobalClock.run();
 						auto valid = validateReadSet | nts.readSet | nts.readStamp | nts.transId;
-						// if (valid)
-                        // {
-                        //     commitChangesToMemory | wstamp | wslist;
-                        //     wakeUpBQ | wslist;
-                        //     unlock | nts.transId | locks;
-                        //     return a;
-                        // }
+						if (valid)
+                        {
+                            commitChangesToMemory | wstamp | wslist;
+                            // wakeUpBQ | wslist;
+                            // unlock | nts.transId | locks;
+                            // return a;
+                        }
                         // else
                         // {
                         //     --cleanWriteSet nts
