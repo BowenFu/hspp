@@ -4142,6 +4142,12 @@ constexpr auto mapM_ = toGFunc<2> | [](auto func, auto lst)
     });
 };
 
+constexpr auto even = toGFunc<1> | [](auto n)
+{
+    static_assert(std::is_integral_v<decltype(n)>);
+    return n % 2 == 0;
+};
+
 } // namespace hspp
 
 #endif // HSPP_PARSER_H
