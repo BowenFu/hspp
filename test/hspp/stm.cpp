@@ -474,9 +474,10 @@ bool operator<(RSE const& lhs, RSE const& rhs)
 
 constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
 {
-    return io([=]
+    return io([=]() -> _O_
     {
         *ioRef.data = data;
+        return _o_;
     });
 };
 
@@ -526,21 +527,10 @@ constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, IOR
     return WSE{lock, writeStamp, waitQueue, WSEData{content, newValue}};
 };
 
-class ReadSet
-{
-public:
-    using T = std::set<RSE>;
-    std::shared_ptr<T> data = std::make_shared<T>();
-};
+using ReadSet = IORef<std::set<RSE>>;
+using WriteSet = IORef<std::map<ID, WSE>>;
 
-class WriteSet
-{
-public:
-    using T = std::map<ID, WSE>;
-    std::shared_ptr<T> data = std::make_shared<T>();
-};
-
-using TId = std::thread::id;
+using TId = Integer;
 using Stamp = Integer;
 
 struct TState
@@ -717,6 +707,12 @@ constexpr auto writeTVar = toGFunc<2> | [](auto tvar, auto newValue)
 
 constexpr auto isLocked = even;
 
+constexpr auto isLockedIO = toFunc<> | [](Lock lock)
+{
+    auto const v = (readIORef | lock).run();
+    return (isLocked | v);
+};
+
 template <typename A>
 constexpr auto readTVarImpl(TVar<A> const tvar)
 {
@@ -828,7 +824,7 @@ public:
 namespace concurrent
 {
 
-constexpr auto myTId = io([]
+constexpr auto myTId = io([]() -> TId
 {
     return 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
 });
@@ -836,7 +832,7 @@ constexpr auto myTId = io([]
 constexpr auto newTState = io([]
 {
     auto const readStamp = readIORef(globalClock).run();
-    return TState{std::this_thread::get_id(), readStamp, {}, {}};
+    return TState{myTId.run(), readStamp, {}, {}};
 });
 
 constexpr auto hassert = toFunc<> | [](bool result, std::string const& msg)
@@ -901,7 +897,7 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
     });
 };
 
-auto validateReadSet2(typename ReadSet::T rseLst, Integer readStamp, Integer myid)
+auto validateReadSet2(typename ReadSet::Data rseLst, Integer readStamp, Integer myid)
 {
     return io([=]() -> bool
     {
@@ -966,7 +962,7 @@ auto commitAny(std::any wseData)
     iter->second(wseData);
 }
 
-constexpr auto commitChangesToMemory = toFunc<> | [](Integer wstamp, typename WriteSet::T wset)
+constexpr auto commitChangesToMemory = toFunc<> | [](Integer wstamp, typename WriteSet::Data wset)
 {
     auto commit = [wstamp](auto wsePair)
     {
@@ -997,6 +993,61 @@ constexpr auto unblockThreads = toFunc<> | [](std::pair<ID, WSE> const& pair)
 
 constexpr auto wakeUpBQ = mapM_ | unblockThreads;
 
+constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Integer myId, ReadSet::Data const& readSet)
+{
+    return io([=]() -> std::pair<bool, std::vector<std::pair<IORef<Integer>, Lock>>>
+    {
+        std::vector<std::pair<IORef<Integer>, Lock>> locks;
+        for (RSE rse : readSet)
+        {
+            auto lock = rse.lock;
+            auto wstamp = rse.writeStamp;
+            auto lockValue = (readLock | lock).run();
+            if (isLocked | lockValue)
+            {
+                hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!";
+                return std::make_pair(false, locks);
+            }
+            else
+            {
+                if (lockValue > readStamp)
+                {
+                    return std::make_pair(false, locks);
+                }
+                else
+                {
+                    auto r = (atomCAS | lock | lockValue | myId).run();
+                    if (r)
+                    {
+                        locks.emplace_back(wstamp, lock);
+                    }
+                    else
+                    {
+                        return std::make_pair(false, locks);
+                    }
+                }
+            }
+        }
+        return std::make_pair(true, locks);
+    });
+};
+
+constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
+{
+    return mapM_ | [=](RSE rse)
+    {
+        auto lock = rse.lock;
+        auto iomlist = rse.waitQueue;
+        return io([=]() -> _O_
+        {
+            (hassert | (isLockedIO | lock) | "AddtoQueues: tvar not locked!!!").run();
+            auto list = (readIORef | iomlist).run();
+            list.push_back(mvar);
+            return (writeIORef | iomlist | list).run();
+        });
+    };
+};
+
 
 template <typename A, typename Func>
 auto atomicallyImpl(STM<A, Func> const& stmac)
@@ -1023,19 +1074,16 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
 						auto valid = validateReadSet | nts.readSet | nts.readStamp | nts.transId;
 						if (valid)
                         {
-                            commitChangesToMemory | wstamp | wslist;
-                            // wakeUpBQ | wslist;
-                            // unlock | nts.transId | locks;
-                            // return a;
+                            (commitChangesToMemory | wstamp | wslist).run();
+                            (wakeUpBQ | wslist).run();
+                            (unlock | nts.transId | locks).run();
+                            return a;
                         }
-                        // else
-                        // {
-                        //     --cleanWriteSet nts
-                        //     --clean nts
-                        //     unlock (transId nts) locks
-                        //     clean nts
-                        //     atomically stmac
-                        // }
+                        else
+                        {
+                            (unlock | nts.transId | locks).run();
+                            return atomicallyImpl(stmac).run();
+                        }
                     }
                     else
                     {
@@ -1044,9 +1092,24 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
                     }
                     return A{};
                 },
-                [=](Retry const&)
+                [=](Retry const& nts)
                 {
-                    return A{};
+                    auto rs = (readIORef | nts.readSet).run();
+                    auto lrs = rs;
+                    auto [valid, locks] = (validateAndAcquireLocks | nts.readStamp | nts.transId | lrs).run();
+                    if (valid)
+                    {
+                        auto waitMVar = newEmptyMVar<_O_>.run();
+                        (addToWaitQueues | waitMVar | lrs).run();
+                        (unlock | nts.transId | locks).run();
+                        (takeMVar | waitMVar).run();
+                        return atomicallyImpl(stmac).run();
+                    }
+                    else
+                    {
+                        unlock | nts.transId | locks;
+                        return atomicallyImpl(stmac).run();
+                    }
                 },
                 [=](Invalid const& nts)
                 {
