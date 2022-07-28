@@ -851,6 +851,25 @@ using data::toGFunc;
 using data::unCurry;
 using data::id;
 
+// For io
+constexpr auto mapM_ = toGFunc<2> | [](auto func, auto lst)
+{
+    return data::io([=]
+    {
+        for (auto e : lst)
+        {
+            func(e).run();
+        }
+        return _o_;
+    });
+};
+
+constexpr auto even = toGFunc<1> | [](auto n)
+{
+    static_assert(std::is_integral_v<decltype(n)>);
+    return n % 2 == 0;
+};
+
 } // namespace hspp
 
 #endif // HSPP_DATA_H
