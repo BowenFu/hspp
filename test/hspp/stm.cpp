@@ -520,10 +520,13 @@ public:
 template <typename A>
 struct WSEData
 {
-    constexpr static CommitterRegister<A> dummy{};
+    static const CommitterRegister<A> dummy;
     IORef<A> content;
     A newValue;
 };
+
+template <typename A>
+const CommitterRegister<A> WSEData<A>::dummy{};
 
 struct WSE
 {
