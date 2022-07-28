@@ -458,6 +458,16 @@ struct TVar
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
+// constexpr auto newTVar = toGFunc<1> | [](auto a)
+// {
+//     using A = decltype(a);
+//     return io([&]
+//     {
+//         auto const readStamp = readIORef(globalClock).run();
+//         return TVar<A>{myTId.run(), initIORef(readStamp), {}, {}};
+//     });
+// };
+
 struct RSE
 {
     ID id;
@@ -500,7 +510,8 @@ public:
 template <typename T>
 class CommitterRegister
 {
-    CommitterRegister()
+public:
+    constexpr CommitterRegister()
     {
         anyCommiters.emplace(std::type_index(typeid(T)), Commiter<T>{});
     }
@@ -509,7 +520,7 @@ class CommitterRegister
 template <typename A>
 struct WSEData
 {
-    static const CommitterRegister<A> dummy{};
+    constexpr static CommitterRegister<A> dummy{};
     IORef<A> content;
     A newValue;
 };
@@ -524,7 +535,7 @@ struct WSE
 
 constexpr auto toWSE = toGFunc<5> | [](Lock lock, IORef<Integer> writeStamp, IORef<std::vector<MVar<_O_>>> waitQueue, auto content, auto newValue)
 {
-    return WSE{lock, writeStamp, waitQueue, WSEData{content, newValue}};
+    return WSE{lock, writeStamp, waitQueue, WSEData<decltype(newValue)>{content, newValue}};
 };
 
 using ReadSet = IORef<std::set<RSE>>;
@@ -596,11 +607,10 @@ TEST(atomCAS, clock)
 
 template <typename A>
 class Valid : public std::pair<TState, A>
-{};
-
-constexpr auto toValid = toGFunc<2> | [](TState ts, auto a)
 {
-    return Valid{ts, a};
+public:
+    using T = A;
+    using std::pair<TState, A>::pair;
 };
 
 class Retry : public TState
@@ -614,6 +624,12 @@ class TResult : public std::variant<Valid<A>, Retry, Invalid>
 {
 public:
     using DataT = A;
+    using std::variant<Valid<A>, Retry, Invalid>::variant;
+};
+
+constexpr auto toValid = toGFunc<2> | [](TState ts, auto a)
+{
+    return TResult<decltype(a)>{Valid<decltype(a)>{ts, a}};
 };
 
 template <typename A, typename Func>
@@ -627,7 +643,7 @@ public:
     constexpr STM(Func func)
     : mFunc{std::move(func)}
     {}
-    auto run(TState tState) const
+    auto run(TState tState) const -> RetT
     {
         return mFunc(tState);
     }
@@ -647,11 +663,6 @@ constexpr auto toSTMImpl(Func func)
 constexpr auto toSTM = toGFunc<1> | [](auto func)
 {
     return toSTMImpl(func);
-};
-
-constexpr auto castToPtr = toGFunc<1> | [](auto obj)
-{
-    return ioData(std::any{obj});
 };
 
 constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
@@ -691,9 +702,8 @@ constexpr auto writeTVarImpl(TVar<A> const& tvar, A const& newValue)
     return toSTM | [=](auto tState)
     {
         auto [lock, id, wstamp, content, queue] = tvar;
-        Id<WSE> wse;
+        WSE wse = (toWSE | lock | wstamp | queue | content | newValue);
         return do_(
-            wse <= (toWSE | lock | wstamp | queue | content | newValue),
             putWS | (getWriteSet | tState) | id | wse,
             return_ | (toValid | tState | _o_)
         );
@@ -718,28 +728,28 @@ constexpr auto readTVarImpl(TVar<A> const tvar)
 {
     return toSTM | [=](TState tState)
     {
-        Id<std::optional<std::any>> mptr;
-        auto const handleMPtr = toFunc<> | [=](TState tState, std::optional<WSE> mptr_)
+        Id<std::optional<WSE>> mwse;
+        auto const handleMWse = toFunc<> | [=](TState tState, std::optional<WSE> mwse_)
         {
             return io([=]() -> TResult<A>
             {
-                if (mptr_.has_value())
+                if (mwse_.has_value())
                 {
-                    auto const& wse = mptr_.value();
+                    auto const& wse = mwse_.value();
                     auto const& wseData = std::any_cast<WSEData<A> const&>(wse.wseData);
-                    return toValid | tState | wseData.newData;
+                    return toValid | tState | wseData.newValue;
                 }
                 else
                 {
                     auto [lock, id, wstamp, content, queue] = tvar;
 
-                    auto const lockVal = lock.data.get();
+                    auto lockVal = (readLock | lock).run();
                     if (isLocked | lockVal)
                     {
                         return Invalid{tState};
                     }
-                    auto const result = content.data.get();
-                    auto const lockVal2 = lock.data.get();
+                    auto const result = (readIORef | content).run();
+                    auto lockVal2 = (readLock | lock).run();
                     if ((lockVal != lockVal2) || (lockVal > (tState.readStamp)))
                     {
                         return Invalid{tState};
@@ -751,8 +761,8 @@ constexpr auto readTVarImpl(TVar<A> const tvar)
             });
         };
         return do_(
-            mptr <= (lookUpWS | (getWriteSet | tState) | tvar.id),
-            handleMPtr | tState | mptr
+            mwse <= (lookUpWS | (getWriteSet | tState) | tvar.id),
+            handleMWse | tState | mwse
         );
     };
 }
@@ -771,11 +781,11 @@ template <>
 class Applicative<STM>
 {
 public:
-    template <typename A, typename Repr>
-    constexpr static auto pure(A x)
+    constexpr static auto pure = toGFunc<1> | [](auto x)
     {
+        using A = decltype(x);
         return toSTM | [=](auto tState) { return ioData<TResult<A>>(toValid | tState | x); };
-    }
+    };
 };
 
 
@@ -784,7 +794,7 @@ class MonadBase<STM>
 {
 public:
     template <typename A, typename Repr, typename Func>
-    constexpr static auto bind(STM<A, Repr> const& t1, Func const& f)
+    constexpr static auto bind(STM<A, Repr> const& t1, Func const& func)
     {
         return toSTM || [=](TState tState)
         {
@@ -793,26 +803,28 @@ public:
             {
                 return io([=]
                 {
+                    using T = typename std::decay_t<decltype(func(std::declval<A>()).run(std::declval<TState>()).run())>::DataT;
+                    using RetT = TResult<T>;
                     return std::visit(overload(
-                        [=](Valid<A> const& v_) -> TResult<A>
+                        [=](Valid<A> const& v_) -> RetT
                         {
                             auto [nTState, v] = v_;
                             auto t2 = func(v);
-                            return t2(nTState).run();
+                            return t2.run(nTState).run();
                         },
-                        [=](Retry const&)
+                        [=](Retry const& retry_) -> RetT
                         {
-                            return tResult;
+                            return toValid | tState | T{};
                         },
-                        [=](Invalid const&)
+                        [=](Invalid const& invalid_) -> RetT
                         {
-                            return tResult;
+                            return toValid | tState | T{};
                         }
                     ), tResult);
                 });
             };
             return do_(
-                tRes <= t1(tState),
+                tRes <= t1.run(tState),
                 dispatchResult | tRes
             );
         };
@@ -1050,7 +1062,7 @@ constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
 
 
 template <typename A, typename Func>
-auto atomicallyImpl(STM<A, Func> const& stmac)
+auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
 {
     Id<TState> ts;
     Id<TResult<A>> r;
@@ -1067,11 +1079,11 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
                     (void)ti;
                     (void)a;
                     auto wslist = (readIORef | nts.writeSet).run();
-                    auto [success, locks] = getLocks | nts.transId | wslist;
+                    auto [success, locks] = (getLocks | nts.transId | wslist).run();
                     if (success)
                     {
 						auto wstamp = incrementGlobalClock.run();
-						auto valid = validateReadSet | nts.readSet | nts.readStamp | nts.transId;
+						auto valid = (validateReadSet | nts.readSet | nts.readStamp | nts.transId).run();
 						if (valid)
                         {
                             (commitChangesToMemory | wstamp | wslist).run();
@@ -1118,11 +1130,50 @@ auto atomicallyImpl(STM<A, Func> const& stmac)
             ), tResult);
         });
     };
-    return do_(
-        ts <= newTState,
-        r <= stmac.run(ts),
+    return toTEIO | do_(
+        r <= stmac.run(newTState.run()),
         dispatchResult | r
     );
 }
 
+constexpr auto atomically = toGFunc<1> | [](auto const& stmac)
+{
+    return atomicallyImpl(stmac);
+};
+
 } // namespace concurrent
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct hspp::TypeClassTrait<TypeClassT, STM<Args...>>
+{
+    using Type = TypeClassT<STM>;
+};
+
+template <typename A, typename Repr>
+struct hspp::DataTrait<STM<A, Repr>>
+{
+    using Type = A;
+};
+
+TEST(atomically, 1)
+{
+    constexpr auto transferSTM = toFunc<> | [](TVar<Integer> ma, TVar<Integer> mb, Integer d)
+    {
+        Id<Integer> wa, wb;
+        return do_(
+            wa <= (readTVar | ma),
+            wb <= (readTVar | mb),
+            writeTVar | ma | (wa - d),
+            writeTVar | mb | (wb + d)
+        );
+    };
+    constexpr auto transfer = toFunc<> | [=](TVar<Integer> ma, TVar<Integer> mb, Integer d)
+    {
+        return atomically || transferSTM | ma | mb | d;
+    };
+   // Id<TVar<Integer>> ia, ib;
+    // auto io_ = do_(
+    //     ia <= newTV
+    // );
+
+}
