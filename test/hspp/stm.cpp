@@ -620,7 +620,10 @@ class Invalid : public TState
 {};
 
 template <typename A>
-class TResult : public std::variant<Valid<A>, Retry, Invalid>
+using TResultBase = std::variant<Valid<A>, Retry, Invalid>;
+
+template <typename A>
+class TResult : public TResultBase<A>
 {
 public:
     using DataT = A;
@@ -820,7 +823,7 @@ public:
                         {
                             return toValid | tState | T{};
                         }
-                    ), tResult);
+                    ), static_cast<TResultBase<A> const&>(tResult));
                 });
             };
             return do_(
