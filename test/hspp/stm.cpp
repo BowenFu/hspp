@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <map>
 #include <typeindex>
+#include <variant>
 
 using namespace hspp;
 using namespace hspp::data;
