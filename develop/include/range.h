@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <limits>
 #include <memory>
+#include <tuple>
 
 namespace hspp
 {
