@@ -1130,7 +1130,7 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 {
                     return atomicallyImpl(stmac).run();
                 }
-            ), tResult);
+            ), static_cast<TResultBase<A> const&>(tResult));
         });
     };
     return toTEIO | do_(
