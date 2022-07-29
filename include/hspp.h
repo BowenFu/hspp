@@ -1697,7 +1697,6 @@ constexpr auto odd = toGFunc<1> | [](auto n)
     return !(even | n);
 };
 
-
 } // namespace hspp
 
 #endif // HSPP_DATA_H
