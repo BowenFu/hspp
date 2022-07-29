@@ -425,6 +425,17 @@ auto initIORef(A a)
     return std::make_shared<typename IORef<A>::Repr>(std::move(a));
 }
 
+constexpr auto newIORef = toGFunc<1> | [](auto a)
+{
+    using A = decltype(a);
+    return io([a=std::move(a)]
+    {
+        return IORef<A>{initIORef(std::move(a))};
+    });
+};
+
+constexpr auto newLock = newIORef | Integer{1};
+
 template <typename A>
 auto atomCASImpl(IORef<A> ptr, A old, A new_)
 {
@@ -445,8 +456,7 @@ constexpr auto atomCAS = toGFunc<3> | [](auto const& ptr, auto const& old, auto 
 using ID = Integer;
 
 // Integer => locked : even transaction id or odd, free : odd write stamp
-class Lock : public IORef<Integer>
-{};
+using Lock = IORef<Integer>;
 
 template <typename A>
 struct TVar
@@ -458,15 +468,72 @@ struct TVar
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
-// constexpr auto newTVar = toGFunc<1> | [](auto a)
-// {
-//     using A = decltype(a);
-//     return io([&]
-//     {
-//         auto const readStamp = readIORef(globalClock).run();
-//         return TVar<A>{myTId.run(), initIORef(readStamp), {}, {}};
-//     });
-// };
+template <typename A>
+auto toTVarImpl(Lock lock, ID id, IORef<Integer> writeStamp, IORef<A> content, IORef<std::vector<MVar<_O_>>> waitQueue)
+{
+    return TVar{std::move(lock), std::move(writeStamp), std::move(content), std::move(waitQueue)};
+}
+
+constexpr auto toTVar = toGFunc<5> | [](Lock lock, ID id, IORef<Integer> writeStamp, auto content, IORef<std::vector<MVar<_O_>>> waitQueue)
+{
+    return toTVarImpl(std::move(lock), std::move(writeStamp), std::move(content), std::move(waitQueue));
+};
+
+constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
+{
+    return io([ioRef]() -> typename std::decay_t<decltype(ioRef)>::Data
+    {
+        return *ioRef.data;
+    });
+};
+
+IORef<Integer> idref = (newIORef | Integer{0}).run();
+
+IO<Integer> newID = []
+{
+    Id<Integer> cur;
+    Id<bool> changed;
+    return toTEIO | do_(
+        cur <= (readIORef | idref),
+        changed <= (atomCAS | idref | cur | (cur+1)),
+        ifThenElse | changed | (toTEIO | (Monad<IO>::return_ | (cur+1))) | newID
+    );
+}();
+
+constexpr auto readLock = readIORef;
+
+constexpr auto hassert = toFunc<> | [](bool result, std::string const& msg)
+{
+    return io([=]
+    {
+        if (!result)
+        {
+            throw std::runtime_error{msg};
+        }
+        return _o_;
+    });
+};
+
+constexpr auto newTVarIO = toGFunc<1> | [](auto a)
+{
+    using A = decltype(a);
+    Id<Lock> lock;
+    Id<Integer> ws;
+    Id<Integer> id;
+    Id<IORef<Integer>> writeStamp;
+    Id<IORef<A>> content;
+    Id<IORef<std::vector<MVar<_O_>>>> waitQueue;
+    return do_(
+		lock <= newLock,
+		ws <= (readLock | lock),
+		id <= newID,
+		hassert | (odd | ws) | "newtvar: value in lock is not odd!",
+		writeStamp <= (newIORef | ws),
+		content <= (newIORef | a),
+		waitQueue <= (newIORef | std::vector<MVar<_O_>>{}),
+		return_ | (toTVar | lock | id | writeStamp | content | waitQueue)
+    );
+};
 
 struct RSE
 {
@@ -562,16 +629,6 @@ constexpr auto getWriteSet = toFunc<> | [](TState ts)
 };
 
 IORef<Integer> globalClock{initIORef<Integer>(1)};
-
-constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
-{
-    return io([ioRef]() -> typename std::decay_t<decltype(ioRef)>::Data
-    {
-        return *ioRef.data;
-    });
-};
-
-constexpr auto readLock = readIORef;
 
 constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> IO<Integer>
 {
@@ -852,18 +909,6 @@ constexpr auto newTState = io([]
     auto const readStamp = readIORef(globalClock).run();
     return TState{myTId.run(), readStamp, {}, {}};
 });
-
-constexpr auto hassert = toFunc<> | [](bool result, std::string const& msg)
-{
-    return io([=]
-    {
-        if (!result)
-        {
-            throw std::runtime_error{msg};
-        }
-        return _o_;
-    });
-};
 
 constexpr auto unlock = toGFunc<1> | [](auto tid)
 {

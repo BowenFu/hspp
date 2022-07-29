@@ -870,6 +870,11 @@ constexpr auto even = toGFunc<1> | [](auto n)
     return n % 2 == 0;
 };
 
+constexpr auto odd = toGFunc<1> | [](auto n)
+{
+    return !(even | n);
+};
+
 } // namespace hspp
 
 #endif // HSPP_DATA_H
