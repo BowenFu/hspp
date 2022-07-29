@@ -394,7 +394,7 @@ constexpr auto if_ = guard;
 constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then_, auto else_)
 {
     using MClass = MonadClassType<decltype(evaluate_(then_)), decltype(evaluate_(else_))>;
-    return nullary([=] { return evaluate_(pred) ? (evalDeferred<MClass> | evaluate_(then_)) : (evalDeferred<MClass> | evaluate_(else_)); });
+    return nullary([pred=std::move(pred), then_=std::move(then_), else_=std::move(else_)] { return evaluate_(pred) ? (evalDeferred<MClass> | evaluate_(then_)) : (evalDeferred<MClass> | evaluate_(else_)); });
 };
 
 } // namespace doN
