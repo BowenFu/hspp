@@ -391,10 +391,10 @@ constexpr auto _(Head const& head, Rest const&... rest)
 constexpr auto if_ = guard;
 
 // used for doN, so that Id/Nullary can be used with ifThenElse.
-constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then, auto else_)
+constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then_, auto else_)
 {
-    using MClass = MonadClassType<decltype(evaluate_(then)), decltype(evaluate_(else_))>;
-    return nullary([=] { return evaluate_(pred) ? evalDeferred<MClass> | evaluate_(then) : evalDeferred<MClass> | evaluate_(else_); });
+    using MClass = MonadClassType<decltype(evaluate_(then_)), decltype(evaluate_(else_))>;
+    return nullary([=] { return evaluate_(pred) ? (evalDeferred<MClass> | evaluate_(then_)) : (evalDeferred<MClass> | evaluate_(else_)); });
 };
 
 } // namespace doN
