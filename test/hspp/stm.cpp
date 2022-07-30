@@ -927,7 +927,9 @@ namespace concurrent
 
 constexpr auto myTId = io([]() -> TId
 {
-    return 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+    TId result = 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+    std::cout << "myTID " << result << std::endl;
+    return result;
 });
 
 constexpr auto newTState = io([]
@@ -1152,6 +1154,8 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 {
                     auto [nts, a] = v_;
                     // auto ti = myTId.run();
+                    // std::cout << "ti: " << ti << std::endl;
+                    // std::cout << "nts.transId: " << nts.transId << std::endl;
                     // (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
                     auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = (getLocks | nts.transId | wslist).run();
@@ -1331,7 +1335,7 @@ constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
     Id<Integer> bal;
     return do_(
         putStr | "Getting ready to deposit money...hunting through pockets...\n",
-        threadDelay | 3000,
+        threadDelay | 300,
         putStr | "OK! Depositing now!\n",
         atomically | do_(
             bal <= (readTVar | acc),
