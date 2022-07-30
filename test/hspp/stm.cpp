@@ -471,12 +471,12 @@ struct TVar
 template <typename A>
 auto toTVarImpl(Lock lock, ID id, IORef<Integer> writeStamp, IORef<A> content, IORef<std::vector<MVar<_O_>>> waitQueue)
 {
-    return TVar{std::move(lock), std::move(writeStamp), std::move(content), std::move(waitQueue)};
+    return TVar<A>{std::move(lock), std::move(id), std::move(writeStamp), std::move(content), std::move(waitQueue)};
 }
 
 constexpr auto toTVar = toGFunc<5> | [](Lock lock, ID id, IORef<Integer> writeStamp, auto content, IORef<std::vector<MVar<_O_>>> waitQueue)
 {
-    return toTVarImpl(std::move(lock), std::move(writeStamp), std::move(content), std::move(waitQueue));
+    return toTVarImpl(std::move(lock), std::move(id), std::move(writeStamp), std::move(content), std::move(waitQueue));
 };
 
 constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
@@ -519,7 +519,7 @@ constexpr auto newTVarIO = toGFunc<1> | [](auto a)
     using A = decltype(a);
     Id<Lock> lock;
     Id<Integer> ws;
-    Id<Integer> id;
+    Id<ID> id;
     Id<IORef<Integer>> writeStamp;
     Id<IORef<A>> content;
     Id<IORef<std::vector<MVar<_O_>>>> waitQueue;
@@ -558,7 +558,13 @@ constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
     });
 };
 
-static std::map<const std::type_index, std::function<void(std::any)>> anyCommiters{};
+
+using AnyCommitters = std::map<const std::type_index, std::function<void(std::any)>>;
+AnyCommitters& anyCommitters()
+{
+    static AnyCommitters committers{};
+    return committers;
+}
 
 template <typename A>
 struct WSEData;
@@ -570,9 +576,12 @@ public:
     auto operator()(std::any wseData) const
     {
         auto [iocontent, v] = std::any_cast<WSEData<A> const&>(wseData);
-        writeIORef | iocontent | v;
+        (writeIORef | iocontent | v).run();
     }
 };
+
+template <typename A>
+struct WSEData;
 
 template <typename T>
 class CommitterRegister
@@ -580,20 +589,22 @@ class CommitterRegister
 public:
     constexpr CommitterRegister()
     {
-        anyCommiters.emplace(std::type_index(typeid(T)), Commiter<T>{});
+        anyCommitters().emplace(std::type_index(typeid(WSEData<T>)), Commiter<T>{});
     }
 };
 
 template <typename A>
 struct WSEData
 {
-    static const CommitterRegister<A> dummy;
+    WSEData(IORef<A> content_, A newValue_)
+    : content{content_}
+    , newValue{newValue_}
+    {
+        static const CommitterRegister<A> dummy;
+    }
     IORef<A> content;
     A newValue;
 };
-
-template <typename A>
-const CommitterRegister<A> WSEData<A>::dummy{};
 
 struct WSE
 {
@@ -939,7 +950,7 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
-                hassert | (lockValue != tid) | "Locking WS: lock already held by me!!";
+                (hassert | (lockValue != tid) | "Locking WS: lock already held by me!!").run();
                 return std::make_pair(false, locks);
             }
             else
@@ -1020,8 +1031,8 @@ constexpr auto validateReadSet = toGFunc<3> | [](auto ioReadSet, Integer readSta
 auto commitAny(std::any wseData)
 {
     auto idx = std::type_index(wseData.type());
-    auto iter = anyCommiters.find(idx);
-    hassert | iter != anyCommiters.end() | "Cannot find commiter of this type!";
+    auto iter = anyCommitters().find(idx);
+    (hassert | iter != anyCommitters().end() | "Cannot find commiter of this type!").run();
     iter->second(wseData);
 }
 
@@ -1068,7 +1079,7 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
-                hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!";
+                (hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!").run();
                 return std::make_pair(false, locks);
             }
             else
@@ -1126,9 +1137,7 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 {
                     auto [nts, a] = v_;
                     auto ti = myTId.run();
-                    assert(ti == (nts.transId));
-                    (void)ti;
-                    (void)a;
+                    (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
                     auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = (getLocks | nts.transId | wslist).run();
                     if (success)
@@ -1222,9 +1231,16 @@ TEST(atomically, 1)
     {
         return atomically || transferSTM | ma | mb | d;
     };
-   // Id<TVar<Integer>> ia, ib;
-    // auto io_ = do_(
-    //     ia <= newTV
-    // );
-
+    Id<TVar<Integer>> ta, tb;
+    Id<Integer> ia, ib;
+    auto io_ = do_(
+        ta <= (newTVarIO | Integer{10}),
+        tb <= (newTVarIO | Integer{10}),
+        transfer | ta | tb | 5,
+        ia <= (atomically | (readTVar | ta)),
+        ib <= (atomically | (readTVar | tb)),
+        hassert | (ia == 5) | "ia should be 5",
+        hassert | (ib == 15) | "ib should be 15"
+    );
+    io_.run();
 }
