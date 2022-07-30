@@ -1351,5 +1351,5 @@ TEST(atomically, 2)
         putStr | "Successful withdrawal!\n"
     );
 
-    io_.run();
+    // io_.run();
 }
