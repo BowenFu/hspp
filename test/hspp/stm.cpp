@@ -145,7 +145,7 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
                     return result;
                 }
             }
-            std::this_thread::yield();
+            // std::this_thread::yield();
         }
     });
 }
@@ -170,7 +170,7 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
                     return _o_;
                 }
             }
-            std::this_thread::yield();
+            // std::this_thread::yield();
         }
     });
 }
@@ -706,6 +706,12 @@ constexpr auto toValid = toGFunc<2> | [](TState ts, auto a)
     return TResult<decltype(a)>{Valid<decltype(a)>{ts, a}};
 };
 
+template <typename A>
+constexpr auto toRetry = toFunc<> | [](TState ts)
+{
+    return TResult<A>{Retry{ts}};
+};
+
 template <typename A, typename Func>
 class STM
 {
@@ -747,6 +753,15 @@ constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
         return _o_;
     });
 };
+
+template <typename... Ts>
+class IsSTM : public std::false_type
+{};
+template <typename... Ts>
+class IsSTM<STM<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isSTMV = IsSTM<std::decay_t<T>>::value;
 
 constexpr auto putRS = toFunc<> | [](ReadSet rs, RSE entry)
 {
@@ -1136,8 +1151,8 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 [=](Valid<A> const& v_) -> A
                 {
                     auto [nts, a] = v_;
-                    auto ti = myTId.run();
-                    (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
+                    // auto ti = myTId.run();
+                    // (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
                     auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = (getLocks | nts.transId | wslist).run();
                     if (success)
@@ -1174,7 +1189,8 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                         auto waitMVar = newEmptyMVar<_O_>.run();
                         (addToWaitQueues | waitMVar | lrs).run();
                         (unlock | nts.transId | locks).run();
-                        (takeMVar | waitMVar).run();
+                        // Looks like this line will block. No one is responsible in waking waitqueues in
+                        // (takeMVar | waitMVar).run();
                         return atomicallyImpl(stmac).run();
                     }
                     else
@@ -1201,6 +1217,13 @@ constexpr auto atomically = toGFunc<1> | [](auto const& stmac)
     return atomicallyImpl(stmac);
 };
 
+// todo create a deferred TResult that can be converted to any TResult;
+template <typename A>
+constexpr auto retry = toSTM | [](TState tState)
+{
+    return ioData(toRetry<A>(tState));
+};
+
 } // namespace concurrent
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
@@ -1215,32 +1238,118 @@ struct hspp::DataTrait<STM<A, Repr>>
     using Type = A;
 };
 
+using Account = TVar<Integer>;
+
+template <typename Data, typename Func>
+constexpr auto toTESTMImpl(STM<Data, Func> const& p)
+{
+    return STM<Data, std::function<IO<TResult<Data>>(TState)>>{[p](TState tState)
+    {
+        return toTEIO | p.run(tState);
+    }};
+}
+
+constexpr auto toTESTM = toGFunc<1> | [](auto p)
+{
+    return toTESTMImpl(p);
+};
+
+
+constexpr auto limitedWithdrawSTM = toFunc<> | [](Account acc, Integer amount)
+{
+    Id<Integer> bal;
+    auto result = do_(
+        bal <= (readTVar | acc),
+        ifThenElse | (amount >0 && amount > bal)
+            | (toTESTM | retry<_O_>)
+            | (toTESTM |(writeTVar | acc | (bal - amount)))
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, _O_>);
+    return result;
+};
+
+constexpr auto withdrawSTM = toFunc<> | [](Account acc, Integer amount)
+{
+    Id<Integer> bal;
+    auto result = do_(
+        bal <= (readTVar | acc),
+        writeTVar | acc | (bal - amount)
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, _O_>);
+    return result;
+};
+
+constexpr auto depositSTM = toFunc<> | [](Account acc, Integer amount)
+{
+    return withdrawSTM | acc | (- amount);
+};
+
+constexpr auto transfer = toFunc<> | [](Account from, Account to, Integer amount)
+{
+    auto result = atomically | do_(
+        depositSTM | to | amount,
+        limitedWithdrawSTM | from | amount
+    );
+    using RetT = decltype(result);
+    static_assert(isIOV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, _O_>);
+    return result;
+};
+
+constexpr auto showAccount = toFunc<> | [](Account acc)
+{
+    auto result = atomically | (readTVar | acc);
+    using RetT = decltype(result);
+    static_assert(isIOV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, Integer>);
+    return result;
+};
+
 TEST(atomically, 1)
 {
-    constexpr auto transferSTM = toFunc<> | [](TVar<Integer> ma, TVar<Integer> mb, Integer d)
-    {
-        Id<Integer> wa, wb;
-        return do_(
-            wa <= (readTVar | ma),
-            wb <= (readTVar | mb),
-            writeTVar | ma | (wa - d),
-            writeTVar | mb | (wb + d)
-        );
-    };
-    constexpr auto transfer = toFunc<> | [=](TVar<Integer> ma, TVar<Integer> mb, Integer d)
-    {
-        return atomically || transferSTM | ma | mb | d;
-    };
-    Id<TVar<Integer>> ta, tb;
-    Id<Integer> ia, ib;
+    Id<Account> from, to;
+    Id<Integer> v1, v2;
     auto io_ = do_(
-        ta <= (newTVarIO | Integer{10}),
-        tb <= (newTVarIO | Integer{10}),
-        transfer | ta | tb | 5,
-        ia <= (atomically | (readTVar | ta)),
-        ib <= (atomically | (readTVar | tb)),
-        hassert | (ia == 5) | "ia should be 5",
-        hassert | (ib == 15) | "ib should be 15"
+        from <= (newTVarIO | Integer{200}),
+        to   <= (newTVarIO | Integer{100}),
+        transfer | from | to | 50,
+        v1 <= (showAccount | from),
+        v2 <= (showAccount | to),
+        hassert | (v1 == 150) | "v1 should be 150",
+        hassert | (v2 == 150) | "v2 should be 150"
     );
+    io_.run();
+}
+
+
+constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
+{
+    Id<Integer> bal;
+    return do_(
+        putStr | "Getting ready to deposit money...hunting through pockets...\n",
+        threadDelay | 3000,
+        putStr | "OK! Depositing now!\n",
+        atomically | do_(
+            bal <= (readTVar | acc),
+            writeTVar | acc | (bal + amount)
+        )
+    );
+};
+
+TEST(atomically, 2)
+{
+    Id<Account> acc;
+    auto io_ = do_(
+        acc <= (newTVarIO | Integer{100}),
+        forkIO | (delayDeposit | acc | 1),
+        putStr | "Trying to withdraw money...\n",
+        atomically | (limitedWithdrawSTM | acc | 101),
+        putStr | "Successful withdrawal!\n"
+    );
+
     io_.run();
 }
