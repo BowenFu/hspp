@@ -194,6 +194,7 @@ constexpr auto tryPutMVarImpl(MVar<A>& a, A new_)
                 return true;
             }
         }
+        assert(false);
         return false;
     });
 }
@@ -443,7 +444,9 @@ auto atomCASImpl(IORef<A> ptr, A old, A new_)
         [ptr, old, new_]
         {
             auto old_ = old;
-            return ptr.data->compare_exchange_strong(old_, new_);
+            auto result = ptr.data->compare_exchange_strong(old_, new_);
+            std::cout << "atomCAS old_: " << old_ << ", new_ :" << new_ << ", result :" << result << std::endl;
+            return result;
         }
     );
 }
@@ -499,6 +502,12 @@ IO<Integer> newID = []
         ifThenElse | changed | (toTEIO | (Monad<IO>::return_ | (cur+1))) | newID
     );
 }();
+
+TEST(newID, 1)
+{
+    EXPECT_EQ(newID.run(), 1);
+    EXPECT_EQ(newID.run(), 2);
+}
 
 constexpr auto readLock = readIORef;
 
@@ -808,8 +817,11 @@ constexpr auto isLocked = even;
 
 constexpr auto isLockedIO = toFunc<> | [](Lock lock)
 {
-    auto const v = (readIORef | lock).run();
-    return (isLocked | v);
+    Id<Integer> v;
+    return do_(
+        v <= (readIORef | lock),
+        return_ | (isLocked | v)
+    ).run();
 };
 
 template <typename A>
@@ -903,11 +915,11 @@ public:
                         },
                         [=](Retry const& retry_) -> RetT
                         {
-                            return toValid | tState | T{};
+                            return RetT{retry_};
                         },
                         [=](Invalid const& invalid_) -> RetT
                         {
-                            return toValid | tState | T{};
+                            return RetT{invalid_};
                         }
                     ), static_cast<TResultBase<A> const&>(tResult));
                 });
@@ -927,7 +939,9 @@ namespace concurrent
 
 constexpr auto myTId = io([]() -> TId
 {
-    return 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+    TId result = 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+    std::cerr << "myTId " << result << std::endl;
+    return result;
 });
 
 constexpr auto newTState = io([]
@@ -945,6 +959,8 @@ constexpr auto unlock = toGFunc<1> | [](auto tid)
         Id<bool> unlocked;
         return do_(
             ws <= (readIORef | iows),
+            print | tid,
+            print | ws,
             unlocked <= (atomCAS | lock | tid | ws),
             hassert | unlocked | "COULD NOT UNLOCK LOCK",
             return_ | _o_
@@ -965,11 +981,13 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
+                std::cerr << "getLocks1: lockValue = " << lockValue << ", tid = " << tid << std::endl;
                 (hassert | (lockValue != tid) | "Locking WS: lock already held by me!!").run();
                 return std::make_pair(false, locks);
             }
             else
             {
+                std::cerr << "getLocks2: lockValue = " << lockValue << ", tid = " << tid << std::endl;
                 auto r = (atomCAS | lock | lockValue | tid).run();
                 if (r)
                 {
@@ -1074,7 +1092,10 @@ constexpr auto unblockThreads = toFunc<> | [](std::pair<ID, WSE> const& pair)
     {
         auto const& queue = pair.second.waitQueue;
         auto listMVars = (readIORef | queue).run();
-        mapM_ | [](auto mvar) { return tryPutMVar | mvar | _o_; } | listMVars;
+        mapM_ | [](auto mvar)
+        {
+            return tryPutMVar | mvar | _o_;
+        } | listMVars;
         writeIORef | queue | std::vector<MVar<_O_>>{};
         return _o_;
     });
@@ -1094,6 +1115,7 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
+                std::cerr << "validateAndAcquireLocks1 lockValue = " << lockValue << ", myId = " << myId << std::endl;
                 (hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!").run();
                 return std::make_pair(false, locks);
             }
@@ -1105,6 +1127,7 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
                 }
                 else
                 {
+                    std::cerr << "validateAndAcquireLocks2 lockValue = " << lockValue << ", myId = " << myId << std::endl;
                     auto r = (atomCAS | lock | lockValue | myId).run();
                     if (r)
                     {
@@ -1152,6 +1175,8 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 {
                     auto [nts, a] = v_;
                     // auto ti = myTId.run();
+                    // std::cerr << "ti: " << ti << std::endl;
+                    // std::cerr << "nts.transId: " << nts.transId << std::endl;
                     // (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
                     auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = (getLocks | nts.transId | wslist).run();
@@ -1190,7 +1215,7 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                         (addToWaitQueues | waitMVar | lrs).run();
                         (unlock | nts.transId | locks).run();
                         // Looks like this line will block. No one is responsible in waking waitqueues in
-                        // (takeMVar | waitMVar).run();
+                        (takeMVar | waitMVar).run();
                         return atomicallyImpl(stmac).run();
                     }
                     else
@@ -1331,7 +1356,7 @@ constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
     Id<Integer> bal;
     return do_(
         putStr | "Getting ready to deposit money...hunting through pockets...\n",
-        threadDelay | 3000,
+        threadDelay | 300,
         putStr | "OK! Depositing now!\n",
         atomically | do_(
             bal <= (readTVar | acc),
@@ -1351,5 +1376,6 @@ TEST(atomically, 2)
         putStr | "Successful withdrawal!\n"
     );
 
+    // TODO, add more unittests.
     // io_.run();
 }
