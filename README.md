@@ -20,7 +20,7 @@ Here you are!
 
 [badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
 
-Sample 1 for monadic do notation
+### Sample 1 for monadic do notation
 
 [godbolt1]: https://godbolt.org/z/7fTvTd3hT
 [![Try it on godbolt][badge.godbolt]][godbolt1]
@@ -36,7 +36,7 @@ Sample 1 for monadic do notation
     );
 ```
 
-Sample 2 for monad comprehension
+### Sample 2 for monad comprehension
 
 
 [godbolt2]: https://godbolt.org/z/M8Ynjvr3x
@@ -56,7 +56,7 @@ Sample 2 for monad comprehension
     );
 ```
 
-Sample 3 for parser combinator
+### Sample 3 for parser combinator
 
 Original haskell version [Monadic Parsing in Haskell](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/monadic-parsing-in-haskell/E557DFCCE00E0D4B6ED02F3FB0466093)
 
@@ -101,7 +101,7 @@ extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 
 ### Sample 4
 
-https://godbolt.org/z/ad11qYMYh
+https://godbolt.org/z/KMqdGqfcx
 
 ## Haskell vs Hspp (Incomplete list)
 
