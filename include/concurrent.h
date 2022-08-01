@@ -1,3 +1,7 @@
+/*
+Reference: Implemented based on https://www.researchgate.net/publication/220888858_An_Implementation_of_Composable_Memory_Transactions_in_Haskell
+*/
+
 #include <vector>
 #include <list>
 #include <cmath>
