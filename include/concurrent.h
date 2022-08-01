@@ -381,6 +381,7 @@ constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
 
 
 using AnyCommitters = std::map<const std::type_index, std::function<void(std::any)>>;
+// TODO: move definition to cpp
 AnyCommitters& anyCommitters()
 {
     static AnyCommitters committers{};
