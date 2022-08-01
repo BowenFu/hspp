@@ -108,7 +108,7 @@ Transfer from one account to another one atomically.
 Id<Account> from, to;
 Id<Integer> v1, v2;
 auto io_ = do_(
-    from <= (atomically | (newTVar | Integer{200})),
+    from <= (newTVarIO | Integer{200}),
     to   <= (newTVarIO | Integer{100}),
     transfer | from | to | 50,
     v1 <= (showAccount | from),
