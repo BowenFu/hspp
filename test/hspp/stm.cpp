@@ -104,10 +104,53 @@ TEST(forkIO, 3)
 }
 
 template <typename A>
+struct MVar;
+
+template <typename A>
+class Atomic
+{
+public:
+    Atomic() = default;
+    Atomic(A value)
+    : mValue{std::move(value)}
+    {}
+    bool compareExchangeStrong(A& expected, A desired)
+    {
+        std::unique_lock lc{mLock};
+        if (expected != mValue)
+        {
+            expected = mValue;
+            return false;
+        }
+        mValue = desired;
+        return true;
+    }
+    void store(A const& a)
+    {
+        std::unique_lock lc{mLock};
+        mValue = a;
+    }
+    A load() const
+    {
+        std::shared_lock lc{mLock};
+        return mValue;
+    }
+    std::shared_mutex& lock() const
+    {
+        return mLock;
+    }
+    A mValue;
+private:
+    template <typename B>
+    friend constexpr auto takeMVarImpl(MVar<B> const& a);
+    mutable std::shared_mutex mLock;
+};
+
+template <typename A>
 struct MVar
 {
     using Data = A;
-    using T = std::pair<std::optional<A>, std::shared_mutex>;
+    using T = Atomic<std::optional<A>>;
     std::shared_ptr<T> data = std::make_shared<T>();
     MVar() = default;
     MVar(A a)
@@ -137,11 +180,11 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
         while (true)
         {
             {
-                std::unique_lock lock{a.data->second};
-                if (a.data->first.has_value())
+                std::unique_lock lock{a.data->lock()};
+                if (a.data->mValue.has_value())
                 {
-                    auto result = std::move(a.data->first.value());
-                    a.data->first.reset();
+                    auto result = std::move(a.data->mValue.value());
+                    a.data->mValue.reset();
                     return result;
                 }
             }
@@ -158,20 +201,15 @@ constexpr auto takeMVar = toGFunc<1> | [](auto a)
 template <typename A>
 constexpr auto putMVarImpl(MVar<A>& a, A new_)
 {
-    return io([a, new_]
+    return io([a, new_=std::optional<A>{new_}]
     {
-        while (true)
+        auto old_ = std::optional<A>{};
+        while (!a.data->compareExchangeStrong(old_, new_))
         {
-            {
-                std::unique_lock lock{a.data->second};
-                if (!a.data->first.has_value())
-                {
-                    a.data->first = new_;
-                    return _o_;
-                }
-            }
+            old_ = std::optional<A>{};
             // std::this_thread::yield();
         }
+        return _o_;
     });
 }
 
@@ -185,16 +223,12 @@ constexpr auto tryPutMVarImpl(MVar<A>& a, A new_)
 {
     return io([a, new_]
     {
-        std::unique_lock lock{a.data->second, std::defer_lock};
-        if (lock.try_lock())
+        std::unique_lock lock{a.data->lock()};
+        if (!a.data->mValue.has_value())
         {
-            if (!a.data->first.has_value())
-            {
-                a.data->first = new_;
-                return true;
-            }
+            a.data->mValue = new_;
+            return true;
         }
-        assert(false);
         return false;
     });
 }
@@ -262,6 +296,16 @@ TEST(MVar, 3)
 
 class Message : public std::string{};
 class Stop : public MVar<_O_>{};
+
+bool operator==(Stop const& lhs, Stop const& rhs)
+{
+    return lhs.data->load() == rhs.data->load();
+}
+
+bool operator!=(Stop const& lhs, Stop const& rhs)
+{
+    return !(lhs == rhs);
+}
 
 using LogCommand = std::variant<Message, Stop>;
 class Logger : public MVar<LogCommand>{};
@@ -401,22 +445,10 @@ TEST(Async, 1)
 using Integer = int64_t;
 
 template <typename A>
-struct IORefTrait
-{
-    constexpr static bool kSUPPORT_CAS = false;
-};
-
-template <>
-struct IORefTrait<Integer>
-{
-    constexpr static bool kSUPPORT_CAS = true;
-};
-
-template <typename A>
 struct IORef
 {
     using Data = A;
-    using Repr = std::conditional_t<IORefTrait<A>::kSUPPORT_CAS, std::atomic<A>, A>;
+    using Repr = Atomic<A>;
     std::shared_ptr<Repr> data = std::make_shared<Repr>();
 };
 
@@ -444,7 +476,7 @@ auto atomCASImpl(IORef<A> ptr, A old, A new_)
         [ptr, old, new_]
         {
             auto old_ = old;
-            auto result = ptr.data->compare_exchange_strong(old_, new_);
+            auto result = ptr.data->compareExchangeStrong(old_, new_);
             std::cout << "atomCAS old_: " << old_ << ", new_ :" << new_ << ", result :" << result << std::endl;
             return result;
         }
@@ -486,7 +518,7 @@ constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
 {
     return io([ioRef]() -> typename std::decay_t<decltype(ioRef)>::Data
     {
-        return *ioRef.data;
+        return ioRef.data->load();
     });
 };
 
@@ -562,7 +594,7 @@ constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
 {
     return io([=]() -> _O_
     {
-        *ioRef.data = data;
+        ioRef.data->store(data);
         return _o_;
     });
 };
@@ -758,7 +790,8 @@ constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
 {
     return io([=]
     {
-        ws.data->emplace(id, wse);
+        std::unique_lock lc{ws.data->lock()};
+        ws.data->mValue.emplace(id, wse);
         return _o_;
     });
 };
@@ -776,7 +809,8 @@ constexpr auto putRS = toFunc<> | [](ReadSet rs, RSE entry)
 {
     return io([=]
     {
-        rs.data->insert(entry);
+        std::unique_lock lc{rs.data->lock()};
+        rs.data->mValue.insert(entry);
         return _o_;
     });
 };
@@ -785,8 +819,9 @@ constexpr auto lookUpWS = toFunc<> | [](WriteSet ws, ID id)
 {
     return io([=]() -> std::optional<WSE>
     {
-        auto iter = ws.data->find(id);
-        if (iter == ws.data->end())
+        std::shared_lock lc{ws.data->lock()};
+        auto iter = ws.data->mValue.find(id);
+        if (iter == ws.data->mValue.end())
         {
             return {};
         }
@@ -1092,11 +1127,12 @@ constexpr auto unblockThreads = toFunc<> | [](std::pair<ID, WSE> const& pair)
     {
         auto const& queue = pair.second.waitQueue;
         auto listMVars = (readIORef | queue).run();
-        mapM_ | [](auto mvar)
+        std::cout << "listMVars.size() : " << listMVars.size() << std::endl;
+        (mapM_ | [](auto mvar)
         {
             return tryPutMVar | mvar | _o_;
-        } | listMVars;
-        writeIORef | queue | std::vector<MVar<_O_>>{};
+        } | listMVars).run();
+        (writeIORef | queue | std::vector<MVar<_O_>>{}).run();
         return _o_;
     });
 };
@@ -1154,11 +1190,30 @@ constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
         {
             (hassert | (isLockedIO | lock) | "AddtoQueues: tvar not locked!!!").run();
             auto list = (readIORef | iomlist).run();
+            std::cout << "list.size() old: " << list.size();
             list.push_back(mvar);
+            std::cout << ", new: " << list.size() << std::endl;
+            std::cout << "mvar: " << mvar.data.get() << std::endl;
             return (writeIORef | iomlist | list).run();
         });
     };
 };
+
+// TEST(addToWaitQueues, 1)
+// {
+//     auto lst = std::set<RSE>{};
+//     Id<MVar<_O_>> waitMVar;
+//     auto io_ = do_(
+//         waitMVar <= newEmptyMVar<_O_>,
+//         addToWaitQueues | waitMVar | lst,
+//         forkIO | do_(
+//             threadDelay | 3000,
+//             wakeUpBQ | lst
+//         ),
+//         takeMVar | waitMVar
+//     );
+//     io_.run();
+// }
 
 
 template <typename A, typename Func>
@@ -1356,7 +1411,7 @@ constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
     Id<Integer> bal;
     return do_(
         putStr | "Getting ready to deposit money...hunting through pockets...\n",
-        threadDelay | 300,
+        threadDelay | 3000,
         putStr | "OK! Depositing now!\n",
         atomically | do_(
             bal <= (readTVar | acc),
@@ -1377,5 +1432,5 @@ TEST(atomically, 2)
     );
 
     // TODO, add more unittests.
-    // io_.run();
+    io_.run();
 }
