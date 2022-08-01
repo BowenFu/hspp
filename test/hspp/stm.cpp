@@ -188,7 +188,7 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
                     return result;
                 }
             }
-            // std::this_thread::yield();
+            std::this_thread::yield();
         }
     });
 }
@@ -207,7 +207,7 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
         while (!a.data->compareExchangeStrong(old_, new_))
         {
             old_ = std::optional<A>{};
-            // std::this_thread::yield();
+            std::this_thread::yield();
         }
         return _o_;
     });
@@ -786,6 +786,20 @@ constexpr auto toSTM = toGFunc<1> | [](auto func)
     return toSTMImpl(func);
 };
 
+constexpr auto newTVar = toGFunc<1> | [](auto a)
+{
+    return toSTM | [a](TState tState)
+    {
+        using A = decltype(a);
+        Id<TVar<A>> tvar;
+        return do_(
+			tvar <= (newTVarIO | a),
+			return_ | (toValid | tState | tvar)
+        );
+    };
+};
+
+
 constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
 {
     return io([=]
@@ -1199,22 +1213,6 @@ constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
     };
 };
 
-// TEST(addToWaitQueues, 1)
-// {
-//     auto lst = std::set<RSE>{};
-//     Id<MVar<_O_>> waitMVar;
-//     auto io_ = do_(
-//         waitMVar <= newEmptyMVar<_O_>,
-//         addToWaitQueues | waitMVar | lst,
-//         forkIO | do_(
-//             threadDelay | 3000,
-//             wakeUpBQ | lst
-//         ),
-//         takeMVar | waitMVar
-//     );
-//     io_.run();
-// }
-
 
 template <typename A, typename Func>
 auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
@@ -1394,7 +1392,7 @@ TEST(atomically, 1)
     Id<Account> from, to;
     Id<Integer> v1, v2;
     auto io_ = do_(
-        from <= (newTVarIO | Integer{200}),
+        from <= (atomically | (newTVar | Integer{200})),
         to   <= (newTVarIO | Integer{100}),
         transfer | from | to | 50,
         v1 <= (showAccount | from),
