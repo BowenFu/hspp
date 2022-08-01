@@ -1,7 +1,5 @@
-#include "hspp.h"
 #include <vector>
 #include <list>
-#include <gtest/gtest.h>
 #include <cmath>
 #include <cctype>
 #include <thread>
@@ -11,12 +9,16 @@
 #include <type_traits>
 #include <map>
 #include <typeindex>
+#include <set>
 
 using namespace hspp;
 using namespace hspp::data;
 using namespace hspp::parser;
 using namespace std::literals;
 using namespace hspp::doN;
+
+namespace hspp
+{
 
 namespace concurrent
 {
@@ -49,59 +51,6 @@ constexpr auto threadDelay = toFunc<> | [](size_t microseconds)
         }
     );
 };
-
-TEST(forkIO, 1)
-{
-    auto io_ = do_(
-        forkIO | (replicateM_ | 10000U | (putChar | 'A')),
-        (replicateM_ | 10000U | (putChar | 'B'))
-    );
-    io_.run();
-}
-
-constexpr auto setReminder = toFunc<> | [](std::string const& s)
-{
-    Id<size_t> n;
-    return do_(
-        n = (hspp::read<size_t> | s), // let expression.
-        putStr | "Ok, I'll remind you in ",
-        print | n,
-        putStrLn | " seconds",
-        threadDelay | (1000000U * n),
-        print | n,
-        putStrLn | " seconds is up! BING!BEL"
-    );
-};
-
-TEST(forkIO, 2)
-{
-    Id<std::string> s;
-    auto io_ = forever || do_(
-        s <= getLine,
-        forkIO || setReminder | s
-    );
-    // io.run();
-    (void)io_;
-
-}
-
-TEST(forkIO, 3)
-{
-    IO<_O_> loop0 = []{ return _o_; };
-    auto loop = loop0;
-
-    Id<std::string> s;
-    loop = toTEIO | do_(
-        s <= getLine,
-        ifThenElse(s == "exit")
-            || loop0
-            || toTEIO | (doInner(forkIO || setReminder | s,
-                nullary([&]{ return loop;}))) // capturing by ref is important, so that loop is not fixed to loop0.
-    );
-
-    // loop.run();
-    (void)loop;
-}
 
 template <typename A>
 struct MVar;
@@ -188,7 +137,7 @@ constexpr auto takeMVarImpl(MVar<A> const& a)
                     return result;
                 }
             }
-            // std::this_thread::yield();
+            std::this_thread::yield();
         }
     });
 }
@@ -207,7 +156,7 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
         while (!a.data->compareExchangeStrong(old_, new_))
         {
             old_ = std::optional<A>{};
-            // std::this_thread::yield();
+            std::this_thread::yield();
         }
         return _o_;
     });
@@ -249,151 +198,6 @@ constexpr auto readMVar = toGFunc<1> | [](auto m){
     );
 };
 
-TEST(MVar, 1)
-{
-    (void)newMVar;
-
-    Id<MVar<char>> m;
-    Id<char> r;
-    auto const io_ = do_(
-        m <= newEmptyMVar<char>,
-        forkIO || putMVar | m | 'x',
-        r <= (takeMVar | m),
-        print | r
-    );
-    io_.run();
-}
-
-TEST(MVar, 2)
-{
-    Id<MVar<char>> m;
-    Id<char> r;
-    auto io_ = do_(
-        m <= newEmptyMVar<char>,
-        forkIO || doInner(
-            putMVar | m | 'x',
-            putMVar | m | 'y'
-        ),
-        r <= (takeMVar | m),
-        print | r,
-        r <= (takeMVar | m),
-        print | r
-    );
-    io_.run();
-}
-
-TEST(MVar, 3)
-{
-    Id<MVar<char>> m;
-    auto io_ = do_(
-        m <= newEmptyMVar<char>,
-        takeMVar | m
-    );
-    // stuck
-    (void)io_;
-    // io_.run();
-}
-
-class Message : public std::string{};
-class Stop : public MVar<_O_>{};
-
-bool operator==(Stop const& lhs, Stop const& rhs)
-{
-    return lhs.data->load() == rhs.data->load();
-}
-
-bool operator!=(Stop const& lhs, Stop const& rhs)
-{
-    return !(lhs == rhs);
-}
-
-using LogCommand = std::variant<Message, Stop>;
-class Logger : public MVar<LogCommand>{};
-
-constexpr auto toStop = toFunc<> | [](MVar<_O_> mo)
-{
-    return Stop{std::move(mo)};
-};
-
-constexpr auto toLogCommnad = toGFunc<1> | [](auto l)
-{
-    return LogCommand{std::move(l)};
-};
-
-constexpr auto toLogger = toFunc<> | [](MVar<LogCommand> mlc)
-{
-    return Logger{std::move(mlc)};
-};
-
-const auto logger = toFunc<> | [] (Logger m)
-{
-    auto const dispatchCmd = toGFunc<2> | [](LogCommand const& lc, auto const& loop)
-    {
-        return std::visit(overload(
-            [&](Message const& msg){
-                return toTEIO | do_(print | msg, loop());
-            },
-            [](Stop s){
-                return toTEIO | do_(putStrLn | "logger: stop", putMVar | s | _o_);
-            }
-        ), lc);
-    };
-
-
-    auto loop = yCombinator | [=](auto const& self) -> IO<_O_>
-    {
-        Id<LogCommand> cmd;
-        return toTEIO | do_(
-            cmd <= (takeMVar | m),
-            dispatchCmd | cmd | self
-        );
-    };
-    return loop();
-};
-
-auto initLogger()
-{
-    Id<MVar<LogCommand>> m;
-    Id<Logger> l;
-    return do_(
-        m <= newEmptyMVar<LogCommand>,
-        l = (toLogger | m),
-        forkIO | (logger | l),
-        return_ | l
-    );
-}
-
-constexpr auto logMessage = toFunc<> | [](Logger m, std::string s)
-{
-    return putMVar | m | LogCommand{Message{s}};
-};
-
-constexpr auto logStop = toFunc<> | [](Logger m)
-{
-    Id<MVar<_O_>> s;
-    return do_(
-        s <= newEmptyMVar<_O_>,
-        putMVar | m || (toLogCommnad || toStop | s),
-        takeMVar | s
-    );
-};
-
-TEST(MVar, logger)
-{
-    Id<Logger> l;
-    auto io_ = do_(
-        l <= initLogger(),
-        logMessage | l | "hello",
-        logMessage | l | "bye",
-        logStop | l
-    );
-
-    testing::internal::CaptureStdout();
-    io_.run();
-    std::string output = testing::internal::GetCapturedStdout();
-    EXPECT_EQ(output, "hello\nbye\nlogger: stop\n");
-}
-
 template <typename A>
 class Async : public MVar<A>
 {};
@@ -421,26 +225,7 @@ constexpr auto wait = toGFunc<1> | [](auto aVar)
     return readMVar | aVar;
 };
 
-TEST(Async, 1)
-{
-    Id<Async<std::string>> a1;
-    Id<Async<std::string>> a2;
-    Id<std::string> r1;
-    Id<std::string> r2;
-    auto io_ = do_(
-        a1 <= (async | ioData("12345"s)),
-        a2 <= (async | ioData("67890"s)),
-        r1 <= (wait | a1),
-        r2 <= (wait | a2),
-        print | r1,
-        print | r2
-    );
-
-    testing::internal::CaptureStdout();
-    io_.run();
-    std::string output = testing::internal::GetCapturedStdout();
-    EXPECT_EQ(output, "12345\n67890\n");
-}
+// For STM
 
 using Integer = int64_t;
 
@@ -534,12 +319,6 @@ IO<Integer> newID = []
         ifThenElse | changed | (toTEIO | (Monad<IO>::return_ | (cur+1))) | newID
     );
 }();
-
-TEST(newID, 1)
-{
-    EXPECT_EQ(newID.run(), 1);
-    EXPECT_EQ(newID.run(), 2);
-}
 
 constexpr auto readLock = readIORef;
 
@@ -697,26 +476,6 @@ constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> 
 
 const auto incrementGlobalClock = incrementGlobalClockImpl();
 
-TEST(atomCAS, integer)
-{
-    auto a  = IORef<Integer>{initIORef<Integer>(1)};
-    Integer old = 1;
-    Integer new_ = 2;
-    auto io_ = atomCAS | a | old | new_;
-    EXPECT_EQ(a.data->load(), 1);
-    auto result = io_.run();
-    EXPECT_TRUE(result);
-    EXPECT_EQ(a.data->load(), 2);
-}
-
-TEST(atomCAS, clock)
-{
-    auto io_ = incrementGlobalClock;
-    EXPECT_EQ(globalClock.data->load(), 1);
-    io_.run();
-    EXPECT_EQ(globalClock.data->load(), 3);
-}
-
 template <typename A>
 class Valid : public std::pair<TState, A>
 {
@@ -785,6 +544,20 @@ constexpr auto toSTM = toGFunc<1> | [](auto func)
 {
     return toSTMImpl(func);
 };
+
+constexpr auto newTVar = toGFunc<1> | [](auto a)
+{
+    return toSTM | [a](TState tState)
+    {
+        using A = decltype(a);
+        Id<TVar<A>> tvar;
+        return do_(
+			tvar <= (newTVarIO | a),
+			return_ | (toValid | tState | tvar)
+        );
+    };
+};
+
 
 constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
 {
@@ -908,69 +681,6 @@ constexpr auto readTVar = toGFunc<1> | [](auto tvar)
     return readTVarImpl(tvar);
 };
 
-} // namespace concurrent
-
-namespace hspp
-{
-    using namespace concurrent;
-template <>
-class Applicative<STM>
-{
-public:
-    constexpr static auto pure = toGFunc<1> | [](auto x)
-    {
-        using A = decltype(x);
-        return toSTM | [=](auto tState) { return ioData<TResult<A>>(toValid | tState | x); };
-    };
-};
-
-
-template <>
-class MonadBase<STM>
-{
-public:
-    template <typename A, typename Repr, typename Func>
-    constexpr static auto bind(STM<A, Repr> const& t1, Func const& func)
-    {
-        return toSTM || [=](TState tState)
-        {
-            Id<TResult<A>> tRes;
-            auto const dispatchResult = toFunc<> | [=](TResult<A> tResult)
-            {
-                return io([=]
-                {
-                    using T = typename std::decay_t<decltype(func(std::declval<A>()).run(std::declval<TState>()).run())>::DataT;
-                    using RetT = TResult<T>;
-                    return std::visit(overload(
-                        [=](Valid<A> const& v_) -> RetT
-                        {
-                            auto [nTState, v] = v_;
-                            auto t2 = func(v);
-                            return t2.run(nTState).run();
-                        },
-                        [=](Retry const& retry_) -> RetT
-                        {
-                            return RetT{retry_};
-                        },
-                        [=](Invalid const& invalid_) -> RetT
-                        {
-                            return RetT{invalid_};
-                        }
-                    ), static_cast<TResultBase<A> const&>(tResult));
-                });
-            };
-            return do_(
-                tRes <= t1.run(tState),
-                dispatchResult | tRes
-            );
-        };
-    }
-};
-
-} // namespace hspp
-
-namespace concurrent
-{
 
 constexpr auto myTId = io([]() -> TId
 {
@@ -1199,22 +909,6 @@ constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
     };
 };
 
-// TEST(addToWaitQueues, 1)
-// {
-//     auto lst = std::set<RSE>{};
-//     Id<MVar<_O_>> waitMVar;
-//     auto io_ = do_(
-//         waitMVar <= newEmptyMVar<_O_>,
-//         addToWaitQueues | waitMVar | lst,
-//         forkIO | do_(
-//             threadDelay | 3000,
-//             wakeUpBQ | lst
-//         ),
-//         takeMVar | waitMVar
-//     );
-//     io_.run();
-// }
-
 
 template <typename A, typename Func>
 auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
@@ -1304,22 +998,6 @@ constexpr auto retry = toSTM | [](TState tState)
     return ioData(toRetry<A>(tState));
 };
 
-} // namespace concurrent
-
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
-struct hspp::TypeClassTrait<TypeClassT, STM<Args...>>
-{
-    using Type = TypeClassT<STM>;
-};
-
-template <typename A, typename Repr>
-struct hspp::DataTrait<STM<A, Repr>>
-{
-    using Type = A;
-};
-
-using Account = TVar<Integer>;
-
 template <typename Data, typename Func>
 constexpr auto toTESTMImpl(STM<Data, Func> const& p)
 {
@@ -1334,103 +1012,95 @@ constexpr auto toTESTM = toGFunc<1> | [](auto p)
     return toTESTMImpl(p);
 };
 
-
-constexpr auto limitedWithdrawSTM = toFunc<> | [](Account acc, Integer amount)
+#if 0
+template <typename A, typename Repr1, typename Repr2, typename Repr3>
+auto orElseImpl(STM<A, Repr1> const& s1, STM<A, Repr2> const& s2, STM<A, Repr3> const& s3)
 {
-    Id<Integer> bal;
-    auto result = do_(
-        bal <= (readTVar | acc),
-        ifThenElse | (amount >0 && amount > bal)
-            | (toTESTM | retry<_O_>)
-            | (toTESTM |(writeTVar | acc | (bal - amount)))
-    );
-    using RetT = decltype(result);
-    static_assert(isSTMV<RetT>);
-    static_assert(std::is_same_v<DataType<RetT>, _O_>);
-    return result;
-};
-
-constexpr auto withdrawSTM = toFunc<> | [](Account acc, Integer amount)
-{
-    Id<Integer> bal;
-    auto result = do_(
-        bal <= (readTVar | acc),
-        writeTVar | acc | (bal - amount)
-    );
-    using RetT = decltype(result);
-    static_assert(isSTMV<RetT>);
-    static_assert(std::is_same_v<DataType<RetT>, _O_>);
-    return result;
-};
-
-constexpr auto depositSTM = toFunc<> | [](Account acc, Integer amount)
-{
-    return withdrawSTM | acc | (- amount);
-};
-
-constexpr auto transfer = toFunc<> | [](Account from, Account to, Integer amount)
-{
-    auto result = atomically | do_(
-        depositSTM | to | amount,
-        limitedWithdrawSTM | from | amount
-    );
-    using RetT = decltype(result);
-    static_assert(isIOV<RetT>);
-    static_assert(std::is_same_v<DataType<RetT>, _O_>);
-    return result;
-};
-
-constexpr auto showAccount = toFunc<> | [](Account acc)
-{
-    auto result = atomically | (readTVar | acc);
-    using RetT = decltype(result);
-    static_assert(isIOV<RetT>);
-    static_assert(std::is_same_v<DataType<RetT>, Integer>);
-    return result;
-};
-
-TEST(atomically, 1)
-{
-    Id<Account> from, to;
-    Id<Integer> v1, v2;
-    auto io_ = do_(
-        from <= (newTVarIO | Integer{200}),
-        to   <= (newTVarIO | Integer{100}),
-        transfer | from | to | 50,
-        v1 <= (showAccount | from),
-        v2 <= (showAccount | to),
-        hassert | (v1 == 150) | "v1 should be 150",
-        hassert | (v2 == 150) | "v2 should be 150"
-    );
-    io_.run();
+    return toSTM | [=](TState tstate)
+    {
+        return do_(
+            tsCopy <- cloneTState tstate
+            tRes1 <- t1 tstate
+            case tRes1 of
+                Retry nTState1 	-> do
+                        tRes2 <- t2 tsCopy
+                        case tRes2 of
+                            Retry nTState2 -> do	fTState <- mergeTStates nTState2 nTState1 
+                                        return (Retry fTState)
+                            Valid nTState2 r ->  do	fTState <- mergeTStates nTState2 nTState1
+                                        return (Valid fTState r)
+                            _ ->         return tRes2
+                _	-> return tRes1
+        );
+    };
 }
+#endif
 
+} // namespace concurrent
 
-constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, concurrent::STM<Args...>>
 {
-    Id<Integer> bal;
-    return do_(
-        putStr | "Getting ready to deposit money...hunting through pockets...\n",
-        threadDelay | 3000,
-        putStr | "OK! Depositing now!\n",
-        atomically | do_(
-            bal <= (readTVar | acc),
-            writeTVar | acc | (bal + amount)
-        )
-    );
+    using Type = TypeClassT<concurrent::STM>;
 };
 
-TEST(atomically, 2)
+template <typename A, typename Repr>
+struct DataTrait<concurrent::STM<A, Repr>>
 {
-    Id<Account> acc;
-    auto io_ = do_(
-        acc <= (newTVarIO | Integer{100}),
-        forkIO | (delayDeposit | acc | 1),
-        putStr | "Trying to withdraw money...\n",
-        atomically | (limitedWithdrawSTM | acc | 101),
-        putStr | "Successful withdrawal!\n"
-    );
+    using Type = A;
+};
 
-    // TODO, add more unittests.
-    io_.run();
-}
+template <>
+class Applicative<concurrent::STM>
+{
+public:
+    constexpr static auto pure = toGFunc<1> | [](auto x)
+    {
+        using A = decltype(x);
+        return concurrent::toSTM | [=](auto tState) { return ioData<concurrent::TResult<A>>(concurrent::toValid | tState | x); };
+    };
+};
+
+
+template <>
+class MonadBase<concurrent::STM>
+{
+public:
+    template <typename A, typename Repr, typename Func>
+    constexpr static auto bind(concurrent::STM<A, Repr> const& t1, Func const& func)
+    {
+        return concurrent::toSTM || [=](concurrent::TState tState)
+        {
+            Id<concurrent::TResult<A>> tRes;
+            auto const dispatchResult = toFunc<> | [=](concurrent::TResult<A> tResult)
+            {
+                return io([=]
+                {
+                    using T = typename std::decay_t<decltype(func(std::declval<A>()).run(std::declval<concurrent::TState>()).run())>::DataT;
+                    using RetT = concurrent::TResult<T>;
+                    return std::visit(overload(
+                        [=](concurrent::Valid<A> const& v_) -> RetT
+                        {
+                            auto [nTState, v] = v_;
+                            auto t2 = func(v);
+                            return t2.run(nTState).run();
+                        },
+                        [=](concurrent::Retry const& retry_) -> RetT
+                        {
+                            return RetT{retry_};
+                        },
+                        [=](concurrent::Invalid const& invalid_) -> RetT
+                        {
+                            return RetT{invalid_};
+                        }
+                    ), static_cast<concurrent::TResultBase<A> const&>(tResult));
+                });
+            };
+            return do_(
+                tRes <= t1.run(tState),
+                dispatchResult | tRes
+            );
+        };
+    }
+};
+} // namespace hspp

@@ -99,6 +99,10 @@ auto const term = factor <chainl1> mulOp;
 extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
+### Sample 4
+
+https://godbolt.org/z/ad11qYMYh
+
 ## Haskell vs Hspp (Incomplete list)
 
 | Haskell       | Hspp |
