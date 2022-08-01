@@ -1,15 +1,4 @@
-#include <vector>
-#include <list>
 #include <gtest/gtest.h>
-#include <cmath>
-#include <cctype>
-#include <thread>
-#include <atomic>
-#include <shared_mutex>
-#include <any>
-#include <type_traits>
-#include <map>
-#include <typeindex>
 #include "hspp.h"
 #include "concurrent.h"
 

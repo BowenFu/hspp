@@ -99,9 +99,39 @@ auto const term = factor <chainl1> mulOp;
 extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
-### Sample 4
+### Sample 4 for STM / concurrent
 
-https://godbolt.org/z/KMqdGqfcx
+[concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
+
+Transfer from one account to another one atomically.
+```c++
+Id<Account> from, to;
+Id<Integer> v1, v2;
+auto io_ = do_(
+    from <= (atomically | (newTVar | Integer{200})),
+    to   <= (newTVarIO | Integer{100}),
+    transfer | from | to | 50,
+    v1 <= (showAccount | from),
+    v2 <= (showAccount | to),
+    hassert | (v1 == 150) | "v1 should be 150",
+    hassert | (v2 == 150) | "v2 should be 150"
+);
+io_.run();
+```
+
+Withdraw from an account but waiting for sufficient money.
+```c++
+Id<Account> acc;
+auto io_ = do_(
+    acc <= (newTVarIO | Integer{100}),
+    forkIO | (delayDeposit | acc | 1),
+    putStr | "Trying to withdraw money...\n",
+    atomically | (limitedWithdrawSTM | acc | 101),
+    putStr | "Successful withdrawal!\n"
+);
+
+io_.run();
+```
 
 ## Haskell vs Hspp (Incomplete list)
 
