@@ -1039,13 +1039,13 @@ auto orElseImpl(STM<A, Repr1> const& s1, STM<A, Repr2> const& s2, STM<A, Repr3> 
 } // namespace concurrent
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
-struct hspp::TypeClassTrait<TypeClassT, concurrent::STM<Args...>>
+struct TypeClassTrait<TypeClassT, concurrent::STM<Args...>>
 {
     using Type = TypeClassT<concurrent::STM>;
 };
 
 template <typename A, typename Repr>
-struct hspp::DataTrait<concurrent::STM<A, Repr>>
+struct DataTrait<concurrent::STM<A, Repr>>
 {
     using Type = A;
 };
