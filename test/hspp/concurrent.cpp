@@ -352,6 +352,43 @@ TEST(atomically, 2)
         putStr | "Successful withdrawal!\n"
     );
 
-    // TODO, add more unittests.
+    io_.run();
+}
+
+// (limitedWithdraw2 acc1 acc2 amt) withdraws amt from acc1,
+// if acc1 has enough money, otherwise from acc2.
+// If neither has enough, it retries.
+constexpr auto limitedWithdraw2 = toFunc<> | [](Account acc1, Account acc2, Integer amt)
+{
+    return orElse | (limitedWithdrawSTM | acc1 | amt) | (limitedWithdrawSTM | acc2 | amt);
+};
+
+constexpr auto showAcc = toFunc<> | [](std::string name, Account acc)
+{
+    Id<Integer> bal;
+    return do_(
+        bal <= atomically (readTVar | acc),
+        print | (name + ": $"),
+        print | (show | bal)
+    );
+};
+
+TEST(atomically, 3)
+{
+    Id<Account> acc1, acc2;
+    auto io_ = do_(
+        acc1 <= (atomically | (newTVar | Integer{100})),
+        acc2 <= (atomically | (newTVar | Integer{100})),
+        showAcc | "Left pocket" | acc1,
+        showAcc | "Right pocket" | acc2,
+        forkIO | (delayDeposit | acc2 | 1),
+        print | "Withdrawing $101 from either pocket...",
+        atomically | (limitedWithdraw2 | acc1 | acc2 | Integer{101}),
+        print | "Successful withdrawal!",
+        showAcc | "Left pocket" | acc1,
+        showAcc | "Right pocket" | acc2
+    );
+
+    // FIXME
     io_.run();
 }
