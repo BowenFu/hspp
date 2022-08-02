@@ -389,6 +389,5 @@ TEST(atomically, 3)
         showAcc | "Right pocket" | acc2
     );
 
-    // FIXME
     io_.run();
 }
