@@ -269,7 +269,6 @@ auto atomCASImpl(IORef<A> ptr, A old, A new_)
         {
             auto old_ = old;
             auto result = ptr.data->compareExchangeStrong(old_, new_);
-            std::cout << "atomCAS old_: " << old_ << ", new_ :" << new_ << ", result :" << result << std::endl;
             return result;
         }
     );
@@ -460,6 +459,11 @@ struct TState
     Integer readStamp;
     ReadSet readSet;
     WriteSet writeSet;
+};
+
+constexpr auto toTState = toGFunc<4> | [](TId transId, Integer readStamp, ReadSet readSet, WriteSet writeSet)
+{
+    return TState{transId, readStamp, readSet, writeSet};
 };
 
 constexpr auto getWriteSet = toFunc<> | [](TState ts)
@@ -693,7 +697,6 @@ constexpr auto readTVar = toGFunc<1> | [](auto tvar)
 constexpr auto myTId = io([]() -> TId
 {
     TId result = 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
-    std::cerr << "myTId " << result << std::endl;
     return result;
 });
 
@@ -734,13 +737,11 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
-                std::cerr << "getLocks1: lockValue = " << lockValue << ", tid = " << tid << std::endl;
                 (hassert | (lockValue != tid) | "Locking WS: lock already held by me!!").run();
                 return std::make_pair(false, locks);
             }
             else
             {
-                std::cerr << "getLocks2: lockValue = " << lockValue << ", tid = " << tid << std::endl;
                 auto r = (atomCAS | lock | lockValue | tid).run();
                 if (r)
                 {
@@ -845,7 +846,6 @@ constexpr auto unblockThreads = toFunc<> | [](std::pair<ID, WSE> const& pair)
     {
         auto const& queue = pair.second.waitQueue;
         auto listMVars = (readIORef | queue).run();
-        std::cout << "listMVars.size() : " << listMVars.size() << std::endl;
         (mapM_ | [](auto mvar)
         {
             return tryPutMVar | mvar | _o_;
@@ -869,7 +869,6 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
-                std::cerr << "validateAndAcquireLocks1 lockValue = " << lockValue << ", myId = " << myId << std::endl;
                 (hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!").run();
                 return std::make_pair(false, locks);
             }
@@ -881,7 +880,6 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
                 }
                 else
                 {
-                    std::cerr << "validateAndAcquireLocks2 lockValue = " << lockValue << ", myId = " << myId << std::endl;
                     auto r = (atomCAS | lock | lockValue | myId).run();
                     if (r)
                     {
@@ -908,10 +906,7 @@ constexpr auto addToWaitQueues = toFunc<> | [](MVar<_O_> mvar)
         {
             (hassert | (isLockedIO | lock) | "AddtoQueues: tvar not locked!!!").run();
             auto list = (readIORef | iomlist).run();
-            std::cout << "list.size() old: " << list.size();
             list.push_back(mvar);
-            std::cout << ", new: " << list.size() << std::endl;
-            std::cout << "mvar: " << mvar.data.get() << std::endl;
             return (writeIORef | iomlist | list).run();
         });
     };
@@ -931,10 +926,6 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                 [=](Valid<A> const& v_) -> A
                 {
                     auto [nts, a] = v_;
-                    // auto ti = myTId.run();
-                    // std::cerr << "ti: " << ti << std::endl;
-                    // std::cerr << "nts.transId: " << nts.transId << std::endl;
-                    // (hassert | (ti == (nts.transId)) | "ti should equal to transId").run();
                     auto wslist = (readIORef | nts.writeSet).run();
                     auto [success, locks] = (getLocks | nts.transId | wslist).run();
                     if (success)
@@ -1020,29 +1011,104 @@ constexpr auto toTESTM = toGFunc<1> | [](auto p)
     return toTESTMImpl(p);
 };
 
-#if 0
-template <typename A, typename Repr1, typename Repr2, typename Repr3>
-auto orElseImpl(STM<A, Repr1> const& s1, STM<A, Repr2> const& s2, STM<A, Repr3> const& s3)
+constexpr auto cloneIORef = toGFunc<1> | [](auto ioRef)
+{
+    using Data = typename std::decay_t<decltype(ioRef)>::Data;
+    Id<Data> value;
+    return do_(
+        value <= (readIORef | ioRef),
+        newIORef | value
+    );
+};
+
+constexpr auto cloneTState = toFunc<> | [](TState tstate)
+{
+    Id<WriteSet> nws;
+    Id<ReadSet> nrs;
+    return do_(
+        nws <= (cloneIORef | tstate.writeSet),
+        nrs <= (cloneIORef | tstate.readSet),
+        return_ | (toTState | tstate.transId | tstate.readStamp | nrs | nws)
+    );
+};
+
+constexpr auto setUnion = toGFunc<2> | [](auto set1, auto set2)
+{
+    using Set = decltype(set1);
+    static_assert(std::is_same_v<Set, decltype(set2)>);
+    set1.merge(set2);
+    return set1;
+};
+
+constexpr auto mergeTStates = toFunc<> | [](TState ts1, TState ts2)
+{
+    using Data = typename ReadSet::Data;
+    Id<Data> rs1;
+    Id<Data> rs2;
+    Id<Data> nrs;
+    return do_(
+        rs1 <= (readIORef | ts1.readSet),
+        rs2 <= (readIORef | ts2.readSet),
+        nrs = (setUnion | rs1 | rs2),
+        writeIORef | ts1.readSet | nrs,
+        return_ | ts1
+    );
+};
+
+
+template <typename A, typename Repr1, typename Repr2>
+auto orElseImpl(STM<A, Repr1> const& s1, STM<A, Repr2> const& s2)
 {
     return toSTM | [=](TState tstate)
     {
+        using TResType = decltype(s1.run(tstate).run());
+        auto dispatchTRes1 = toFunc<> | [=](TResType const& tRes1, TState const& tsCopy)
+        {
+            return io([=]() -> TResType
+            {
+                auto retry1 = std::get_if<Retry>(static_cast<TResultBase<A> const*>(&tRes1));
+                if (retry1)
+                {
+                    auto nTState1 = static_cast<TState const&>(*retry1);
+                    auto tRes2 = s2.run(tsCopy).run();
+                    using TRes2Type = decltype(tRes2);
+                    using DataT = typename TRes2Type::DataT;
+                    return std::visit(overload(
+                        [=](Retry const& retry2) -> TRes2Type
+                        {
+                            auto nTState2 = static_cast<TState const&>(retry2);
+                            auto fTState = (mergeTStates | nTState2 | nTState1).run();
+                            return toRetry<DataT> | fTState;
+                        },
+                        [=](Valid<DataT> const& valid2) -> TRes2Type
+                        {
+                            auto [nTState2, r] = valid2;
+                            auto fTState = (mergeTStates | nTState2 | nTState1).run();
+                            return (toValid | fTState | r);
+                        },
+                        [=](Invalid const& invalid2) -> TRes2Type
+                        {
+                            return tRes2;
+                        }), static_cast<TResultBase<A> const&>(tRes2));
+                }
+                return tRes1;
+            });
+        };
+
+        Id<TState> tsCopy;
+        Id<TResType> tRes1;
         return do_(
-            tsCopy <- cloneTState tstate
-            tRes1 <- t1 tstate
-            case tRes1 of
-                Retry nTState1 	-> do
-                        tRes2 <- t2 tsCopy
-                        case tRes2 of
-                            Retry nTState2 -> do	fTState <- mergeTStates nTState2 nTState1 
-                                        return (Retry fTState)
-                            Valid nTState2 r ->  do	fTState <- mergeTStates nTState2 nTState1
-                                        return (Valid fTState r)
-                            _ ->         return tRes2
-                _	-> return tRes1
+            tsCopy <= (cloneTState | tstate),
+            tRes1 <= s1.run(tstate),
+            dispatchTRes1 | tRes1 | tsCopy
         );
     };
 }
-#endif
+
+constexpr auto orElse = toGFunc<2> | [](auto s1, auto s2)
+{
+    return orElseImpl(s1, s2);
+};
 
 } // namespace concurrent
 
