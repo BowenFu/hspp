@@ -1166,6 +1166,37 @@ constexpr auto takeTMVar = toGFunc<1> | [](auto t)
     return takeTMVarImpl(t);
 };
 
+template <typename A>
+constexpr auto putTMVarImpl(TMVar<A> const& t, A const& a)
+{
+    auto dispatch = toFunc<> | [=](Maybe<A> m)
+    {
+        if (m.hasValue())
+        {
+            return toTESTM | retry<A>;
+        }
+        return toTESTM | do_(
+            (writeTVar | t | (just | a)),
+            return_ | _o_
+        );
+    };
+
+    Id<Maybe<A>> m;
+    auto result = do_(
+        m <= (readTVar | t),
+        dispatch | m
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, _O_>);
+    return result;
+}
+
+constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
+{
+    return putTMVarImpl(t, a);
+};
+
 } // namespace concurrent
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
