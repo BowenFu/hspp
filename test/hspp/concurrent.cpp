@@ -254,6 +254,8 @@ TEST(atomCAS, clock)
     EXPECT_EQ(globalClock.data->load(), 3);
 }
 
+// Some tests borrowed from https://www.schoolofhaskell.com/school/advanced-haskell/beautiful-concurrency/3-software-transactional-memory
+
 using Account = TVar<Integer>;
 
 constexpr auto limitedWithdrawSTM = toFunc<> | [](Account acc, Integer amount)
