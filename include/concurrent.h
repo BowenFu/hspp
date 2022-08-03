@@ -1216,7 +1216,7 @@ public:
     constexpr static auto pure = toGFunc<1> | [](auto x)
     {
         using A = decltype(x);
-        return concurrent::toSTM | [=](auto tState) { return ioData<concurrent::TResult<A>>(concurrent::toValid | tState | x); };
+        return concurrent::toSTM | [=](auto tState) { return ioData(concurrent::toValid | tState | x); };
     };
 };
 
