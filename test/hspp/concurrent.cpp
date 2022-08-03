@@ -345,18 +345,18 @@ constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
 TEST(atomically, 2)
 {
     Id<Account> acc;
+    Id<Integer> bal;
     auto io_ = do_(
         acc <= (newTVarIO | Integer{100}),
         forkIO | (delayDeposit | acc | 1),
         putStr | "Trying to withdraw money...\n",
         atomically | (limitedWithdrawSTM | acc | 101),
-        putStr | "Successful withdrawal!\n"
+        putStr | "Successful withdrawal!\n",
+        bal <= (showAccount | acc),
+        hassert | (bal == 0) | "bal should be 0"
     );
 
-    testing::internal::CaptureStdout();
     io_.run();
-    std::string output = testing::internal::GetCapturedStdout();
-    EXPECT_EQ(output, "Trying to withdraw money...\nGetting ready to deposit money...hunting through pockets...\nOK! Depositing now!\nSuccessful withdrawal!\n");
 }
 
 // (limitedWithdraw2 acc1 acc2 amt) withdraws amt from acc1,
@@ -380,6 +380,7 @@ constexpr auto showAcc = toFunc<> | [](std::string name, Account acc)
 TEST(atomically, 3)
 {
     Id<Account> acc1, acc2;
+    Id<Integer> v1, v2;
     auto io_ = do_(
         acc1 <= (atomically | (newTVar | Integer{100})),
         acc2 <= (atomically | (newTVar | Integer{100})),
@@ -390,13 +391,14 @@ TEST(atomically, 3)
         atomically | (limitedWithdraw2 | acc1 | acc2 | Integer{101}),
         print | "Successful withdrawal!",
         showAcc | "Left pocket" | acc1,
-        showAcc | "Right pocket" | acc2
+        showAcc | "Right pocket" | acc2,
+        v1 <= (showAccount | acc1),
+        v2 <= (showAccount | acc2),
+        hassert | (v1 == 100) | "v1 should be 100",
+        hassert | (v2 == 0) | "v2 should be 0"
     );
 
-    testing::internal::CaptureStdout();
     io_.run();
-    std::string output = testing::internal::GetCapturedStdout();
-    EXPECT_EQ(output, "Left pocket: $100\nRight pocket: $100\nWithdrawing $101 from either pocket...\nGetting ready to deposit money...hunting through pockets...\nOK! Depositing now!\nSuccessful withdrawal!\nLeft pocket: $100\nRight pocket: $0\n");
 }
 
 TEST(TMVar, 1)
