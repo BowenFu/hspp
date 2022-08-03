@@ -1120,10 +1120,10 @@ constexpr auto toTMVar = toGFunc<1> | [](auto t)
 };
 
 template <typename A>
-inline auto newEmptyTMVar = []
+auto newEmptyTMVar()
 {
-    Id<TVar<Maybe<A>>> t;
-    auto result = do_(
+    static Id<TVar<Maybe<A>>> t;
+    static auto result = do_(
         t <= (newTVar | Maybe<A>{}),
         return_ | (toTMVar | t)
     );
@@ -1131,7 +1131,7 @@ inline auto newEmptyTMVar = []
     static_assert(isSTMV<RetT>);
     static_assert(std::is_same_v<DataType<RetT>, TMVar<A>>);
     return result;
-}();
+}
 
 template <typename A>
 constexpr auto takeTMVarImpl(TMVar<A> const& t)

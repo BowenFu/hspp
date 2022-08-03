@@ -408,8 +408,8 @@ TEST(TMVar, 1)
     Id<TMVar<int>> ta, tb;
     Id<int> a, b;
     auto io_ = atomically | do_(
-        ta <= newEmptyTMVar<int>,
-        tb <= newEmptyTMVar<int>,
+        ta <= newEmptyTMVar<int>(),
+        tb <= newEmptyTMVar<int>(),
         putTMVar | ta | 10,
         putTMVar | tb | 20,
         a <= (takeTMVar | ta),
