@@ -254,6 +254,8 @@ TEST(atomCAS, clock)
     EXPECT_EQ(globalClock.data->load(), 3);
 }
 
+// Some tests borrowed from https://www.schoolofhaskell.com/school/advanced-haskell/beautiful-concurrency/3-software-transactional-memory
+
 using Account = TVar<Integer>;
 
 constexpr auto limitedWithdrawSTM = toFunc<> | [](Account acc, Integer amount)
@@ -323,6 +325,7 @@ TEST(atomically, 1)
         hassert | (v1 == 150) | "v1 should be 150",
         hassert | (v2 == 150) | "v2 should be 150"
     );
+
     io_.run();
 }
 
@@ -344,12 +347,15 @@ constexpr auto delayDeposit = toFunc<> | [](Account acc, Integer amount)
 TEST(atomically, 2)
 {
     Id<Account> acc;
+    Id<Integer> bal;
     auto io_ = do_(
         acc <= (newTVarIO | Integer{100}),
         forkIO | (delayDeposit | acc | 1),
         putStr | "Trying to withdraw money...\n",
         atomically | (limitedWithdrawSTM | acc | 101),
-        putStr | "Successful withdrawal!\n"
+        putStr | "Successful withdrawal!\n",
+        bal <= (showAccount | acc),
+        hassert | (bal == 0) | "bal should be 0"
     );
 
     io_.run();
@@ -368,14 +374,15 @@ constexpr auto showAcc = toFunc<> | [](std::string name, Account acc)
     Id<Integer> bal;
     return do_(
         bal <= atomically (readTVar | acc),
-        print | (name + ": $"),
-        print | (show | bal)
+        putStr | (name + ": $"),
+        putStrLn | (show | bal)
     );
 };
 
 TEST(atomically, 3)
 {
     Id<Account> acc1, acc2;
+    Id<Integer> v1, v2;
     auto io_ = do_(
         acc1 <= (atomically | (newTVar | Integer{100})),
         acc2 <= (atomically | (newTVar | Integer{100})),
@@ -386,8 +393,29 @@ TEST(atomically, 3)
         atomically | (limitedWithdraw2 | acc1 | acc2 | Integer{101}),
         print | "Successful withdrawal!",
         showAcc | "Left pocket" | acc1,
-        showAcc | "Right pocket" | acc2
+        showAcc | "Right pocket" | acc2,
+        v1 <= (showAccount | acc1),
+        v2 <= (showAccount | acc2),
+        hassert | (v1 == 100) | "v1 should be 100",
+        hassert | (v2 == 0) | "v2 should be 0"
     );
 
     io_.run();
+}
+
+TEST(TMVar, 1)
+{
+    Id<TMVar<int>> ta, tb;
+    Id<int> a, b;
+    auto io_ = atomically | do_(
+        ta <= newEmptyTMVar<int>(),
+        tb <= newEmptyTMVar<int>(),
+        putTMVar | ta | 10,
+        putTMVar | tb | 20,
+        a <= (takeTMVar | ta),
+        b <= (takeTMVar | tb),
+        return_ | (makeTuple<2> | a | b)
+    );
+    auto result = io_.run();
+    EXPECT_EQ(result, std::make_tuple(10, 20));
 }

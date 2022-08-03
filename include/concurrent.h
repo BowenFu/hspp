@@ -715,8 +715,6 @@ constexpr auto unlock = toGFunc<1> | [](auto tid)
         Id<bool> unlocked;
         return do_(
             ws <= (readIORef | iows),
-            print | tid,
-            print | ws,
             unlocked <= (atomCAS | lock | tid | ws),
             hassert | unlocked | "COULD NOT UNLOCK LOCK",
             return_ | _o_
@@ -1110,6 +1108,93 @@ constexpr auto orElse = toGFunc<2> | [](auto s1, auto s2)
     return orElseImpl(s1, s2);
 };
 
+template <typename A>
+class TMVar : public TVar<data::Maybe<A>>
+{
+};
+
+constexpr auto toTMVar = toGFunc<1> | [](auto t)
+{
+    using A = DataType<DataType<decltype(t)>>;
+    return TMVar<A>{t};
+};
+
+template <typename A>
+auto newEmptyTMVar()
+{
+    static Id<TVar<Maybe<A>>> t;
+    static auto result = do_(
+        t <= (newTVar | Maybe<A>{}),
+        return_ | (toTMVar | t)
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, TMVar<A>>);
+    return result;
+}
+
+template <typename A>
+constexpr auto takeTMVarImpl(TMVar<A> const& t)
+{
+    auto dispatch = toFunc<> | [=](Maybe<A> m)
+    {
+        if (m.hasValue())
+        {
+            return toTESTM | do_(
+                (writeTVar | t | data::Maybe<A>{}),
+                return_ | m.value()
+            );
+        }
+        return toTESTM | retry<A>;
+    };
+
+    Id<Maybe<A>> m;
+    auto result = do_(
+        m <= (readTVar | t),
+        dispatch | m
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, A>);
+    return result;
+}
+
+constexpr auto takeTMVar = toGFunc<1> | [](auto t)
+{
+    return takeTMVarImpl(t);
+};
+
+template <typename A>
+constexpr auto putTMVarImpl(TMVar<A> const& t, A const& a)
+{
+    auto dispatch = toFunc<> | [=](Maybe<A> m)
+    {
+        if (m.hasValue())
+        {
+            return toTESTM | retry<_O_>;
+        }
+        return toTESTM | do_(
+            (writeTVar | t | (just | a)),
+            return_ | _o_
+        );
+    };
+
+    Id<Maybe<A>> m;
+    auto result = do_(
+        m <= (readTVar | t),
+        dispatch | m
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, _O_>);
+    return result;
+}
+
+constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
+{
+    return putTMVarImpl(t, a);
+};
+
 } // namespace concurrent
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
@@ -1131,7 +1216,7 @@ public:
     constexpr static auto pure = toGFunc<1> | [](auto x)
     {
         using A = decltype(x);
-        return concurrent::toSTM | [=](auto tState) { return ioData<concurrent::TResult<A>>(concurrent::toValid | tState | x); };
+        return concurrent::toSTM | [=](auto tState) { return ioData(concurrent::toValid | tState | x); };
     };
 };
 
