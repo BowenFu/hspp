@@ -392,4 +392,19 @@ TEST(atomically, 3)
     io_.run();
 }
 
-auto x = newEmptyTMVar<Integer>;
+TEST(TMVar, 1)
+{
+    Id<TMVar<int>> ta, tb;
+    Id<int> a, b;
+    auto io_ = atomically | do_(
+        ta <= newEmptyTMVar<int>,
+        tb <= newEmptyTMVar<int>,
+        putTMVar | ta | 10,
+        putTMVar | tb | 20,
+        a <= (takeTMVar | ta),
+        b <= (takeTMVar | tb),
+        return_ | (makeTuple<2> | a | b)
+    );
+    auto result = io_.run();
+    EXPECT_EQ(result, std::make_tuple(10, 20));
+}

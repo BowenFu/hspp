@@ -1143,7 +1143,7 @@ constexpr auto takeTMVarImpl(TMVar<A> const& t)
         if (m.hasValue())
         {
             return toTESTM | do_(
-                (writeTVar | t | data::nothing),
+                (writeTVar | t | data::Maybe<A>{}),
                 return_ | m.value()
             );
         }
@@ -1173,7 +1173,7 @@ constexpr auto putTMVarImpl(TMVar<A> const& t, A const& a)
     {
         if (m.hasValue())
         {
-            return toTESTM | retry<A>;
+            return toTESTM | retry<_O_>;
         }
         return toTESTM | do_(
             (writeTVar | t | (just | a)),
