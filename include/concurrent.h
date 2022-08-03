@@ -1110,6 +1110,36 @@ constexpr auto orElse = toGFunc<2> | [](auto s1, auto s2)
     return orElseImpl(s1, s2);
 };
 
+template <typename A>
+class TMVar : public TVar<data::Maybe<A>>
+{
+};
+
+constexpr auto toTMVar = toGFunc<1> | [](auto t)
+{
+    using A = DataType<DataType<decltype(t)>>;
+    return TMVar<A>{t};
+};
+
+template <typename A>
+inline auto newEmptyTMVar = []
+{
+    Id<TVar<Maybe<A>>> t;
+    auto result = do_(
+        t <= (newTVar | Maybe<A>{}),
+        return_ | (toTMVar | t)
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, TMVar<A>>);
+    return result;
+}();
+
+// takeTMVar :: TMVar a -> STM a takeTMVar (TMVar t) = do
+// m <- readTVar t -- case m of
+// Nothing -> retry -- Justa ->do
+// writeTVar t Nothing -- return a
+
 } // namespace concurrent
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>

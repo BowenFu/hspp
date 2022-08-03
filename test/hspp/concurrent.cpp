@@ -391,3 +391,5 @@ TEST(atomically, 3)
 
     io_.run();
 }
+
+auto x = newEmptyTMVar<Integer>;
