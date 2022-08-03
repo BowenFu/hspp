@@ -1135,10 +1135,36 @@ inline auto newEmptyTMVar = []
     return result;
 }();
 
-// takeTMVar :: TMVar a -> STM a takeTMVar (TMVar t) = do
-// m <- readTVar t -- case m of
-// Nothing -> retry -- Justa ->do
-// writeTVar t Nothing -- return a
+template <typename A>
+constexpr auto takeTMVarImpl(TMVar<A> const& t)
+{
+    auto dispatch = toFunc<> | [=](Maybe<A> m)
+    {
+        if (m.hasValue())
+        {
+            return toTESTM | do_(
+                (writeTVar | t | data::nothing),
+                return_ | m.value()
+            );
+        }
+        return toTESTM | retry<A>;
+    };
+
+    Id<Maybe<A>> m;
+    auto result = do_(
+        m <= (readTVar | t),
+        dispatch | m
+    );
+    using RetT = decltype(result);
+    static_assert(isSTMV<RetT>);
+    static_assert(std::is_same_v<DataType<RetT>, A>);
+    return result;
+}
+
+constexpr auto takeTMVar = toGFunc<1> | [](auto t)
+{
+    return takeTMVarImpl(t);
+};
 
 } // namespace concurrent
 
