@@ -323,6 +323,7 @@ TEST(atomically, 1)
         hassert | (v1 == 150) | "v1 should be 150",
         hassert | (v2 == 150) | "v2 should be 150"
     );
+
     io_.run();
 }
 
@@ -352,7 +353,10 @@ TEST(atomically, 2)
         putStr | "Successful withdrawal!\n"
     );
 
+    testing::internal::CaptureStdout();
     io_.run();
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "Trying to withdraw money...\nGetting ready to deposit money...hunting through pockets...\nOK! Depositing now!\nSuccessful withdrawal!\n");
 }
 
 // (limitedWithdraw2 acc1 acc2 amt) withdraws amt from acc1,
@@ -368,8 +372,8 @@ constexpr auto showAcc = toFunc<> | [](std::string name, Account acc)
     Id<Integer> bal;
     return do_(
         bal <= atomically (readTVar | acc),
-        print | (name + ": $"),
-        print | (show | bal)
+        putStr | (name + ": $"),
+        putStrLn | (show | bal)
     );
 };
 
@@ -389,7 +393,10 @@ TEST(atomically, 3)
         showAcc | "Right pocket" | acc2
     );
 
+    testing::internal::CaptureStdout();
     io_.run();
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "Left pocket: $100\nRight pocket: $100\nWithdrawing $101 from either pocket...\nGetting ready to deposit money...hunting through pockets...\nOK! Depositing now!\nSuccessful withdrawal!\nLeft pocket: $100\nRight pocket: $0\n");
 }
 
 TEST(TMVar, 1)

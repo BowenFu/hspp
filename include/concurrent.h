@@ -715,8 +715,6 @@ constexpr auto unlock = toGFunc<1> | [](auto tid)
         Id<bool> unlocked;
         return do_(
             ws <= (readIORef | iows),
-            print | tid,
-            print | ws,
             unlocked <= (atomCAS | lock | tid | ws),
             hassert | unlocked | "COULD NOT UNLOCK LOCK",
             return_ | _o_
