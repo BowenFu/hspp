@@ -557,19 +557,83 @@ constexpr auto toSTM = toGFunc<1> | [](auto func)
     return toSTMImpl(func);
 };
 
+} // namespace concurrent
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+struct TypeClassTrait<TypeClassT, concurrent::STM<Args...>>
+{
+    using Type = TypeClassT<concurrent::STM>;
+};
+
+template <typename A, typename Repr>
+struct DataTrait<concurrent::STM<A, Repr>>
+{
+    using Type = A;
+};
+
+template <>
+class Applicative<concurrent::STM>
+{
+public:
+    constexpr static auto pure = toGFunc<1> | [](auto x)
+    {
+        using A = decltype(x);
+        return concurrent::toSTM | [=](auto tState) { return ioData(concurrent::toValid | tState | x); };
+    };
+};
+
+
+template <>
+class MonadBase<concurrent::STM>
+{
+public:
+    template <typename A, typename Repr, typename Func>
+    constexpr static auto bind(concurrent::STM<A, Repr> const& t1, Func const& func)
+    {
+        return concurrent::toSTM || [=](concurrent::TState tState)
+        {
+            Id<concurrent::TResult<A>> tRes;
+            auto const dispatchResult = toFunc<> | [=](concurrent::TResult<A> tResult)
+            {
+                return io([=]
+                {
+                    using T = typename std::decay_t<decltype(func(std::declval<A>()).run(std::declval<concurrent::TState>()).run())>::DataT;
+                    using RetT = concurrent::TResult<T>;
+                    return std::visit(overload(
+                        [=](concurrent::Valid<A> const& v_) -> RetT
+                        {
+                            auto [nTState, v] = v_;
+                            auto t2 = func(v);
+                            return t2.run(nTState).run();
+                        },
+                        [=](concurrent::Retry const& retry_) -> RetT
+                        {
+                            return RetT{retry_};
+                        },
+                        [=](concurrent::Invalid const& invalid_) -> RetT
+                        {
+                            return RetT{invalid_};
+                        }
+                    ), static_cast<concurrent::TResultBase<A> const&>(tResult));
+                });
+            };
+            return do_(
+                tRes <= t1.run(tState),
+                dispatchResult | tRes
+            );
+        };
+    }
+};
+
+namespace concurrent
+{
 constexpr auto newTVar = toGFunc<1> | [](auto a)
 {
     return toSTM | [a](TState tState)
     {
-        using A = decltype(a);
-        Id<TVar<A>> tvar;
-        return do_(
-			tvar <= (newTVarIO | a),
-			return_ | (toValid | tState | tvar)
-        );
+        return (newTVarIO | a) >>= (return_ <o> (toValid | tState));
     };
 };
-
 
 constexpr auto putWS = toFunc<> | [](WriteSet ws, ID id, WSE wse)
 {
@@ -637,11 +701,8 @@ constexpr auto isLocked = even;
 
 constexpr auto isLockedIO = toFunc<> | [](Lock lock)
 {
-    Id<Integer> v;
-    return do_(
-        v <= (readIORef | lock),
-        return_ | (isLocked | v)
-    ).run();
+    auto io_ = (readIORef | lock) >>= (return_ <o> isLocked);
+    return io_.run();
 };
 
 template <typename A>
@@ -1120,18 +1181,7 @@ constexpr auto toTMVar = toGFunc<1> | [](auto t)
 };
 
 template <typename A>
-auto newEmptyTMVar()
-{
-    static Id<TVar<Maybe<A>>> t;
-    static auto result = do_(
-        t <= (newTVar | Maybe<A>{}),
-        return_ | (toTMVar | t)
-    );
-    using RetT = decltype(result);
-    static_assert(isSTMV<RetT>);
-    static_assert(std::is_same_v<DataType<RetT>, TMVar<A>>);
-    return result;
-}
+constexpr auto newEmptyTMVar = ((newTVar | Maybe<A>{}) >>= (Monad<STM>::return_ <o> toTMVar));
 
 template <typename A>
 constexpr auto takeTMVarImpl(TMVar<A> const& t)
@@ -1197,69 +1247,4 @@ constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
 
 } // namespace concurrent
 
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
-struct TypeClassTrait<TypeClassT, concurrent::STM<Args...>>
-{
-    using Type = TypeClassT<concurrent::STM>;
-};
-
-template <typename A, typename Repr>
-struct DataTrait<concurrent::STM<A, Repr>>
-{
-    using Type = A;
-};
-
-template <>
-class Applicative<concurrent::STM>
-{
-public:
-    constexpr static auto pure = toGFunc<1> | [](auto x)
-    {
-        using A = decltype(x);
-        return concurrent::toSTM | [=](auto tState) { return ioData(concurrent::toValid | tState | x); };
-    };
-};
-
-
-template <>
-class MonadBase<concurrent::STM>
-{
-public:
-    template <typename A, typename Repr, typename Func>
-    constexpr static auto bind(concurrent::STM<A, Repr> const& t1, Func const& func)
-    {
-        return concurrent::toSTM || [=](concurrent::TState tState)
-        {
-            Id<concurrent::TResult<A>> tRes;
-            auto const dispatchResult = toFunc<> | [=](concurrent::TResult<A> tResult)
-            {
-                return io([=]
-                {
-                    using T = typename std::decay_t<decltype(func(std::declval<A>()).run(std::declval<concurrent::TState>()).run())>::DataT;
-                    using RetT = concurrent::TResult<T>;
-                    return std::visit(overload(
-                        [=](concurrent::Valid<A> const& v_) -> RetT
-                        {
-                            auto [nTState, v] = v_;
-                            auto t2 = func(v);
-                            return t2.run(nTState).run();
-                        },
-                        [=](concurrent::Retry const& retry_) -> RetT
-                        {
-                            return RetT{retry_};
-                        },
-                        [=](concurrent::Invalid const& invalid_) -> RetT
-                        {
-                            return RetT{invalid_};
-                        }
-                    ), static_cast<concurrent::TResultBase<A> const&>(tResult));
-                });
-            };
-            return do_(
-                tRes <= t1.run(tState),
-                dispatchResult | tRes
-            );
-        };
-    }
-};
 } // namespace hspp
