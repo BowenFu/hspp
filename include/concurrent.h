@@ -121,7 +121,7 @@ constexpr auto newEmptyMVar = io([]{ return MVar<A>{}; });
 template <typename A>
 constexpr auto newMVarImpl(A a)
 {
-    return io([&]{ return MVar<A>{std::move(a)}; });
+    return io([a=std::move(a)]{ return MVar<A>{std::move(a)}; });
 }
 
 constexpr auto newMVar = toGFunc<1> | [](auto a)
