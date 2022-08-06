@@ -97,13 +97,9 @@ TEST(MVar, 2)
 TEST(MVar, 3)
 {
     Id<MVar<char>> m;
-    auto io_ = do_(
-        m <= newEmptyMVar<char>,
-        takeMVar | m
-    );
-    // stuck
+    auto io_ = newEmptyMVar<char> >>= takeMVar;
+    // Expected to be stuck.
     (void)io_;
-    // io_.run();
 }
 
 class Message : public std::string{};

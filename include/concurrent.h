@@ -1245,6 +1245,67 @@ constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
     return putTMVarImpl(t, a);
 };
 
+template <typename A>
+struct Stream
+{
+    using Item = std::pair<A, std::unique_ptr<Stream<A>>>;
+    MVar<Item> data;
+};
+
+constexpr auto toItem = toGFunc<2> | [](auto a, auto b)
+{
+    using A = decltype(a);
+    using B = decltype(b);
+    static_assert(std::is_same_v<std::unique_ptr<Stream<A>>, B>);
+    return typename Stream<A>::Item{a, b};
+};
+
+template <typename A>
+struct Chan : public std::array<MVar<Stream<A>>, 2>
+{};
+
+constexpr auto toChan = toGFunc<2> | [](auto a, auto b)
+{
+    using A = decltype(a);
+    using B = decltype(b);
+    static_assert(std::is_same_v<A, B>);
+    return Chan<A>{a, b};
+};
+
+template <typename A>
+constexpr auto newChanImpl()
+{
+    Id<Stream<A>> hole;
+    Id<MVar<Stream<A>>> readVar, writeVar;
+    return do_(
+        hole <= newEmptyMVar<Stream<A>>,
+        readVar <= (newMVar | hole),
+        writeVar <= (newMVar | hole),
+        return_ | (toChan | readVar | writeVar)
+    );
+};
+
+template <typename A>
+constexpr auto newChan = newChanImpl<A>();
+
+template <typename A>
+constexpr auto writeChanImpl(Chan<A> chan, A val)
+{
+    auto writeVar = chan[1];
+    Id<MVar<Stream<A>>> newHole, oldHole;
+    return do_(
+        newHole <= newEmptyMVar<Stream<A>>,
+        oldHole <= (takeMVar | writeVar),
+        putMVar | oldHole | (toItem | val | newHole),
+        putMVar | writeVar | newHole
+    );
+};
+
+constexpr auto writeChan = toGFunc<2> | [](auto chan, auto val)
+{
+    return writeChanImpl(chan, val);
+};
+
 } // namespace concurrent
 
 } // namespace hspp
