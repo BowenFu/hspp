@@ -415,3 +415,22 @@ TEST(TMVar, 1)
     auto result = io_.run();
     EXPECT_EQ(result, std::make_tuple(10, 20));
 }
+
+TEST(Chan, 1)
+{
+    Id<Chan<int>> a, b;
+    Id<int> x, y;
+    auto io_ = do_(
+        a <= newChan<int>,
+        b <= (dupChan | a),
+        forkIO | (replicateM_ | 10U | doInner(
+            x <= (readChan | a),
+            print | x)),
+        forkIO | (replicateM_ | 10U | doInner(
+            y <= (readChan | b),
+            print | y)),
+        replicateM_ | 10 || writeChan | a | 5
+    );
+    auto result = io_.run();
+    EXPECT_EQ(result, _o_);
+}
