@@ -17,6 +17,7 @@ Du Bois, A.R. (2011). An Implementation of Composable Memory Transactions in Has
 #include <map>
 #include <typeindex>
 #include <set>
+#include <array>
 
 using namespace hspp;
 using namespace hspp::data;
@@ -70,7 +71,7 @@ public:
     Atomic(A value)
     : mValue{std::move(value)}
     {}
-    bool compareExchangeStrong(A& expected, A desired)
+    bool compareExchangeStrong(A& expected, A const& desired)
     {
         std::unique_lock lc{mLock};
         if (expected != mValue)
@@ -110,7 +111,7 @@ struct MVar
     std::shared_ptr<T> data = std::make_shared<T>();
     MVar() = default;
     MVar(A a)
-    : data{std::make_shared<T>(a, {})}
+    : data{std::make_shared<T>(std::make_optional(std::move(a)))}
     {}
 };
 
@@ -155,9 +156,9 @@ constexpr auto takeMVar = toGFunc<1> | [](auto a)
 };
 
 template <typename A>
-constexpr auto putMVarImpl(MVar<A>& a, A new_)
+constexpr auto putMVarImpl(MVar<A> a, A new_)
 {
-    return io([a, new_=std::optional<A>{new_}]
+    return io([a, new_=std::optional<A>{std::move(new_)}]
     {
         auto old_ = std::optional<A>{};
         while (!a.data->compareExchangeStrong(old_, new_))
@@ -171,7 +172,7 @@ constexpr auto putMVarImpl(MVar<A>& a, A new_)
 
 constexpr auto putMVar = toGFunc<2> | [](auto a, auto new_)
 {
-    return putMVarImpl(a, new_);
+    return putMVarImpl(std::move(a), std::move(new_));
 };
 
 template <typename A>
@@ -1245,6 +1246,150 @@ constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
     return putTMVarImpl(t, a);
 };
 
+template <typename A>
+struct Stream;
+
+template <typename A>
+using StreamPtr = std::shared_ptr<Stream<A>>;
+
+template <typename A>
+using Item = std::pair<A, StreamPtr<A>>;
+
+template <typename A>
+using StreamBase = MVar<Item<A>>;
+
+template <typename A>
+struct Stream : public StreamBase<A>
+{
+public:
+    Stream(StreamBase<A> sb)
+    : StreamBase<A>{std::move(sb)}
+    {}
+};
+
+template <typename A>
+constexpr auto toStreamPtrImpl(StreamBase<A> sb)
+{
+    return std::make_shared<Stream<A>>(Stream<A>{std::move(sb)});
+};
+
+constexpr auto toStreamPtr = toGFunc<1> | [](auto sb)
+{
+    return toStreamPtrImpl(std::move(sb));
+};
+
+template <typename T>
+constexpr auto cast = toGFunc<1> | [](auto v)
+{
+    return static_cast<T>(v);
+};
+
+template <typename T>
+constexpr auto makeShared = toGFunc<1> | [](auto v)
+{
+    return std::make_shared<T>(std::move(v));
+};
+
+constexpr auto toItem = toGFunc<2> | [](auto a, auto b)
+{
+    using A = decltype(a);
+    using B = decltype(b);
+    static_assert(std::is_same_v<StreamPtr<A>, B>);
+    return Item<A>{a, std::move(b)};
+};
+
+template <typename A>
+struct Chan : public std::array<MVar<StreamPtr<A>>, 2>
+{};
+
+template <typename A>
+constexpr auto toChanImpl(MVar<StreamPtr<A>> a, MVar<StreamPtr<A>> b)
+{
+    return Chan<A>{a, b};
+}
+
+constexpr auto toChan = toGFunc<2> | [](auto a, auto b)
+{
+    return toChanImpl(std::move(a), std::move(b));
+};
+
+template <typename A>
+constexpr auto newChanImpl()
+{
+    Id<StreamBase<A>> hole_;
+    Id<StreamPtr<A>> hole;
+    Id<MVar<StreamPtr<A>>> readVar, writeVar;
+    return do_(
+        hole_ <= newEmptyMVar<Item<A>>,
+        hole = toStreamPtr | hole_,
+        readVar <= (newMVar | hole),
+        writeVar <= (newMVar | hole),
+        return_ | (toChan | readVar | writeVar)
+    );
+};
+
+template <typename A>
+inline const auto newChan = newChanImpl<A>();
+
+template <typename A>
+constexpr auto writeChanImpl(Chan<A> chan, A val)
+{
+    auto writeVar = chan[1];
+    Id<MVar<Item<A>>> newHole_;
+    Id<StreamPtr<A>> newHole;
+    Id<StreamPtr<A>> oldHole;
+    return do_(
+        newHole_ <= newEmptyMVar<Item<A>>,
+        newHole = makeShared<Stream<A>> || cast<Stream<A>> | newHole_,
+        oldHole <= (takeMVar | writeVar),
+        putMVar | (cast<StreamBase<A>> | (deref | oldHole)) | (toItem | val | newHole),
+        putMVar | writeVar | newHole
+    );
+};
+
+constexpr auto writeChan = toGFunc<2> | [](auto chan, auto val)
+{
+    return writeChanImpl(chan, val);
+};
+
+template <typename A>
+constexpr auto readChanImpl(Chan<A> chan)
+{
+    auto readVar = chan[0];
+    Id<StreamPtr<A>> stream;
+    Id<StreamBase<A>> stream_;
+    Id<Item<A>> item;
+    return do_(
+        stream <= (takeMVar | readVar),
+        stream_ = cast<StreamBase<A>> || deref | stream,
+        item <= (readMVar || stream_),
+        putMVar | readVar | (snd | item),
+        return_ || fst | item
+    );
+};
+
+constexpr auto readChan = toGFunc<1> | [](auto chan)
+{
+    return readChanImpl(chan);
+};
+
+template <typename A>
+constexpr auto dupChanImpl(Chan<A> chan)
+{
+    auto writeVar = chan[1];
+    Id<StreamPtr<A>> hole;
+    Id<MVar<StreamPtr<A>>> newReadVar;
+    return do_(
+        hole <= (readMVar | writeVar),
+        newReadVar <= (newMVar | hole),
+        return_ | (toChan | newReadVar | writeVar)
+    );
+}
+
+constexpr auto dupChan = toGFunc<1> | [](auto chan)
+{
+    return dupChanImpl(chan);
+};
 } // namespace concurrent
 
 } // namespace hspp

@@ -1138,6 +1138,34 @@ private:
     Repr mFunc;
 };
 
+#if 0
+template <size_t nbArgs, typename Repr>
+class GenericFunction : public CallViaPipe<GenericFunction<nbArgs, Repr>>
+{
+    static_assert(nbArgs > 0);
+public:
+    constexpr GenericFunction(Repr func)
+    : mFunc{std::move(func)}
+    {
+    }
+    template <typename Arg>
+    constexpr auto operator()(Arg&& arg) const
+    {
+        if constexpr (nbArgs == 1)
+        {
+            return mFunc(std::forward<Arg>(arg));
+        }
+        else
+        {
+            auto lamb = [arg=std::forward<Arg>(arg), func=mFunc](auto&&... rest){ return func(arg, std::forward<decltype(rest)>(rest)...); };
+            return GenericFunction<nbArgs-1, std::decay_t<decltype(lamb)>>{std::move(lamb)};
+        }
+    }
+private:
+    Repr mFunc;
+};
+#endif
+
 template <size_t nbArgs, typename Func>
 constexpr auto toGFuncImpl(Func const& func)
 {
@@ -1552,6 +1580,21 @@ template <size_t N=2>
 constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
 {
     return std::make_tuple(std::move(e), std::move(l)...);
+});
+
+constexpr inline auto fst = toGFunc<1>([](auto e)
+{
+    return std::get<0>(e);
+});
+
+constexpr inline auto snd = toGFunc<1>([](auto e)
+{
+    return std::get<1>(e);
+});
+
+constexpr inline auto deref = toGFunc<1>([](auto e)
+{
+    return *e;
 });
 
 template <typename Data>

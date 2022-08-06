@@ -97,13 +97,9 @@ TEST(MVar, 2)
 TEST(MVar, 3)
 {
     Id<MVar<char>> m;
-    auto io_ = do_(
-        m <= newEmptyMVar<char>,
-        takeMVar | m
-    );
-    // stuck
+    auto io_ = newEmptyMVar<char> >>= takeMVar;
+    // Expected to be stuck.
     (void)io_;
-    // io_.run();
 }
 
 class Message : public std::string{};
@@ -418,4 +414,24 @@ TEST(TMVar, 1)
     );
     auto result = io_.run();
     EXPECT_EQ(result, std::make_tuple(10, 20));
+}
+
+TEST(Chan, 1)
+{
+    Id<Chan<int>> a, b;
+    Id<int> x, y;
+    auto io_ = do_(
+        a <= newChan<int>,
+        b <= (dupChan | a),
+        forkIO | (replicateM_ | 20 || writeChan | a | 5),
+        forkIO | (replicateM_ | 10U | doInner(
+            x <= (readChan | a),
+            print | x)),
+        replicateM_ | 10U | doInner(
+            y <= (readChan | b),
+            print | y)
+    );
+    (void)io_;
+    // auto result = io_.run();
+    // EXPECT_EQ(result, _o_);
 }
