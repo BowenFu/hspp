@@ -416,22 +416,35 @@ TEST(TMVar, 1)
     EXPECT_EQ(result, std::make_tuple(10, 20));
 }
 
+TEST(Chan, 0)
+{
+    auto hole_ = newEmptyMVar<Item<int>>.run();
+    auto hole = toStreamPtr | hole_;
+    auto readVar = (newMVar | hole).run();
+}
+
 TEST(Chan, 1)
 {
     Id<Chan<int>> a, b;
     Id<int> x, y;
     auto io_ = do_(
         a <= newChan<int>,
-        b <= (dupChan | a),
-        forkIO | (replicateM_ | 20 || writeChan | a | 5),
-        forkIO | (replicateM_ | 10U | doInner(
-            x <= (readChan | a),
-            print | x)),
-        replicateM_ | 10U | doInner(
-            y <= (readChan | b),
-            print | y)
+        writeChan | a | 5
     );
-    (void)io_;
-    // auto result = io_.run();
-    // EXPECT_EQ(result, _o_);
+    auto result = io_.run();
+    EXPECT_EQ(result, _o_);
+}
+
+TEST(Chan, 2)
+{
+    Id<Chan<int>> a, b;
+    auto io_ = do_(
+        a <= newChan<int>,
+        b <= (dupChan | a),
+        forkIO | (replicateM_ | 10U || writeChan | a | 5),
+        forkIO | (replicateM_ | 10U || readChan | a),
+        replicateM_ | 10U || readChan | b
+    );
+    auto result = io_.run();
+    EXPECT_EQ(result, _o_);
 }
