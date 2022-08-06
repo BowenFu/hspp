@@ -432,6 +432,6 @@ TEST(Chan, 1)
             print | y)
     );
     (void)io_;
-    // auto result = io_.run();
-    // EXPECT_EQ(result, _o_);
+    auto result = io_.run();
+    EXPECT_EQ(result, _o_);
 }
