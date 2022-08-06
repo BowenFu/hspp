@@ -17,6 +17,7 @@ Du Bois, A.R. (2011). An Implementation of Composable Memory Transactions in Has
 #include <map>
 #include <typeindex>
 #include <set>
+#include <array>
 
 using namespace hspp;
 using namespace hspp::data;
