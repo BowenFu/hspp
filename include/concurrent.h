@@ -110,7 +110,7 @@ struct MVar
     std::shared_ptr<T> data = std::make_shared<T>();
     MVar() = default;
     MVar(A a)
-    : data{std::make_shared<T>(a)}
+    : data{std::make_shared<T>(std::make_optional(std::move(a)))}
     {}
 };
 
