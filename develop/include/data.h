@@ -742,6 +742,11 @@ constexpr inline auto snd = toGFunc<1>([](auto e)
     return std::get<1>(e);
 });
 
+constexpr inline auto deref = toGFunc<1>([](auto e)
+{
+    return *e;
+});
+
 template <typename Data>
 class DataHolder
 {
