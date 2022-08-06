@@ -1246,10 +1246,15 @@ constexpr auto putTMVar = toGFunc<2> | [](auto t, auto a)
 };
 
 template <typename A>
+struct Stream;
+
+template <typename A>
+using Item = std::pair<A, std::unique_ptr<Stream<A>>>;
+
+template <typename A>
 struct Stream
 {
-    using Item = std::pair<A, std::unique_ptr<Stream<A>>>;
-    MVar<Item> data;
+    MVar<Item<A>> data;
 };
 
 constexpr auto toItem = toGFunc<2> | [](auto a, auto b)
@@ -1257,7 +1262,7 @@ constexpr auto toItem = toGFunc<2> | [](auto a, auto b)
     using A = decltype(a);
     using B = decltype(b);
     static_assert(std::is_same_v<std::unique_ptr<Stream<A>>, B>);
-    return typename Stream<A>::Item{a, b};
+    return Item<A>{a, b};
 };
 
 template <typename A>
@@ -1304,6 +1309,25 @@ constexpr auto writeChanImpl(Chan<A> chan, A val)
 constexpr auto writeChan = toGFunc<2> | [](auto chan, auto val)
 {
     return writeChanImpl(chan, val);
+};
+
+template <typename A>
+constexpr auto readChanImpl(Chan<A> chan)
+{
+    auto readVar = chan[0];
+    Id<MVar<Stream<A>>> stream;
+    Id<Item<A>> item;
+    return do_(
+        stream <= (takeMVar | readVar),
+        item <= (readMVar | stream),
+        putMVar | readVar | (snd | item),
+        return_ || fst | item
+    );
+};
+
+constexpr auto readChan = toGFunc<1> | [](auto chan)
+{
+    return readChanImpl(chan);
 };
 
 } // namespace concurrent

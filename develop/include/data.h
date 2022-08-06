@@ -732,6 +732,16 @@ constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
     return std::make_tuple(std::move(e), std::move(l)...);
 });
 
+constexpr inline auto fst = toGFunc<1>([](auto e)
+{
+    return std::get<0>(e);
+});
+
+constexpr inline auto snd = toGFunc<1>([](auto e)
+{
+    return std::get<1>(e);
+});
+
 template <typename Data>
 class DataHolder
 {
