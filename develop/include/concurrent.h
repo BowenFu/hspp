@@ -1268,7 +1268,7 @@ template <typename A>
 constexpr auto toStreamPtrImpl(StreamBase<A> sb)
 {
     return std::make_shared<Stream<A>>(Stream<A>{std::move(sb)});
-};
+}
 
 constexpr auto toStreamPtr = toGFunc<1> | [](auto sb)
 {
