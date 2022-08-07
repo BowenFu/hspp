@@ -21,7 +21,6 @@ Du Bois, A.R. (2011). An Implementation of Composable Memory Transactions in Has
 
 using namespace hspp;
 using namespace hspp::data;
-using namespace hspp::parser;
 using namespace std::literals;
 using namespace hspp::doN;
 

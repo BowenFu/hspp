@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
-#include "hspp.h"
+#include "range.h"
+#include "data.h"
+#include "typeclass.h"
+#include "do_notation.h"
 #include "concurrent.h"
 
 using namespace hspp::data;
-using namespace hspp::parser;
 using namespace std::literals;
 using namespace hspp::doN;
 using namespace hspp::concurrent;
