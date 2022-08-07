@@ -313,9 +313,9 @@ constexpr auto readIORef = toGFunc<1> | [](auto const& ioRef)
     });
 };
 
-IORef<Integer> idref = (newIORef | Integer{0}).run();
+inline IORef<Integer> idref = (newIORef | Integer{0}).run();
 
-IO<Integer> newID = []
+inline IO<Integer> newID = []
 {
     Id<Integer> cur;
     Id<bool> changed;
@@ -369,7 +369,7 @@ struct RSE
     IORef<std::vector<MVar<_O_>>> waitQueue;
 };
 
-bool operator<(RSE const& lhs, RSE const& rhs)
+inline constexpr bool operator<(RSE const& lhs, RSE const& rhs)
 {
     auto result = (lhs.id <compare> rhs.id);
     return result == Ordering::kLT;
@@ -386,8 +386,8 @@ constexpr auto writeIORef = toGFunc<2> | [](auto const& ioRef, auto const& data)
 
 
 using AnyCommitters = std::map<const std::type_index, std::function<void(std::any)>>;
-// TODO: move definition to cpp
-AnyCommitters& anyCommitters()
+// inline is ok? Move to cpp otherwise. Or choose to use virtual dispatch instead of map.
+inline AnyCommitters& anyCommitters()
 {
     static AnyCommitters committers{};
     return committers;
@@ -471,7 +471,8 @@ constexpr auto getWriteSet = toFunc<> | [](TState ts)
     return ts.writeSet;
 };
 
-IORef<Integer> globalClock{initIORef<Integer>(1)};
+// inline ok? unique for each translation unit?
+inline IORef<Integer> globalClock{initIORef<Integer>(1)};
 
 constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> IO<Integer>
 {
@@ -577,8 +578,7 @@ class Applicative<concurrent::STM>
 public:
     constexpr static auto pure = toGFunc<1> | [](auto x)
     {
-        using A = decltype(x);
-        return concurrent::toSTM | [=](auto tState) { return ioData(concurrent::toValid | tState | x); };
+        return concurrent::toSTM | [=](concurrent::TState tState) { return ioData(concurrent::toValid | tState | x); };
     };
 };
 
@@ -754,10 +754,9 @@ constexpr auto readTVar = toGFunc<1> | [](auto tvar)
     return readTVarImpl(tvar);
 };
 
-
 constexpr auto myTId = io([]() -> TId
 {
-    TId result = 2 * std::hash<std::thread::id>{}(std::this_thread::get_id());
+    TId result = 2 * static_cast<Integer>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
     return result;
 });
 
@@ -787,7 +786,6 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
 {
     return io([=]() -> std::pair<bool, std::vector<std::pair<IORef<Integer>, Lock>>>
     {
-        bool success = true;
         std::vector<std::pair<IORef<Integer>, Lock>> locks;
         for (auto [_, wse] : wsList)
         {
@@ -817,7 +815,7 @@ constexpr auto getLocks = toGFunc<2> | [](auto tid, auto wsList)
     });
 };
 
-auto validateReadSet2(typename ReadSet::Data rseLst, Integer readStamp, Integer myid)
+inline auto validateReadSet2(typename ReadSet::Data rseLst, Integer readStamp, Integer myid)
 {
     return io([=]() -> bool
     {
@@ -874,7 +872,7 @@ constexpr auto validateReadSet = toGFunc<3> | [](auto ioReadSet, Integer readSta
 // https://en.cppreference.com/w/cpp/utility/any/type
 // any_committer
 
-auto commitAny(std::any wseData)
+inline auto commitAny(std::any wseData)
 {
     auto idx = std::type_index(wseData.type());
     auto iter = anyCommitters().find(idx);
@@ -1031,7 +1029,7 @@ auto atomicallyImpl(STM<A, Func> const& stmac) -> IO<A>
                         return atomicallyImpl(stmac).run();
                     }
                 },
-                [=](Invalid const& nts)
+                [=](Invalid const&)
                 {
                     return atomicallyImpl(stmac).run();
                 }
@@ -1145,7 +1143,7 @@ auto orElseImpl(STM<A, Repr1> const& s1, STM<A, Repr2> const& s2)
                             auto fTState = (mergeTStates | nTState2 | nTState1).run();
                             return (toValid | fTState | r);
                         },
-                        [=](Invalid const& invalid2) -> TRes2Type
+                        [=](Invalid const&) -> TRes2Type
                         {
                             return tRes2;
                         }), static_cast<TResultBase<A> const&>(tRes2));

@@ -1,9 +1,5 @@
 #include <gtest/gtest.h>
-#include "range.h"
-#include "data.h"
-#include "typeclass.h"
-#include "do_notation.h"
-#include "concurrent.h"
+#include "hspp.h"
 
 using namespace hspp::data;
 using namespace std::literals;
