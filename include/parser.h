@@ -57,26 +57,6 @@ constexpr auto char_ = toFunc<> | [](char c)
     return sat | (data::equalTo | c);
 };
 
-template <typename Func>
-class YCombinator
-{
-    Func mFunc;
-public:
-    constexpr YCombinator(Func func)
-    : mFunc{std::move(func)}
-    {}
-    template <typename... Args>
-    constexpr auto operator()(Args&&... args) const
-    {
-        return mFunc(*this, args...);
-    }
-};
-
-constexpr auto yCombinator = toGFunc<1> | [](auto func)
-{
-    return YCombinator<decltype(func)>{std::move(func)};
-};
-
 class StringParser;
 
 inline auto stringImpl(std::string const& cs)

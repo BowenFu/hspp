@@ -890,6 +890,26 @@ constexpr auto odd = toGFunc<1> | [](auto n)
     return !(even | n);
 };
 
+template <typename Func>
+class YCombinator
+{
+    Func mFunc;
+public:
+    constexpr YCombinator(Func func)
+    : mFunc{std::move(func)}
+    {}
+    template <typename... Args>
+    constexpr auto operator()(Args&&... args) const
+    {
+        return mFunc(*this, args...);
+    }
+};
+
+constexpr auto yCombinator = toGFunc<1> | [](auto func)
+{
+    return YCombinator<decltype(func)>{std::move(func)};
+};
+
 } // namespace hspp
 
 #endif // HSPP_DATA_H
