@@ -1494,8 +1494,6 @@ TEST(MapM_, IO)
 
 TEST(MapM, IO)
 {
-    testing::internal::CaptureStdout();
-
     const auto lst = std::vector{"3"s, "4"s};
     const auto func = hspp::Monad<IO>::return_ <o> hspp::read<int>;
     const auto mapMResult = mapM | func | lst;
@@ -1506,7 +1504,21 @@ TEST(MapM, IO)
 
 TEST(catch_, 1)
 {
-    
+    auto io_ = io([]{
+        throw std::runtime_error{"Some error"};
+        return 1;
+    });
+    auto newIo = io_ <catch_> [](std::runtime_error const& re)
+    {
+        return io([=]{
+            std::cout << re.what() << std::endl;
+            return 2;
+        });
+    };
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(newIo.run(), 2);
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output, "Some error\n");
 }
 
 TEST(even, 1)

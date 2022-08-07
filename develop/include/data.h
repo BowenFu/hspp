@@ -932,19 +932,19 @@ public:
     using RetT = Ret;
     using ArgsT = std::tuple<Args...>;
     template <size_t I>
-    using Arg = std::tuple_element<I, ArgsT>;
+    using Arg = std::tuple_element_t<I, ArgsT>;
 };
 
 template <typename A, typename Func, typename Handler>
-constexpr auto catchImpl(data::IO<A, Func> const& io, Handler handler)
+constexpr auto catchImpl(data::IO<A, Func> const& io_, Handler handler)
 {
     // extract exception type from Hanlder arg
     using HandlerTrait = FunctionTrait<decltype(&Handler::operator())>;
     using ExceptionT = typename HandlerTrait::template Arg<0>;
-    return io([=]{
+    return data::io([=]{
         try
         {
-            return io.run();
+            return io_.run();
         }
         catch (ExceptionT const& e)
         {
