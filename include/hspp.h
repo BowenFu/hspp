@@ -5527,7 +5527,7 @@ constexpr auto newChanImpl()
         writeVar <= (newMVar | hole),
         return_ | (toChan | readVar | writeVar)
     );
-};
+}
 
 template <typename A>
 inline const auto newChan = newChanImpl<A>();
@@ -5546,7 +5546,7 @@ constexpr auto writeChanImpl(Chan<A> chan, A val)
         putMVar | (cast<StreamBase<A>> | (deref | oldHole)) | (toItem | val | newHole),
         putMVar | writeVar | newHole
     );
-};
+}
 
 constexpr auto writeChan = toGFunc<2> | [](auto chan, auto val)
 {
@@ -5567,7 +5567,7 @@ constexpr auto readChanImpl(Chan<A> chan)
         putMVar | readVar | (snd | item),
         return_ || fst | item
     );
-};
+}
 
 constexpr auto readChan = toGFunc<1> | [](auto chan)
 {
