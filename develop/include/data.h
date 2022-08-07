@@ -907,6 +907,57 @@ constexpr auto mapM_ = toGFunc<2> | [](auto func, auto lst)
     });
 };
 
+// For io
+constexpr auto mapM = toGFunc<2> | [](auto func, auto lst)
+{
+    return data::io([=]
+    {
+        using Data = std::decay_t<decltype(func(lst.front()).run())>;
+        std::vector<Data> result;
+        for (auto e : lst)
+        {
+            result.emplace_back(func(e).run());
+        }
+        return result;
+    });
+};
+
+template <typename Func>
+class FunctionTrait;
+
+template <typename Func, typename Ret, typename... Args>
+class FunctionTrait<Ret(Func::*)(Args...) const>
+{
+public:
+    using RetT = Ret;
+    using ArgsT = std::tuple<Args...>;
+    template <size_t I>
+    using Arg = std::tuple_element_t<I, ArgsT>;
+};
+
+template <typename A, typename Func, typename Handler>
+constexpr auto catchImpl(data::IO<A, Func> const& io_, Handler handler)
+{
+    // extract exception type from Hanlder arg
+    using HandlerTrait = FunctionTrait<decltype(&Handler::operator())>;
+    using ExceptionT = typename HandlerTrait::template Arg<0>;
+    return data::io([=]{
+        try
+        {
+            return io_.run();
+        }
+        catch (ExceptionT const& e)
+        {
+            return handler(e).run();
+        }
+    });
+}
+
+constexpr auto catch_ = toGFunc<2> | [](auto io, auto handler)
+{
+    return catchImpl(io, handler);
+};
+
 constexpr auto even = toGFunc<1> | [](auto n)
 {
     static_assert(std::is_integral_v<decltype(n)>);
