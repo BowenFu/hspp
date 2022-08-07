@@ -23,6 +23,7 @@ Here you are!
 ### Sample 1 for monadic do notation
 
 [godbolt1]: https://godbolt.org/z/7fTvTd3hT
+
 [![Try it on godbolt][badge.godbolt]][godbolt1]
 
 ```c++
@@ -75,6 +76,10 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
+[godbolt3]: https://godbolt.org/z/cEPzfhfx6
+
+[![Try it on godbolt][badge.godbolt]][godbolt3]
+
 ```c++
 Id<char> x;
 auto const digit = do_(
@@ -102,6 +107,11 @@ extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ### Sample 4 for STM / concurrent
 
 [concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
+
+[godbolt4]: https://godbolt.org/z/naenvnq87
+
+[![Try it on godbolt][badge.godbolt]][godbolt4]
+
 
 Transfer from one account to another one atomically.
 ```c++
