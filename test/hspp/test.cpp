@@ -1492,6 +1492,23 @@ TEST(MapM_, IO)
     EXPECT_EQ(output1, "3\n4\n");
 }
 
+TEST(MapM, IO)
+{
+    testing::internal::CaptureStdout();
+
+    const auto lst = std::vector{"3"s, "4"s};
+    const auto func = hspp::Monad<IO>::return_ <o> hspp::read<int>;
+    const auto mapMResult = mapM | func | lst;
+
+    const auto expected = std::vector{3, 4};
+    EXPECT_EQ(mapMResult.run(), expected);
+}
+
+TEST(catch_, 1)
+{
+    
+}
+
 TEST(even, 1)
 {
     EXPECT_FALSE(even(3));
