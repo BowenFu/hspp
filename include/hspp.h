@@ -1780,6 +1780,8 @@ constexpr auto catch_ = toGFunc<2> | [](auto io, auto handler)
     return catchImpl(io, handler);
 };
 
+constexpr auto handle = flip | catch_;
+
 constexpr auto even = toGFunc<1> | [](auto n)
 {
     static_assert(std::is_integral_v<decltype(n)>);
