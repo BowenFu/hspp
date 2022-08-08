@@ -22,7 +22,9 @@ Here you are!
 
 ### Sample 1 for monadic do notation
 
-[godbolt1]: https://godbolt.org/z/7fTvTd3hT
+Filter even numbers.
+
+[godbolt1]: https://godbolt.org/z/MM7MW9MPY
 
 [![Try it on godbolt][badge.godbolt]][godbolt1]
 
@@ -39,8 +41,15 @@ Here you are!
 
 ### Sample 2 for monad comprehension
 
+Obtain an infinite range of Pythagorean triples.
 
-[godbolt2]: https://godbolt.org/z/M8Ynjvr3x
+Haskell version
+
+```haskell
+triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2]
+```
+
+[godbolt2]: https://godbolt.org/z/nnKozMYzo
 
 [![Try it on godbolt][badge.godbolt]][godbolt2]
 
@@ -76,7 +85,7 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
-[godbolt3]: https://godbolt.org/z/cEPzfhfx6
+[godbolt3]: https://godbolt.org/z/T194sG8TY
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
 
@@ -101,14 +110,14 @@ auto const factor =
 
 auto const term = factor <chainl1> mulOp;
 
-extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
+TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
 ### Sample 4 for STM / concurrent
 
 [concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
 
-[godbolt4]: https://godbolt.org/z/naenvnq87
+[godbolt4]: https://godbolt.org/z/azYehhd36
 
 [![Try it on godbolt][badge.godbolt]][godbolt4]
 

@@ -1,4 +1,5 @@
 #include "hspp.h"
+#include "parser.h"
 #include <cassert>
 
 auto expectTrue(bool x)
@@ -99,7 +100,7 @@ auto const factor =
 
 auto const term = factor <chainl1> mulOp;
 
-extern TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
+TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 
 int main()
 {
