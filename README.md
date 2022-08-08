@@ -85,7 +85,7 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
-[godbolt3]: https://godbolt.org/z/T194sG8TY
+[godbolt3]: https://godbolt.org/z/afxfTxze5
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
 
