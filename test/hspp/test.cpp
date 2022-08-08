@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "hspp.h"
+#include "parser.h"
 #include <vector>
 #include <list>
 #include <cmath>
