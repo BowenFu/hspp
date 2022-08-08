@@ -1509,17 +1509,24 @@ TEST(catch_, 1)
         throw std::runtime_error{"Some error"};
         return 1;
     });
-    auto newIo = io_ <catch_> [](std::runtime_error const& re)
+    auto handler = [](std::runtime_error const& re)
     {
         return io([=]{
             std::cout << re.what() << std::endl;
             return 2;
         });
     };
+    auto newIo = io_ <catch_> handler;
     testing::internal::CaptureStdout();
     EXPECT_EQ(newIo.run(), 2);
     std::string output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(output, "Some error\n");
+
+    auto newIo2 = handler <handle> io_ ;
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(newIo2.run(), 2);
+    std::string output2 = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(output2, "Some error\n");
 }
 
 TEST(even, 1)

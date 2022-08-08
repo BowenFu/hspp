@@ -1,5 +1,7 @@
 # hspp
 
+![hspp](./hspp.svg)
+
 ## hspp: bring Haskell Style Programming to C++.
 
 ![Standard](https://img.shields.io/badge/c%2B%2B-17/20-blue.svg)
