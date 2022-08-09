@@ -217,4 +217,4 @@ Discussions / issues / PRs are welcome.
 
 ## Related
 
-Haskell pattern matching is not covered in this repo. You may be interested in [matchit(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.
+Haskell pattern matching is not covered in this repo. You may be interested in [match(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.
