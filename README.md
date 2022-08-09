@@ -87,7 +87,7 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
-[godbolt3]: https://godbolt.org/z/afxfTxze5
+[godbolt3]: https://godbolt.org/z/r7WTYjGYa
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
 
@@ -119,7 +119,7 @@ TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 
 [concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
 
-[godbolt4]: https://godbolt.org/z/azYehhd36
+[godbolt4]: https://godbolt.org/z/zj9Mc1h4h
 
 [![Try it on godbolt][badge.godbolt]][godbolt4]
 
