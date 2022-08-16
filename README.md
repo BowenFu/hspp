@@ -68,7 +68,31 @@ triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2
     );
 ```
 
-### Sample 3 for parser combinator
+### Sample 3 for Function Monad used in do notation
+
+We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
+
+[godbolt3]: https://godbolt.org/z/c7EonM1Pq
+
+[![Try it on godbolt][badge.godbolt]][godbolt3]
+
+```c++
+    auto plus1 = toFunc<> | [](int x){ return 1+x; };
+    auto showStr = toFunc<> | [](int x){ return show | x; };
+
+    Id<int> x;
+    Id<std::string> y;
+    auto go = do_(
+        x <= plus1,
+        y <= showStr,
+        return_ || makeTuple<2> | x | y
+    );
+    auto result = go | 3;
+    std::cout << std::get<0>(result) << std::endl;
+    std::cout << std::get<1>(result) << std::endl;
+```
+
+### Sample 4 for parser combinator
 
 Original haskell version [Monadic Parsing in Haskell](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/monadic-parsing-in-haskell/E557DFCCE00E0D4B6ED02F3FB0466093)
 
@@ -87,9 +111,9 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
-[godbolt3]: https://godbolt.org/z/r7WTYjGYa
+[godbolt4]: https://godbolt.org/z/r7WTYjGYa
 
-[![Try it on godbolt][badge.godbolt]][godbolt3]
+[![Try it on godbolt][badge.godbolt]][godbolt4]
 
 ```c++
 Id<char> x;
@@ -115,13 +139,13 @@ auto const term = factor <chainl1> mulOp;
 TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
-### Sample 4 for STM / concurrent
+### Sample 5 for STM / concurrent
 
 [concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
 
-[godbolt4]: https://godbolt.org/z/zj9Mc1h4h
+[godbolt5]: https://godbolt.org/z/zj9Mc1h4h
 
-[![Try it on godbolt][badge.godbolt]][godbolt4]
+[![Try it on godbolt][badge.godbolt]][godbolt5]
 
 
 Transfer from one account to another one atomically.
