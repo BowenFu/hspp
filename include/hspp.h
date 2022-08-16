@@ -1849,6 +1849,12 @@ struct DataTrait<Class<Data, Rest...>>
     using ReplaceDataTypeWith = Class<DataT>;
 };
 
+template <typename Repr, typename Ret, typename... Rest>
+struct DataTrait<data::Function<Repr, Ret, Rest...>>
+{
+    using Type = Ret;
+};
+
 template <typename A, typename Repr>
 struct DataTrait<data::Parser<A, Repr>>
 {
@@ -3899,7 +3905,7 @@ BIN_OP_FOR_NULLARY(-)
 template <typename T, typename BodyBaker>
 constexpr auto funcWithParams(Id<T> const& param, BodyBaker const& bodyBaker)
 {
-    return [=](T const& t)
+    return toFunc<> | [=](T const& t)
     {
         // bind before baking body.
         param.bind(t);
