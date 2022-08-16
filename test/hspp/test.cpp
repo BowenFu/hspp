@@ -1534,3 +1534,20 @@ TEST(even, 1)
     EXPECT_FALSE(even(3));
     EXPECT_TRUE(even(4L));
 }
+
+TEST(doNotation, func)
+{
+    auto plus1 = toFunc<> | [](int x){ return 1+x; };
+    auto showStr = toFunc<> | [](int x){ return show | x; };
+
+    using namespace hspp::doN;
+    Id<int> x;
+    Id<std::string> y;
+    auto go = do_(
+        x <= plus1,
+        y <= showStr,
+        return_ || makeTuple<2> | x | y
+    );
+    auto result = go | 3;
+    EXPECT_EQ(result, std::make_tuple(4, "3"));
+}
