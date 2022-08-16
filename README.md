@@ -72,7 +72,7 @@ triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2
 
 We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
 
-[godbolt3]: https://godbolt.org/z/c7EonM1Pq
+[godbolt3]: https://godbolt.org/z/d58Ezbxjz
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
 
