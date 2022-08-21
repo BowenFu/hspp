@@ -1,5 +1,6 @@
 #include "hspp.h"
 #include <memory>
+#include <variant>
 #include <cassert>
 
 auto expectTrue(bool x)
