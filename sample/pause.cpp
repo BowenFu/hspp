@@ -83,12 +83,31 @@ const auto pauseExample = toRun || toTEIO | do_(
   ))
 );
 
-// runN :: Monad m => Int -> Pause m -> m (Pause m)
-// runN 0 p = return p
-// runN _ Done = return Done
-// runN n (Run m)
-//   | n < 0     = fail "Invalid argument to runN" -- ewww I just used fail.
-//   | otherwise = m >>= runN (n - 1)
+template <template <typename...> class M>
+constexpr auto runNImpl(int n, PausePtr<M> p);
+
+constexpr auto runN = toGFunc<2> | [](int n, auto p)
+{
+    return runNImpl(n, p);
+};
+
+template <template <typename...> class M>
+constexpr auto runNImpl(int n, PausePtr<M> p)
+{
+    return ioData([=]{
+
+        if (n == 0)
+        {
+            return p;
+        }
+        if (p == done<IO>)
+        {
+            return done<IO>;
+        }
+        assert (n >= 0);
+        return (std::get<Run>(*p).data >>= (runN | (n-1))).run();
+    });
+}
 
 // fullRun :: Monad m => Pause m -> m ()
 // fullRun Done = return ()
