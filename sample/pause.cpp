@@ -3,6 +3,7 @@
 #include <variant>
 #include <cassert>
 
+#if defined(DISABLE_FOR_CLANG)
 auto expectTrue(bool x)
 {
     if (!x)
@@ -144,3 +145,10 @@ int main()
 
     return 0;
 }
+
+#else
+int main()
+{
+    return 0;
+}
+#endif
