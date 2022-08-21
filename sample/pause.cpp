@@ -38,6 +38,8 @@ struct Run;
 
 class Done{};
 
+constexpr Done done_{};
+
 template <template <typename...> class M>
 using Pause = std::variant<Run<M>, Done>;
 
@@ -51,7 +53,7 @@ struct Run
 };
 
 template <template <typename...> class M>
-const auto done = std::make_shared<Pause<M>>(Done{});
+const auto done = std::make_shared<Pause<M>>(done_);
 
 template <template <typename...> class M, typename... Ts>
 constexpr auto toRunImpl(M<PausePtr<M>, Ts...> d) -> PausePtr<M>
