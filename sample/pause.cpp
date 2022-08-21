@@ -113,7 +113,7 @@ constexpr auto fullRunImpl(PausePtr<M> p) -> M<_O_>
         }
         return (std::get<Run<M>>(*p).data >>= ([](auto p){ return fullRunImpl(p); })).run();
     });
-};
+}
 
 constexpr auto fullRun = toGFunc<1> | [](auto p)
 {
