@@ -10,3 +10,19 @@ foreach(sample ${hspp_SAMPLES})
     set_target_properties(${sample} PROPERTIES CXX_EXTENSIONS OFF)
     add_test(${sample} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sample})
 endforeach()
+
+set_tests_properties(pause
+    PROPERTIES PASS_REGULAR_EXPRESSION
+"Let's begin
+Step 1
+Step 2
+=== should print through step 2 ===
+Step 3
+Yay, we're done!
+Step 3
+Yay, we're done!
+Let's begin
+Step 1
+Step 2
+Step 3
+Yay, we're done!")

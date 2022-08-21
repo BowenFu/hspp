@@ -109,27 +109,37 @@ constexpr auto runNImpl(int n, PausePtr<M> p) -> M<PausePtr<M>>
     });
 }
 
-// fullRun :: Monad m => Pause m -> m ()
-// fullRun Done = return ()
-// fullRun (Run m) = m >>= fullRun
+template <template <typename...> class M>
+constexpr auto fullRunImpl(PausePtr<M> p) -> M<_O_>
+{
+    return toTEIO | io([=]() -> _O_
+    {
+        if (p == done<IO>)
+        {
+            return _o_;
+        }
+        return (std::get<Run<M>>(*p).data >>= ([](auto p){ return fullRunImpl(p); })).run();
+    });
+};
 
-// -- show Check the result
+constexpr auto fullRun = toGFunc<1> | [](auto p)
+{
+    return fullRunImpl(p);
+};
+
 int main()
 {
-    // auto main_ = do_(
-    // rest <- runN 2 pauseExample1
-    // putStrLn "=== should print through step 2 ==="
-    // Done <- runN 1 rest
-    // -- remember, IO Foo is just a recipe for Foo, not a Foo itself
-    // -- so we can run that recipe again
-    // fullRun rest
-    // fullRun pauseExample1
-    // );
-    auto main_ = runN | 2 | pauseExample;
+    Id<PausePtr<IO>> rest;
+    auto main_ = do_(
+        rest <= (runN | 2 | pauseExample),
+        putStrLn | "=== should print through step 2 ===",
+        runN | 1 | rest,
+        // remember, IO Foo is just a recipe for Foo, not a Foo itself
+        // so we can run that recipe again
+        fullRun | rest,
+        fullRun | pauseExample
+    );
     main_.run();
-
-    auto main5 = runN | 5 | pauseExample;
-    main5.run();
 
     return 0;
 }
