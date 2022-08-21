@@ -57,7 +57,7 @@ public:
 };
 
 template <template <typename...> class M>
-const auto done = std::make_shared<Pause<M>>(Done{});
+const auto done = std::make_shared<Pause<M>>(PauseBase<M>{Done{}});
 
 template <template <typename...> class M>
 constexpr auto toRunImpl(M<PausePtr<M>> d) -> PausePtr<M>
