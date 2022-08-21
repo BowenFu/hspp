@@ -33,7 +33,12 @@ using namespace std::literals;
 //   | Done
 
 template <template <typename...> class M>
-class Pause;
+struct Run;
+
+class Done{};
+
+template <template <typename...> class M>
+using Pause = std::variant<Run<M>, Done>;
 
 template <template <typename...> class M>
 using PausePtr = std::shared_ptr<Pause<M>>;
@@ -44,20 +49,8 @@ struct Run
     M<PausePtr<M>> data;
 };
 
-class Done{};
-
 template <template <typename...> class M>
-using PauseBase = std::variant<Run<M>, Done>;
-
-template <template <typename...> class M>
-class Pause : public PauseBase<M>
-{
-public:
-    using PauseBase<M>::PauseBase;
-};
-
-template <template <typename...> class M>
-const auto done = std::make_shared<Pause<M>>(PauseBase<M>{Done{}});
+const auto done = std::make_shared<Pause<M>>(Done{});
 
 template <template <typename...> class M>
 constexpr auto toRunImpl(M<PausePtr<M>> d) -> PausePtr<M>
