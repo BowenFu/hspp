@@ -45,9 +45,14 @@ struct Producing
   M<ProducerState<O, I, M, R>> resume;
 };
 
-// data ProducerState o i m r
-//   = Produced o (Consuming r m i o)
-//   | Done r
+// template <>
+// class Functor<Producing>
+// {
+//   constexpr auto fmap = toGFunc<2> | [](auto f, auto p)
+//   {
+//     return Producing{};
+//   };
+// };
 
 // instance (Functor m) => Functor (Producing o i m) where
 //    fmap f p = Producing $ fmap (fmap f) (resume p)
