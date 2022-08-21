@@ -56,7 +56,7 @@ template <template <typename...> class M>
 constexpr auto toRunImpl(M<PausePtr<M>> d) -> PausePtr<M>
 {
     return std::make_shared<Pause<M>>(Run<M>{d});
-};
+}
 
 constexpr auto toRun = toGFunc<1> | [](auto d)
 {
