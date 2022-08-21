@@ -1282,6 +1282,9 @@ private:
     Func mFunc;
 };
 
+template <typename Data>
+using TEIO = IO<Data, std::function<Data()>>;
+
 template <typename... Ts>
 class IsIO : public std::false_type
 {};
@@ -1307,7 +1310,7 @@ constexpr auto ioData(Data data)
 template <typename Data, typename Func>
 constexpr auto toTEIOImpl(IO<Data, Func> const& p)
 {
-    return IO<Data>{[p]{
+    return TEIO<Data>{[p]{
         return p.run();
     }};
 }
