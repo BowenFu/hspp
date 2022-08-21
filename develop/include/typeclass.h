@@ -31,6 +31,12 @@ struct DataTrait<Class<Data, Rest...>>
     using ReplaceDataTypeWith = Class<DataT>;
 };
 
+template <typename Repr, typename Ret, typename... Rest>
+struct DataTrait<data::Function<Repr, Ret, Rest...>>
+{
+    using Type = Ret;
+};
+
 template <typename A, typename Repr>
 struct DataTrait<data::Parser<A, Repr>>
 {

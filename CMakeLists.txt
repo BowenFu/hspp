@@ -20,6 +20,13 @@ list(APPEND
     "$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-Wall;-Wextra;-pedantic;-Werror;-Wno-parentheses;-Wno-shadow;-Wconversion;-Wsign-conversion>"
         "$<$<CXX_COMPILER_ID:MSVC>:/W4>") # /WX for -Werror
 
+list(APPEND
+    BASE_COMPILE_FLAGS
+    "$<$<CXX_COMPILER_ID:Clang>:-DFOR_CLANG>"
+    "$<$<CXX_COMPILER_ID:AppleClang>:-DFOR_APPLECLANG>"
+    "$<$<CXX_COMPILER_ID:CNU>:-DFOR_GNU>"
+    )
+
 # Fix atomic lib linking for gcc.
 list(APPEND
     BASE_ADDITIONAL_LIBS
