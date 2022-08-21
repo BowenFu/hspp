@@ -84,7 +84,7 @@ const auto pauseExample = toRun || toTEIO | do_(
 );
 
 template <template <typename...> class M>
-constexpr auto runNImpl(int n, PausePtr<M> p);
+constexpr auto runNImpl(int n, PausePtr<M> p) -> M<PausePtr<M>>;
 
 constexpr auto runN = toGFunc<2> | [](int n, auto p)
 {
@@ -92,10 +92,10 @@ constexpr auto runN = toGFunc<2> | [](int n, auto p)
 };
 
 template <template <typename...> class M>
-constexpr auto runNImpl(int n, PausePtr<M> p)
+constexpr auto runNImpl(int n, PausePtr<M> p) -> M<PausePtr<M>>
 {
-    return ioData([=]{
-
+    return toTEIO | io([=]() -> PausePtr<M>
+    {
         if (n == 0)
         {
             return p;
@@ -105,7 +105,7 @@ constexpr auto runNImpl(int n, PausePtr<M> p)
             return done<IO>;
         }
         assert (n >= 0);
-        return (std::get<Run>(*p).data >>= (runN | (n-1))).run();
+        return (std::get<Run<M>>(*p).data >>= ([n](auto p){ return runNImpl(n-1, p); })).run();
     });
 }
 
@@ -114,16 +114,22 @@ constexpr auto runNImpl(int n, PausePtr<M> p)
 // fullRun (Run m) = m >>= fullRun
 
 // -- show Check the result
-// main = do
-//   rest <- runN 2 pauseExample1
-//   putStrLn "=== should print through step 2 ==="
-//   Done <- runN 1 rest
-//   -- remember, IO Foo is just a recipe for Foo, not a Foo itself
-//   -- so we can run that recipe again
-//   fullRun rest
-//   fullRun pauseExample1
-
 int main()
 {
+    // auto main_ = do_(
+    // rest <- runN 2 pauseExample1
+    // putStrLn "=== should print through step 2 ==="
+    // Done <- runN 1 rest
+    // -- remember, IO Foo is just a recipe for Foo, not a Foo itself
+    // -- so we can run that recipe again
+    // fullRun rest
+    // fullRun pauseExample1
+    // );
+    auto main_ = runN | 2 | pauseExample;
+    main_.run();
+
+    auto main5 = runN | 5 | pauseExample;
+    main5.run();
+
     return 0;
 }
