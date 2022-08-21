@@ -51,7 +51,7 @@ struct Run
 };
 
 template <template <typename...> class M>
-const auto done = std::make_shared<Pause<M>>(Pause<M>{Done{}});
+const auto done = std::make_shared<Pause<M>>(Done{});
 
 template <template <typename...> class M, typename... Ts>
 constexpr auto toRunImpl(M<PausePtr<M>, Ts...> d) -> PausePtr<M>
