@@ -3,7 +3,7 @@
 #include <variant>
 #include <cassert>
 
-#if defined(!FOR_CLANG)
+#if !defined(FOR_CLANG)
 auto expectTrue(bool x)
 {
     if (!x)
@@ -151,4 +151,4 @@ int main()
 {
     return 0;
 }
-#endif // defined(!FOR_CLANG)
+#endif // !defined(FOR_CLANG)
