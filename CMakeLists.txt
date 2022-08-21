@@ -22,9 +22,9 @@ list(APPEND
 
 list(APPEND
     BASE_COMPILE_FLAGS
-    "$<$<CXX_COMPILER_ID:Clang>:-DDISABLE_FOR_CLANG>"
-    "$<$<CXX_COMPILER_ID:AppleClang>:-DDISABLE_FOR_APPLECLANG>"
-    "$<$<CXX_COMPILER_ID:CNU>:-DDISABLE_FOR_GNU>"
+    "$<$<CXX_COMPILER_ID:Clang>:-DFOR_CLANG>"
+    "$<$<CXX_COMPILER_ID:AppleClang>:-DFOR_APPLECLANG>"
+    "$<$<CXX_COMPILER_ID:CNU>:-DFOR_GNU>"
     )
 
 # Fix atomic lib linking for gcc.
