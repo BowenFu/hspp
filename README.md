@@ -68,6 +68,34 @@ triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2
     );
 ```
 
+Equivalent version using RangeV3 would be [link](http://ericniebler.com/2014/04/27/range-comprehensions/)
+
+```C++
+using namespace ranges;
+
+// Lazy ranges for generating integer sequences
+auto const intsFrom = view::iota;
+auto const ints = [=](int i, int j)
+    {
+        return view::take(intsFrom(i), j-i+1);
+    };
+
+// Define an infinite range of all the Pythagorean
+// triples:
+auto triples =
+    view::for_each(intsFrom(1), [](int z)
+    {
+        return view::for_each(ints(1, z), [=](int x)
+        {
+            return view::for_each(ints(x, z), [=](int y)
+            {
+                return yield_if(x*x + y*y == z*z,
+                    std::make_tuple(x, y, z));
+            });
+        });
+    });
+```
+
 ### Sample 3 for Function Monad used in do notation
 
 We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
