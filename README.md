@@ -100,7 +100,7 @@ auto triples =
 
 We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
 
-[godbolt3]: https://godbolt.org/z/d58Ezbxjz
+[godbolt3]: https://godbolt.org/z/K4z4TbfTf
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
 
