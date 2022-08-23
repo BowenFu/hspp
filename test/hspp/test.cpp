@@ -1129,42 +1129,6 @@ TEST(Maybe, 1)
     EXPECT_EQ(result, just("123xxx"s));
 }
 
-TEST(Monad, WalkTheLine)
-{
-    using Birds = int;
-    using Pole = std::pair<Birds, Birds>;
-    constexpr auto landLeft = toFunc<>([](Birds n, Pole p)
-    {
-        auto [left, right] = p;
-        if (std::abs((left + n) - right) < 4) 
-        {
-            return Maybe<Pole>{Pole{left + n, right}};
-        }
-        return Maybe<Pole>{};
-    });
-    constexpr auto landRight = toFunc<>([](Birds n, Pole p)
-    {
-        auto [left, right] = p;
-        if (std::abs((right + n) - left) < 4) 
-        {
-            return Maybe<Pole>{Pole{left, right + n}};
-        }
-        return Maybe<Pole>{};
-    });
-    auto const result = (((return_ | Pole{0,0}) >>= (landRight | 2)) >>= (landLeft | 2)) >>= (landRight | 2);
-    EXPECT_EQ(result, just(Pole(2, 4)));
-
-    auto const result2 = ((((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= (landRight | 4)) >>= (landLeft | -1)) >>= (landRight | -2);
-    EXPECT_EQ(result2, nothing);
-
-    constexpr auto banana = toFunc<>([](Pole)
-    {
-        return Maybe<Pole>{};
-    });
-    auto const result3 = (((return_ | Pole{0,0}) >>= (landLeft | 1)) >>= banana) >>= (landRight | 1);
-    EXPECT_EQ(result3, nothing);
-}
-
 TEST(Monad, vec)
 {
     auto const result = std::vector{1,2}

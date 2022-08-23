@@ -1,6 +1,7 @@
 set(hspp_SAMPLES
 parse_expr
 pause
+walk_the_line
 )
 
 foreach(sample ${hspp_SAMPLES})
