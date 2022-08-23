@@ -917,8 +917,6 @@ class Nothing final
 {
 };
 
-constexpr inline Nothing nothing;
-
 template <typename Data>
 class Just final
 {
@@ -957,6 +955,9 @@ public:
         return std::get<Just<Data>>(*this).data;
     }
 };
+
+template <typename T>
+const inline Maybe<T> nothing;
 
 template <typename T>
 constexpr bool operator== (Maybe<T> const& lhs, Maybe<T> const& rhs)
@@ -2343,11 +2344,11 @@ template <typename Data>
 class MonoidBase<First, Data>
 {
 public:
-    constexpr static auto mempty = First<Data>{data::nothing};
+    constexpr static auto mempty = First<Data>{data::Nothing{}};
 
     constexpr static auto mappend = data::toFunc<>([](First<Data> lhs, First<Data> rhs)
     {
-        return (getFirst | lhs) == data::nothing ? rhs : lhs;
+        return (getFirst | lhs) == data::nothing<Data> ? rhs : lhs;
     });
 };
 
@@ -2355,11 +2356,11 @@ template <typename Data>
 class MonoidBase<Last, Data>
 {
 public:
-    constexpr static auto mempty = Last<Data>{data::nothing};
+    constexpr static auto mempty = Last<Data>{data::Nothing{}};
 
     constexpr static auto mappend = data::toFunc<>([](Last<Data> lhs, Last<Data> rhs)
     {
-        return (getLast | rhs) == data::nothing ? lhs : rhs;
+        return (getLast | rhs) == data::nothing<Data> ? lhs : rhs;
     });
 };
 
@@ -2578,7 +2579,7 @@ public:
 };
 
 template <typename Data>
-const data::Maybe<Data> MonoidBase<data::Maybe, Data>::mempty = data::nothing;
+const data::Maybe<Data> MonoidBase<data::Maybe, Data>::mempty = data::nothing<Data>;
 
 template <template <typename...> class C, typename Data>
 struct MonoidTraitImpl
@@ -2720,7 +2721,7 @@ class FoldableBase<data::Maybe>
 public:
     constexpr static auto foldr = toGFunc<3>([](auto&& func, auto&& z, auto&& ta)
     {
-        if (ta == data::nothing)
+        if (ta == data::Nothing{})
         {
             return z;
         }
@@ -2800,7 +2801,7 @@ public:
         return std::visit(overload(
             [](data::Nothing) -> data::Maybe<R>
             {
-                return data::nothing;
+                return data::nothing<R>;
             },
             [func](data::Just<Arg> const& j) -> data::Maybe<R>
             {
@@ -2948,7 +2949,7 @@ public:
             },
             [](auto, auto) -> data::Maybe<R>
             {
-                return data::nothing;
+                return data::nothing<R>;
             }
         ),
         static_cast<data::MaybeBase<Func>const &>(func),
@@ -3177,9 +3178,9 @@ public:
     {
         using R = std::invoke_result_t<Func, Arg>;
         return std::visit(overload(
-            [](data::Nothing) -> R
+            [=](data::Nothing) -> R
             {
-                return data::nothing;
+                return data::Nothing{};
             },
             [func](data::Just<Arg> const& j) -> R
             {
@@ -3445,11 +3446,11 @@ class Traversable<data::Maybe, Args...> : public TraversableBase<data::Maybe, Ar
 public:
     constexpr static auto traverse = toGFunc<2>([](auto&& f, auto&& ta)
     {
-        if (ta == data::nothing)
+        if (ta == data::Nothing{})
         {
             using ResultDataType = decltype(f | ta.value());
             using DataT = DataType<ResultDataType>;
-            return ApplicativeType<ResultDataType>::pure(data::Maybe<DataT>{});
+            return ApplicativeType<ResultDataType>::pure(data::nothing<DataT>);
         }
         return data::just <fmap> (f | ta.value());
     });
