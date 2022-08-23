@@ -22,7 +22,7 @@ Here you are!
 
 [badge.godbolt]: https://img.shields.io/badge/try-godbolt-blue
 
-### Sample 1 for monadic do notation
+### Sample 1 for monadic do notation for a vector monad
 
 Filter even numbers.
 
@@ -41,7 +41,7 @@ Filter even numbers.
     );
 ```
 
-### Sample 2 for monad comprehension
+### Sample 2 for monad comprehension for a range monad
 
 Obtain an infinite range of Pythagorean triples.
 
@@ -96,13 +96,18 @@ auto triples =
     });
 ```
 
-### Sample 3 for Function Monad used in do notation
+### Sample 3 for Maybe (similar to std::optional) Monad used in do notation
 
 We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
 
 [godbolt3]: https://godbolt.org/z/d58Ezbxjz
 
 [![Try it on godbolt][badge.godbolt]][godbolt3]
+
+The sample is originated from Learn You a Haskell for Great Good!
+
+"Pierre has decided to take a break from his job at the fish farm and try tightrope walking. He's not that bad at it, but he does have one problem: birds keep landing on his balancing pole!
+Let's say that he keeps his balance if the number of birds on the left side of the pole and on the right side of the pole is within three."
 
 ```c++
     auto plus1 = toFunc<> | [](int x){ return 1+x; };
@@ -120,7 +125,32 @@ We have two functions, plus1, and showStr. With do notation we construct a new f
     std::cout << std::get<1>(result) << std::endl;
 ```
 
-### Sample 4 for parser combinator
+
+### Sample 4 for Function Monad used in do notation
+
+We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
+
+[godbolt4]: https://godbolt.org/z/d58Ezbxjz
+
+[![Try it on godbolt][badge.godbolt]][godbolt4]
+
+```c++
+    auto plus1 = toFunc<> | [](int x){ return 1+x; };
+    auto showStr = toFunc<> | [](int x){ return show | x; };
+
+    Id<int> x;
+    Id<std::string> y;
+    auto go = do_(
+        x <= plus1,
+        y <= showStr,
+        return_ || makeTuple<2> | x | y
+    );
+    auto result = go | 3;
+    std::cout << std::get<0>(result) << std::endl;
+    std::cout << std::get<1>(result) << std::endl;
+```
+
+### Sample 5 for parser combinator
 
 Original haskell version [Monadic Parsing in Haskell](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/monadic-parsing-in-haskell/E557DFCCE00E0D4B6ED02F3FB0466093)
 
@@ -139,9 +169,9 @@ expr   = term   `chainl1` addop
 C++ version
 [parse_expr](https://github.com/BowenFu/hspp/blob/main/sample/parse_expr.cpp)
 
-[godbolt4]: https://godbolt.org/z/r7WTYjGYa
+[godbolt5]: https://godbolt.org/z/r7WTYjGYa
 
-[![Try it on godbolt][badge.godbolt]][godbolt4]
+[![Try it on godbolt][badge.godbolt]][godbolt5]
 
 ```c++
 Id<char> x;
@@ -167,13 +197,13 @@ auto const term = factor <chainl1> mulOp;
 TEParser<int> const expr = toTEParser || (term <chainl1> addOp);
 ```
 
-### Sample 5 for STM / concurrent
+### Sample 6 for STM / concurrent
 
 [concurrent.cpp](https://github.com/BowenFu/hspp/blob/main/test/hspp/concurrent.cpp)
 
-[godbolt5]: https://godbolt.org/z/zj9Mc1h4h
+[godbolt6]: https://godbolt.org/z/zj9Mc1h4h
 
-[![Try it on godbolt][badge.godbolt]][godbolt5]
+[![Try it on godbolt][badge.godbolt]][godbolt6]
 
 
 Transfer from one account to another one atomically.

@@ -95,8 +95,6 @@ class Nothing final
 {
 };
 
-constexpr inline Nothing nothing;
-
 template <typename Data>
 class Just final
 {
@@ -135,6 +133,9 @@ public:
         return std::get<Just<Data>>(*this).data;
     }
 };
+
+template <typename T>
+const inline Maybe<T> nothing;
 
 template <typename T>
 constexpr bool operator== (Maybe<T> const& lhs, Maybe<T> const& rhs)

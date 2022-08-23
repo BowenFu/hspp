@@ -1179,7 +1179,7 @@ constexpr auto toTMVar = toGFunc<1> | [](auto t)
 };
 
 template <typename A>
-constexpr auto newEmptyTMVar = ((newTVar | Maybe<A>{}) >>= (Monad<STM>::return_ <o> toTMVar));
+const auto newEmptyTMVar = ((newTVar | data::nothing<A>) >>= (Monad<STM>::return_ <o> toTMVar));
 
 template <typename A>
 constexpr auto takeTMVarImpl(TMVar<A> const& t)
@@ -1189,7 +1189,7 @@ constexpr auto takeTMVarImpl(TMVar<A> const& t)
         if (m.hasValue())
         {
             return toTESTM | do_(
-                (writeTVar | t | data::Maybe<A>{}),
+                (writeTVar | t | data::nothing<A>),
                 return_ | m.value()
             );
         }

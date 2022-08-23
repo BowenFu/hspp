@@ -541,7 +541,26 @@ TEST(Monad, Maybe)
         const auto y = return_(4);
         const auto z = x >>= filterEven;
         const auto u = y >>= filterEven;
-        EXPECT_EQ(z, nothing);
+        EXPECT_EQ(z, nothing<int>);
+        EXPECT_EQ(u, just(4));
+    };
+    auto const filterEven = [](int x)-> Maybe<int> { return x%2==0 ? Maybe<int>{x} : Maybe<int>{}; };
+    const TEFunction<Maybe<int>, int> filterEven1 = filterEven;
+    const auto filterEven2 = toFunc<>(filterEven);
+    test(filterEven1);
+    test(filterEven2);
+}
+
+TEST(doNotation, Maybe)
+{
+    auto const test = [=](auto filterEven)
+    {
+        const auto x = return_(3);
+        const auto y = return_(4);
+
+        const auto z = x >>= filterEven;
+        const auto u = y >>= filterEven;
+        EXPECT_EQ(z, nothing<int>);
         EXPECT_EQ(u, just(4));
     };
     auto const filterEven = [](int x)-> Maybe<int> { return x%2==0 ? Maybe<int>{x} : Maybe<int>{}; };
@@ -554,7 +573,7 @@ TEST(Monad, Maybe)
 TEST(Monad, Maybe2)
 {
     auto const result = Maybe<int>{} >> Maybe<int>{3};
-    EXPECT_EQ(result, nothing);
+    EXPECT_EQ(result, nothing<int>);
 }
 
 TEST(Monad, IO)
@@ -935,7 +954,7 @@ TEST(Monoid, range3)
 
 TEST(Monoid, maybe)
 {
-    auto const nested = std::list{just(toProduct(2)), Maybe<Product<int>>{}, just(toProduct(3))};
+    auto const nested = std::list{just(toProduct(2)), nothing<Product<int>>, just(toProduct(3))};
     auto const result = mconcat | nested;
     auto const expected = just(toProduct(6));
     EXPECT_EQ(result, expected);
@@ -988,13 +1007,13 @@ TEST(Monoid, any)
 
 TEST(Monoid, first)
 {
-    auto const result = getFirst <o> mconcat <o> (map | toFirst) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    auto const result = getFirst <o> mconcat <o> (map | toFirst) || std::list<Maybe<int>>{nothing<int>, just(2), just(3)};
     EXPECT_EQ(result, just(2));
 }
 
 TEST(Monoid, toLast)
 {
-    auto const result = getLast <o> mconcat <o> (map | toLast) || std::list<Maybe<int>>{nothing, just(2), just(3)};
+    auto const result = getLast <o> mconcat <o> (map | toLast) || std::list<Maybe<int>>{nothing<int>, just(2), just(3)};
     EXPECT_EQ(result, just(3));
 }
 
@@ -1118,12 +1137,12 @@ TEST(Traversable, vector)
 
 TEST(Maybe, 1)
 {
-    auto result = just("andy"s) <mappend> nothing;
+    auto result = just("andy"s) <mappend> nothing<std::string>;
     EXPECT_EQ(result, just("andy"s));
     result = just("andy"s) <mappend> just("123"s);
     EXPECT_EQ(result, just("andy123"s));
-    result = Maybe<std::string>{nothing} <mappend> Maybe<std::string>{nothing};
-    EXPECT_EQ(result, nothing);
+    result = nothing<std::string> <mappend> nothing<std::string>;
+    EXPECT_EQ(result, nothing<std::string>);
 
     result = mconcat | std::vector{just("123"s), just("xxx"s)};
     EXPECT_EQ(result, just("123xxx"s));
@@ -1181,7 +1200,7 @@ TEST(MonadPlus, guard)
     EXPECT_EQ(result, just(1));
 
     auto const result1 = guard(1 > 2) >> just(1);
-    EXPECT_EQ(result1, nothing);
+    EXPECT_EQ(result1, nothing<int>);
 
     auto const result3 = guard(5 > 2) >> std::vector{2};
     EXPECT_EQ(result3, std::vector{2});
