@@ -109,20 +109,30 @@ The sample is originated from Learn You a Haskell for Great Good!
 "Pierre has decided to take a break from his job at the fish farm and try tightrope walking. He's not that bad at it, but he does have one problem: birds keep landing on his balancing pole!
 Let's say that he keeps his balance if the number of birds on the left side of the pole and on the right side of the pole is within three."
 
-```c++
-    auto plus1 = toFunc<> | [](int x){ return 1+x; };
-    auto showStr = toFunc<> | [](int x){ return show | x; };
+Original Haskell version
 
-    Id<int> x;
-    Id<std::string> y;
-    auto go = do_(
-        x <= plus1,
-        y <= showStr,
-        return_ || makeTuple<2> | x | y
-    );
-    auto result = go | 3;
-    std::cout << std::get<0>(result) << std::endl;
-    std::cout << std::get<1>(result) << std::endl;
+```haskell
+routine :: Maybe Pole
+routine = do
+    start <- return (0,0)
+    first <- landLeft 2 start
+    Nothing
+    second <- landRight 2 first
+    landLeft 1 second
+```
+
+C++ version using hspp
+
+```c++
+Id<Pole> start, first, second;
+auto const routine = do_(
+    // todo: infer DeferredPure type automatically in do notation.
+    start <= (Monad<Maybe>::return_ | Pole{0,0}),
+    first <= (landLeft | 2 | start),
+    nothing<Pole>,
+    second <= (landRight | 2 | first),
+    landLeft | 1 | second
+);
 ```
 
 

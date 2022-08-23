@@ -68,14 +68,15 @@ void walkTheLine1()
 
 void walkTheLine2()
 {
-    Id<Pole> p;
-    auto const result = do_(
-        p <= (landRight | 2 | Pole{0,0}),
-        p <= (landLeft | 2 | p),
-        p <= (banana | p),
-        landRight | 2 | p
+    Id<Pole> start, first, second;
+    auto const routine = do_(
+        start <= (Monad<Maybe>::return_ | Pole{0,0}), // todo: deduce DeferredPure.
+        first <= (landLeft | 2 | start),
+        nothing<Pole>,
+        second <= (landRight | 2 | first),
+        landLeft | 1 | second
     );
-    expectEq(result, nothing<Pole>);
+    expectEq(routine, nothing<Pole>);
 }
 
 int main()
