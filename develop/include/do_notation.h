@@ -184,6 +184,12 @@ constexpr auto operator<= (Id<D>& id, Nullary<N> const& n)
     return nullary([=] { return DeMonad<MT>{evaluate_(n), id}; });
 }
 
+template <typename D>
+constexpr auto operator<= (Id<D>& id, DeferredPure<D> const& n)
+{
+    return id = n.mData;
+}
+
 template <typename T>
 class EvalTraits
 {

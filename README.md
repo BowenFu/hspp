@@ -100,14 +100,12 @@ auto triples =
 
 We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
 
-[godbolt3]: https://godbolt.org/z/K4z4TbfTf
-
-[![Try it on godbolt][badge.godbolt]][godbolt3]
-
 The sample is originated from Learn You a Haskell for Great Good!
 
 "Pierre has decided to take a break from his job at the fish farm and try tightrope walking. He's not that bad at it, but he does have one problem: birds keep landing on his balancing pole!
 Let's say that he keeps his balance if the number of birds on the left side of the pole and on the right side of the pole is within three."
+
+Note that Pierre may also suddenly slip and fall when there is a banana.
 
 Original Haskell version
 
@@ -123,11 +121,14 @@ routine = do
 
 C++ version using hspp
 
+[godbolt3]: https://godbolt.org/z/9T5sa64nE
+
+[![Try it on godbolt][badge.godbolt]][godbolt3]
+
 ```c++
 Id<Pole> start, first, second;
 auto const routine = do_(
-    // todo: infer DeferredPure type automatically in do notation.
-    start <= (Monad<Maybe>::return_ | Pole{0,0}),
+    start <= return_ | Pole{0,0}),
     first <= (landLeft | 2 | start),
     nothing<Pole>,
     second <= (landRight | 2 | first),
