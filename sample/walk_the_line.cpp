@@ -68,7 +68,7 @@ void walkTheLine2()
 {
     Id<Pole> start, first, second;
     auto const routine = do_(
-        start <= (Monad<Maybe>::return_ | Pole{0,0}), // todo: deduce DeferredPure.
+        start <= (return_ | Pole{0,0}),
         first <= (landLeft | 2 | start),
         nothing<Pole>,
         second <= (landRight | 2 | first),
