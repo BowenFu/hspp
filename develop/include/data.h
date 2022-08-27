@@ -851,41 +851,6 @@ constexpr auto toState = toGFunc<1>([](auto func)
 
 constexpr auto runState = from;
 
-// TODO: in param can be std::string const&
-template <typename A, typename Repr>
-class Parser : public DataHolder<Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>
-{
-public:
-    using DataHolder<Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>::DataHolder;
-};
-
-template <typename A, typename Repr>
-constexpr auto toParserImpl(Function<Repr, std::vector<std::tuple<A, std::string>>, std::string> func)
-{
-    return Parser<A, Repr>{std::move(func)};
-}
-
-constexpr auto toParser = toGFunc<1>([](auto func)
-{
-    return toParserImpl(std::move(func));
-});
-
-constexpr auto runParser = from;
-
-template <typename A>
-using TEParser = Parser<A, std::function<std::vector<std::tuple<A, std::string>>(std::string)>>;
-
-template <typename A, typename Repr>
-constexpr auto toTEParserImpl(Parser<A, Repr> p)
-{
-    return TEParser<A>{(runParser | p)};
-}
-
-constexpr auto toTEParser = toGFunc<1> | [](auto p)
-{
-    return toTEParserImpl(p);
-};
-
 } // namespace data
 
 using data::o;

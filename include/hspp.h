@@ -1673,41 +1673,6 @@ constexpr auto toState = toGFunc<1>([](auto func)
 
 constexpr auto runState = from;
 
-// TODO: in param can be std::string const&
-template <typename A, typename Repr>
-class Parser : public DataHolder<Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>
-{
-public:
-    using DataHolder<Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>::DataHolder;
-};
-
-template <typename A, typename Repr>
-constexpr auto toParserImpl(Function<Repr, std::vector<std::tuple<A, std::string>>, std::string> func)
-{
-    return Parser<A, Repr>{std::move(func)};
-}
-
-constexpr auto toParser = toGFunc<1>([](auto func)
-{
-    return toParserImpl(std::move(func));
-});
-
-constexpr auto runParser = from;
-
-template <typename A>
-using TEParser = Parser<A, std::function<std::vector<std::tuple<A, std::string>>(std::string)>>;
-
-template <typename A, typename Repr>
-constexpr auto toTEParserImpl(Parser<A, Repr> p)
-{
-    return TEParser<A>{(runParser | p)};
-}
-
-constexpr auto toTEParser = toGFunc<1> | [](auto p)
-{
-    return toTEParserImpl(p);
-};
-
 } // namespace data
 
 using data::o;
@@ -1860,12 +1825,6 @@ struct DataTrait<data::Function<Repr, Ret, Rest...>>
 };
 
 template <typename A, typename Repr>
-struct DataTrait<data::Parser<A, Repr>>
-{
-    using Type = A;
-};
-
-template <typename A, typename Repr>
 struct DataTrait<data::Range<A, Repr>>
 {
     using Type = A;
@@ -1922,12 +1881,6 @@ template <template <template<typename...> typename Type, typename... Ts> class T
 struct TypeClassTrait<TypeClassT, data::Function<Repr, Ret, Arg, Rest...>>
 {
     using Type = TypeClassT<data::Function, Arg>;
-};
-
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename A, typename Repr>
-struct TypeClassTrait<TypeClassT, data::Parser<A, Repr>>
-{
-    using Type = TypeClassT<data::Parser>;
 };
 
 template <typename>
@@ -2762,10 +2715,6 @@ template <typename... Ts>
 class Functor<std::list, Ts...> : public ContainerFunctor<std::list, Ts...>
 {};
 
-template <typename... Ts>
-class Functor<data::Parser, Ts...>
-{};
-
 template <>
 class Functor<data::Range>
 {
@@ -3031,16 +2980,6 @@ public:
 };
 
 template <>
-class Applicative<data::Parser> : public Functor<data::Parser>
-{
-public:
-    constexpr static auto pure = toGFunc<1> | [](auto a)
-    {
-        return data::toParser || data::toFunc<> | [a=std::move(a)](std::string cs){ return std::vector{std::make_tuple(a, cs)}; };
-    };
-};
-
-template <>
 class Applicative<DummyTemplateClass, GenericFunctionTag> : public Functor<DummyTemplateClass, GenericFunctionTag>
 {
 public:
@@ -3264,26 +3203,6 @@ public:
     }
 };
 
-template <>
-class MonadBase<data::Parser>
-{
-public:
-    template <typename A, typename Repr, typename Func>
-    constexpr static auto bind(data::Parser<A, Repr> const& p, Func f)
-    {
-        return data::toParser | toFunc<>([=](std::string cs)
-        {
-            auto&& tempResult = data::runParser | p | cs;
-            auto const cont = toGFunc<1> | [f=std::move(f)](auto tu)
-            {
-                auto&& [a, cs] = tu;
-                return return_ || data::runParser | f(a) | cs;
-            };
-            return mconcat || (tempResult >>= cont);
-        });
-    }
-};
-
 template <typename T>
 using MonadType = typename TypeClassTrait<Monad, std::decay_t<T>>::Type;
 
@@ -3375,16 +3294,6 @@ public:
 template <typename A>
 const decltype(failIOMZero) MonadZero<data::IO, A>::mzero = failIOMZero;
 
-template <typename A>
-class MonadZero<data::Parser, A>
-{
-public:
-    constexpr static auto mzero = data::toParser || toFunc<> | [](std::string)
-    {
-        return std::vector<std::tuple<A, std::string>>{};
-    };
-};
-
 template <template<typename...> class Type, typename... Ts>
 class MonadPlus : public MonadZero<Type, Ts...>
 {
@@ -3397,20 +3306,6 @@ class MonadPlus<data::IO, A> : public MonadZero<data::IO, A>
 {
 public:
     // constexpr static auto mplus;
-};
-
-
-template <typename A>
-class MonadPlus<data::Parser, A>
-{
-public:
-    constexpr static auto mplus = toGFunc<2> | [](auto p, auto q)
-    {
-        return data::toParser || toFunc<> | [=](std::string cs)
-        {
-            return (data::runParser | p | cs) <hspp::mplus> (data::runParser | q | cs);
-        };
-    };
 };
 
 /////////// Traversable ///////////
