@@ -145,7 +145,7 @@ class MonadTrans<PauseTPtr>
 {
 public:
     // use IO for now.
-    constexpr static auto lift = data::Compose{}(toRunTPtr, (liftM | toDoneTPtr<IO>));
+    constexpr static auto lift = toRunTPtr <o> (liftM | toDoneTPtr<IO>);
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename R>

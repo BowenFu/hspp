@@ -17,7 +17,7 @@ message(STATUS "CXX_STANDARD: ${CMAKE_CXX_STANDARD}")
 
 list(APPEND
     BASE_COMPILE_FLAGS
-    "$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-Wall;-Wextra;-pedantic;-Werror;-Wno-parentheses;-Wno-shadow;-Wconversion;-Wsign-conversion>;-ftemplate-depth=200;-ftemplate-backtrace-limit=0"
+    "$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-Wall;-Wextra;-pedantic;-Werror;-Wno-parentheses;-Wno-shadow;-Wconversion;-Wsign-conversion>"
         "$<$<CXX_COMPILER_ID:MSVC>:/W4>") # /WX for -Werror
 
 list(APPEND
