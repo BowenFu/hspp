@@ -127,11 +127,13 @@ public:
                 },
                 [=](RunT<M, R> r)
                 {
+                    // std::function<PauseTPtr<M, R>(R)> func_ = [=](R r) -> PauseTPtr<M, R> { return func(r); };
                     return RunT<M, R>{
-                        liftM | [=](auto v) { return v >>= func; } | r.data
+                        // liftM | [=](auto v) { return v >>= func; } | r.data
+                        r.data >>= [=](PauseTPtr<M, R> v){ return return_ | (v >>= func); }
                     };
-                }
-            ), *t1);
+                })
+            , *t1);
     };
 };
 
@@ -160,14 +162,21 @@ struct TypeClassTrait<TypeClassT, PausePtrIO<R>>
 // pause = DoneT ()
 const auto pause = toDoneTPtr<IO>(_o_);
 
-const auto example2 = lift<PauseTPtr> || putStrLn | "Step 1";
+const auto example2 =
+  (lift<PauseTPtr> || putStrLn | "Step 1") >>
+  pause >>
+//   (lift<PauseTPtr> || putStrLn | "Step 2") >>
+//   pause >>
+//   (lift<PauseTPtr> || putStrLn | "Step 3");
+
 // const auto example2 = do_(
 //   lift<PauseTPtr> || putStrLn | "Step 1",
 //   pause,
 //   lift<PauseTPtr> || putStrLn | "Step 2",
 //   pause,
-//   lift<PauseTPtr> || putStrLn | "Step 3"
-// );
+  (lift<PauseTPtr> || putStrLn | "Step 3")
+// )
+;
 
 template <template <typename...> class M, typename R>
 constexpr auto runNTImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>;
@@ -216,6 +225,7 @@ constexpr auto fullRun = toGFunc<1> | [](auto p)
 int main()
 {
     static_cast<void>(Applicative<PausePtrIO>::pure);
+    static_cast<void>(MonadTrans<PauseTPtr>::lift);
     Id<PauseTPtr<IO, _O_>> rest;
     auto main_ = do_(
         rest <= (runNT | 2 | example2),
