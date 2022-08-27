@@ -132,7 +132,7 @@ public:
                         liftM | [=](PauseTPtr<M, R> const& v) { return bind(v, func); } | r.data
                     );
                 })
-            , *t1);
+            , static_cast<PauseTBase<M, R> const&>(*t1));
     }
 };
 
