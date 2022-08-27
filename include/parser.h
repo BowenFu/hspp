@@ -8,20 +8,119 @@
 
 namespace hspp
 {
+
+// TODO: in param can be std::string const&
+template <typename A, typename Repr>
+class Parser : public data::DataHolder<data::Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>
+{
+public:
+    using data::DataHolder<data::Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>::DataHolder;
+};
+
+template <typename A, typename Repr>
+constexpr auto toParserImpl(data::Function<Repr, std::vector<std::tuple<A, std::string>>, std::string> func)
+{
+    return Parser<A, Repr>{std::move(func)};
+}
+
+constexpr auto toParser = data::toGFunc<1>([](auto func)
+{
+    return toParserImpl(std::move(func));
+});
+
+constexpr auto runParser = data::from;
+
+template <typename A>
+using TEParser = Parser<A, std::function<std::vector<std::tuple<A, std::string>>(std::string)>>;
+
+template <typename A, typename Repr>
+constexpr auto toTEParserImpl(Parser<A, Repr> p)
+{
+    return TEParser<A>{(runParser | p)};
+}
+
+constexpr auto toTEParser = toGFunc<1> | [](auto p)
+{
+    return toTEParserImpl(p);
+};
+
+template <typename A, typename Repr>
+struct DataTrait<Parser<A, Repr>>
+{
+    using Type = A;
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename A, typename Repr>
+struct TypeClassTrait<TypeClassT, Parser<A, Repr>>
+{
+    using Type = TypeClassT<Parser>;
+};
+
+template <typename... Ts>
+class Functor<Parser, Ts...>
+{};
+
+template <>
+class Applicative<Parser> : public Functor<Parser>
+{
+public:
+    constexpr static auto pure = toGFunc<1> | [](auto a)
+    {
+        return toParser || data::toFunc<> | [a=std::move(a)](std::string cs){ return std::vector{std::make_tuple(a, cs)}; };
+    };
+};
+
+template <>
+class MonadBase<Parser>
+{
+public:
+    template <typename A, typename Repr, typename Func>
+    constexpr static auto bind(Parser<A, Repr> const& p, Func f)
+    {
+        return toParser | toFunc<>([=](std::string cs)
+        {
+            auto&& tempResult = runParser | p | cs;
+            auto const cont = toGFunc<1> | [f=std::move(f)](auto tu)
+            {
+                auto&& [a, cs] = tu;
+                return return_ || runParser | f(a) | cs;
+            };
+            return mconcat || (tempResult >>= cont);
+        });
+    }
+};
+
+template <typename A>
+class MonadZero<Parser, A>
+{
+public:
+    constexpr static auto mzero = toParser || toFunc<> | [](std::string)
+    {
+        return std::vector<std::tuple<A, std::string>>{};
+    };
+};
+
+template <typename A>
+class MonadPlus<Parser, A>
+{
+public:
+    constexpr static auto mplus = toGFunc<2> | [](auto p, auto q)
+    {
+        return toParser || toFunc<> | [=](std::string cs)
+        {
+            return (runParser | p | cs) <hspp::mplus> (runParser | q | cs);
+        };
+    };
+};
+
 namespace parser
 {
-using data::Parser;
-using data::toParser;
-using data::runParser;
-
-using data::TEParser;
-using data::toTEParser;
 
 constexpr auto alt = toGFunc<2> | [](auto p, auto q)
 {
-    return data::toParser <o> data::toFunc<> | [=](std::string cs)
+    return toParser <o> data::toFunc<> | [=](std::string cs)
     {
-        auto const tmp = data::runParser | (p <mplus> q) | cs;
+        auto const tmp = runParser | (p <mplus> q) | cs;
         if (tmp.empty())
         {
             return tmp;
