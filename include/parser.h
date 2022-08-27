@@ -9,6 +9,9 @@
 namespace hspp
 {
 
+namespace parser
+{
+
 // TODO: in param can be std::string const&
 template <typename A, typename Repr>
 class Parser : public data::DataHolder<data::Function<Repr, std::vector<std::tuple<A, std::string>>, std::string>>
@@ -44,46 +47,48 @@ constexpr auto toTEParser = toGFunc<1> | [](auto p)
     return toTEParserImpl(p);
 };
 
+} // namespace parser
+
 template <typename A, typename Repr>
-struct DataTrait<Parser<A, Repr>>
+struct DataTrait<parser::Parser<A, Repr>>
 {
     using Type = A;
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename A, typename Repr>
-struct TypeClassTrait<TypeClassT, Parser<A, Repr>>
+struct TypeClassTrait<TypeClassT, parser::Parser<A, Repr>>
 {
-    using Type = TypeClassT<Parser>;
+    using Type = TypeClassT<parser::Parser>;
 };
 
 template <typename... Ts>
-class Functor<Parser, Ts...>
+class Functor<parser::Parser, Ts...>
 {};
 
 template <>
-class Applicative<Parser> : public Functor<Parser>
+class Applicative<parser::Parser> : public Functor<parser::Parser>
 {
 public:
     constexpr static auto pure = toGFunc<1> | [](auto a)
     {
-        return toParser || data::toFunc<> | [a=std::move(a)](std::string cs){ return std::vector{std::make_tuple(a, cs)}; };
+        return parser::toParser || data::toFunc<> | [a=std::move(a)](std::string cs){ return std::vector{std::make_tuple(a, cs)}; };
     };
 };
 
 template <>
-class MonadBase<Parser>
+class MonadBase<parser::Parser>
 {
 public:
     template <typename A, typename Repr, typename Func>
-    constexpr static auto bind(Parser<A, Repr> const& p, Func f)
+    constexpr static auto bind(parser::Parser<A, Repr> const& p, Func f)
     {
-        return toParser | toFunc<>([=](std::string cs)
+        return parser::toParser | toFunc<>([=](std::string cs)
         {
-            auto&& tempResult = runParser | p | cs;
+            auto&& tempResult = parser::runParser | p | cs;
             auto const cont = toGFunc<1> | [f=std::move(f)](auto tu)
             {
                 auto&& [a, cs] = tu;
-                return return_ || runParser | f(a) | cs;
+                return return_ || parser::runParser | f(a) | cs;
             };
             return mconcat || (tempResult >>= cont);
         });
@@ -91,24 +96,24 @@ public:
 };
 
 template <typename A>
-class MonadZero<Parser, A>
+class MonadZero<parser::Parser, A>
 {
 public:
-    constexpr static auto mzero = toParser || toFunc<> | [](std::string)
+    constexpr static auto mzero = parser::toParser || toFunc<> | [](std::string)
     {
         return std::vector<std::tuple<A, std::string>>{};
     };
 };
 
 template <typename A>
-class MonadPlus<Parser, A>
+class MonadPlus<parser::Parser, A>
 {
 public:
     constexpr static auto mplus = toGFunc<2> | [](auto p, auto q)
     {
-        return toParser || toFunc<> | [=](std::string cs)
+        return parser::toParser || toFunc<> | [=](std::string cs)
         {
-            return (runParser | p | cs) <hspp::mplus> (runParser | q | cs);
+            return (parser::runParser | p | cs) <hspp::mplus> (parser::runParser | q | cs);
         };
     };
 };
@@ -118,7 +123,7 @@ namespace parser
 
 constexpr auto alt = toGFunc<2> | [](auto p, auto q)
 {
-    return toParser <o> data::toFunc<> | [=](std::string cs)
+    return parser::toParser <o> data::toFunc<> | [=](std::string cs)
     {
         auto const tmp = runParser | (p <mplus> q) | cs;
         if (tmp.empty())
@@ -131,7 +136,7 @@ constexpr auto alt = toGFunc<2> | [](auto p, auto q)
     };
 };
 
-constexpr auto item = toParser | toFunc<>([](std::string cs) -> std::vector<std::tuple<char, std::string>>
+constexpr auto item = parser::toParser | toFunc<>([](std::string cs) -> std::vector<std::tuple<char, std::string>>
 {
     if (cs.empty())
     {
@@ -143,7 +148,7 @@ constexpr auto item = toParser | toFunc<>([](std::string cs) -> std::vector<std:
 constexpr auto sat = toGFunc<1> | [](auto p)
 {
     return item >>= toFunc<> | [=](char c) { return
-        toParser || toFunc<> | [flag = p | c, posParser = Monad<Parser>::return_ | c, negParser = MonadZero<Parser, char>::mzero]
+        parser::toParser || toFunc<> | [flag = p | c, posParser = Monad<Parser>::return_ | c, negParser = MonadZero<Parser, char>::mzero]
         (std::string cs) -> std::vector<std::tuple<char, std::string>>
         {
             return flag ? (runParser | posParser | cs) : (runParser | negParser | cs);
