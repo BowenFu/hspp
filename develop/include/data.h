@@ -15,6 +15,7 @@
 #include <iostream>
 #include <functional>
 #include <type_traits>
+#include <optional>
 
 namespace hspp
 {
@@ -959,6 +960,159 @@ constexpr auto yCombinator = toGFunc<1> | [](auto func)
 {
     return YCombinator<decltype(func)>{std::move(func)};
 };
+
+template <typename Data>
+class Product : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class Sum : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class AllImpl : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class AnyImpl : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class First : public data::DataHolder<data::Maybe<Data>>
+{
+public:
+    using data::DataHolder<data::Maybe<Data>>::DataHolder;
+};
+
+template <typename Data>
+class Last : public data::DataHolder<data::Maybe<Data>>
+{
+public:
+    using data::DataHolder<data::Maybe<Data>>::DataHolder;
+};
+
+template <typename Data>
+class ZipList
+{
+    std::variant<Data, std::list<Data>> mData;
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(ZipList const& zipList)
+        : mZipList{zipList}
+        , mBaseIter{}
+        {
+            std::visit(overload(
+                [](Data) {},
+                [this](std::list<Data> const& data)
+                {
+                    mBaseIter = data.begin();
+                }
+            ), mZipList.get().mData);
+        }
+        auto& operator++()
+        {
+            if (mBaseIter)
+            {
+                ++mBaseIter.value();
+            }
+            return *this;
+        }
+        auto operator*() const
+        {
+            if (mBaseIter)
+            {
+                return *mBaseIter.value();
+            }
+            return std::get<Data>(mZipList.get().mData);
+        }
+        bool hasValue() const
+        {
+            return std::visit(overload(
+                [](Data const&) { return true; },
+                [this](std::list<Data> const& data)
+                {
+                    return mBaseIter.value() != data.end();
+                }
+            ), mZipList.get().mData);
+        }
+    private:
+        std::reference_wrapper<ZipList const> mZipList;
+        std::optional<std::decay_t<decltype(std::get<1>(mZipList.get().mData).begin())>> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    ZipList(Data data)
+    : mData{std::move(data)}
+    {}
+    ZipList(std::list<Data> data)
+    : mData{std::move(data)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+};
+
+template <typename Func>
+class Endo : public data::DataHolder<Func>
+{
+public:
+    using data::DataHolder<Func>::DataHolder;
+};
+
+constexpr auto toProduct = data::toType<Product>;
+constexpr auto toSum = data::toType<Sum>;
+constexpr auto toAll = data::toType<AllImpl>;
+constexpr auto toAny = data::toType<AnyImpl>;
+constexpr auto toFirst = toGFunc<1>([](auto data)
+{
+    using Type = std::decay_t<decltype(data.value())>;
+    return First<Type>{data};
+});
+constexpr auto toLast = toGFunc<1>([](auto data)
+{
+    using Type = std::decay_t<decltype(data.value())>;
+    return Last<Type>{data};
+});
+constexpr auto toZipList = toGFunc<1>([](auto data)
+{
+    return ZipList{data};
+});
+constexpr auto toEndo = data::toType<Endo>;
+
+constexpr auto getProduct = data::from;
+constexpr auto getSum = data::from;
+constexpr auto getAll = data::from;
+constexpr auto getAny = data::from;
+constexpr auto getFirst = data::from;
+constexpr auto getLast = data::from;
+constexpr auto getZipList = data::from;
+constexpr auto appEndo = data::from;
+
+using All = AllImpl<bool>;
+using Any = AnyImpl<bool>;
 
 } // namespace hspp
 
