@@ -458,6 +458,10 @@ public:
     {
         return mFunc();
     }
+    operator IO<Data>() const
+    {
+        return IO<Data>{std::function<Data()>(mFunc)};
+    }
 private:
     Func mFunc;
 };

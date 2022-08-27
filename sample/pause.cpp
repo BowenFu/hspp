@@ -1,4 +1,5 @@
 #include "hspp.h"
+#include "monadTrans.h"
 #include <memory>
 #include <variant>
 #include <cassert>
@@ -55,7 +56,13 @@ public:
 };
 
 template <template <typename...> class M, typename R>
-using PauseTPtr = std::shared_ptr<PauseT<M, R>>;
+class PauseTPtr : public std::shared_ptr<PauseT<M, R>>
+{
+public:
+    PauseTPtr(std::shared_ptr<PauseT<M, R>> ptr)
+    : std::shared_ptr<PauseT<M, R>>{std::move(ptr)}
+    {}
+};
 
 template <template <typename...> class M, typename R>
 struct RunT
@@ -63,14 +70,36 @@ struct RunT
     M<PauseTPtr<M, R>> data;
 };
 
+template <template <typename...> class M, typename R, typename... Ts>
+constexpr auto toDoneTPtrImpl(R r) -> PauseTPtr<M, R>
+{
+    return std::make_shared<PauseT<M, R>>(DoneT<R>{r});
+};
+
+template <template <typename...> class M>
+constexpr auto toDoneTPtr = toGFunc<1> | [](auto d)
+{
+    return toDoneTPtrImpl<M>(d);
+};
+
+template <template <typename...> class M, typename R, typename... Ts>
+constexpr auto toRunPtrImpl(M<PauseTPtr<M, R>, Ts...> d) -> PauseTPtr<M, R>
+{
+    return std::make_shared<PauseT<M, R>>(RunT<M, R>{d});
+}
+
+constexpr auto toRunTPtr = toGFunc<1> | [](auto d)
+{
+    return toRunPtrImpl(d);
+};
+
 template <typename R>
-using PauseIO = PauseT<IO, R>;
+using PausePtrIO = PauseTPtr<IO, R>;
 
 namespace hspp
 {
 
-template <>
-class Applicative<PauseIO>
+class ApplicativePausePtr
 {
 public:
     constexpr static auto pure = toGFunc<1> | [](auto x)
@@ -80,10 +109,15 @@ public:
 };
 
 template <>
-class MonadBase<PauseIO>
+class Applicative<PausePtrIO> : public ApplicativePausePtr
+{};
+
+template <template <typename...> class M>
+class MonadBasePause
 {
+public:
     template <typename R, typename Func>
-    constexpr static auto bind(PauseIO<R> const& t1, Func const& func)
+    constexpr static auto bind(PauseTPtr<M, R> const& t1, Func const& func)
     {
         return std::visit(
             overload(
@@ -91,61 +125,60 @@ class MonadBase<PauseIO>
                 {
                     return func(r.r);
                 },
-                [=](RunT<IO, R> r)
+                [=](RunT<M, R> r)
                 {
-                    return RunT<IO, R>{
+                    return RunT<M, R>{
                         liftM | [=](auto v) { return v >>= func; } | r.data
                     };
                 }
-            ), t1);
+            ), *t1);
     };
 };
 
-// instance MonadTrans PauseT where
-//   lift m = RunT $ liftM DoneT m
+template <>
+class MonadBase<PausePtrIO> : public MonadBasePause<IO>
+{};
+
+template <>
+class MonadTrans<PauseTPtr>
+{
+public:
+    // use IO for now.
+    constexpr static auto lift = toRunTPtr <o> (liftM | toDoneTPtr<IO>);
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename R>
+struct TypeClassTrait<TypeClassT, PausePtrIO<R>>
+{
+    using Type = TypeClassT<PausePtrIO>;
+};
+
 
 } // namespace hspp
 
 // pause :: Monad m => PauseT m ()
 // pause = DoneT ()
+const auto pause = toDoneTPtr<IO>(_o_);
+
+const auto example2 = lift<PauseTPtr> || putStrLn | "Step 1";
+// const auto example2 = do_(
+//   lift<PauseTPtr> || putStrLn | "Step 1",
+//   pause,
+//   lift<PauseTPtr> || putStrLn | "Step 2",
+//   pause,
+//   lift<PauseTPtr> || putStrLn | "Step 3"
+// );
 
 template <template <typename...> class M, typename R>
-const auto done = std::make_shared<PauseT<M, R>>(DoneT<R>{});
+constexpr auto runNTImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>;
 
-template <template <typename...> class M, typename R, typename... Ts>
-constexpr auto toRunImpl(M<PauseTPtr<M, R>, Ts...> d) -> PauseTPtr<M, R>
+constexpr auto runNT = toGFunc<2> | [](int n, auto p)
 {
-    return std::make_shared<PauseT<M, R>>(RunT<M, R>{d});
-}
-
-constexpr auto toRun = toGFunc<1> | [](auto d)
-{
-    return toRunImpl(d);
-};
-
-const auto pauseExample = toRun || toTEIO | do_(
-  putStrLn | "Let's begin",
-  putStrLn | "Step 1",
-  return_ || (toRun || toTEIO | do_(
-    putStrLn | "Step 2",
-    return_ || (toRun || toTEIO | do_(
-      putStrLn | "Step 3",
-      putStrLn | "Yay, we're done!",
-      return_ | done<IO, _O_>
-    ))
-  ))
-);
-
-template <template <typename...> class M, typename R>
-constexpr auto runNImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>;
-
-constexpr auto runN = toGFunc<2> | [](int n, auto p)
-{
-    return runNImpl(n, p);
+    return runNTImpl(n, p);
 };
 
 template <template <typename...> class M, typename R>
-constexpr auto runNImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>
+constexpr auto runNTImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>
 {
     return toTEIO | io([=]() -> PauseTPtr<M, R>
     {
@@ -153,12 +186,12 @@ constexpr auto runNImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>
         {
             return p;
         }
-        if (p == done<M, R>)
+        if (std::get_if<DoneT<R>>(p.get()))
         {
             return p;
         }
         assert (n >= 0);
-        return (std::get<RunT<M, R>>(*p).data >>= ([n](auto p){ return runNImpl(n-1, p); })).run();
+        return (std::get<RunT<M, R>>(*p).data >>= ([n](auto p){ return runNTImpl(n-1, p); })).run();
     });
 }
 
@@ -167,9 +200,9 @@ constexpr auto fullRunImpl(PauseTPtr<M, R> p) -> M<_O_>
 {
     return toTEIO | io([=]() -> _O_
     {
-        if (p == done<M, R>)
+        if (auto ptr = std::get_if<DoneT<R>>(p.get()))
         {
-            return _o_;
+            return ptr->r;
         }
         return (std::get<RunT<M, R>>(*p).data >>= ([](auto p){ return fullRunImpl(p); })).run();
     });
@@ -182,16 +215,16 @@ constexpr auto fullRun = toGFunc<1> | [](auto p)
 
 int main()
 {
-    static_cast<void>(Applicative<PauseIO>::pure);
+    static_cast<void>(Applicative<PausePtrIO>::pure);
     Id<PauseTPtr<IO, _O_>> rest;
     auto main_ = do_(
-        rest <= (runN | 2 | pauseExample),
+        rest <= (runNT | 2 | example2),
         putStrLn | "=== should print through step 2 ===",
-        runN | 1 | rest,
+        runNT | 1 | rest,
         // remember, IO Foo is just a recipe for Foo, not a Foo itself
         // so we can run that recipe again
         fullRun | rest,
-        fullRun | pauseExample
+        fullRun | example2
     );
     main_.run();
 
