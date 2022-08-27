@@ -12,7 +12,7 @@ foreach(sample ${hspp_SAMPLES})
     add_test(${sample} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sample})
 endforeach()
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" ORCMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set_tests_properties(pause PROPERTIES PASS_REGULAR_EXPRESSION "")
 else()
 set_tests_properties(pause PROPERTIES PASS_REGULAR_EXPRESSION
