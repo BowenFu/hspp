@@ -74,7 +74,7 @@ template <template <typename...> class M, typename R, typename... Ts>
 constexpr auto toDoneTPtrImpl(R r) -> PauseTPtr<M, R>
 {
     return std::make_shared<PauseT<M, R>>(DoneT<R>{r});
-};
+}
 
 template <template <typename...> class M>
 constexpr auto toDoneTPtr = toGFunc<1> | [](auto d)
