@@ -117,21 +117,20 @@ class MonadBasePause
 {
 public:
     template <typename R, typename Func>
-    constexpr static auto bind(PauseTPtr<M, R> const& t1, Func const& func)
+    constexpr static auto bind(PauseTPtr<M, R> const& t1, Func const& func) -> std::invoke_result_t<Func, R>
     {
+        using RetT = std::invoke_result_t<Func, R>;
         return std::visit(
             overload(
-                [=](DoneT<R> r)
+                [&](DoneT<R> const& r) -> RetT
                 {
                     return func(r.r);
                 },
-                [=](RunT<M, R> r)
+                [&](RunT<M, R> const& r) -> RetT
                 {
-                    // std::function<PauseTPtr<M, R>(R)> func_ = [=](R r) -> PauseTPtr<M, R> { return func(r); };
-                    return RunT<M, R>{
-                        // liftM | [=](auto v) { return v >>= func; } | r.data
-                        r.data >>= [=](PauseTPtr<M, R> v){ return return_ | (v >>= func); }
-                    };
+                    return toRunTPtr(
+                        liftM | [=](PauseTPtr<M, R> const& v) { return bind(v, func); } | r.data
+                    );
                 })
             , *t1);
     }
@@ -146,7 +145,7 @@ class MonadTrans<PauseTPtr>
 {
 public:
     // use IO for now.
-    constexpr static auto lift = toRunTPtr <o> (liftM | toDoneTPtr<IO>);
+    constexpr static auto lift = data::Compose{}(toRunTPtr, (liftM | toDoneTPtr<IO>));
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename R>
@@ -162,21 +161,13 @@ struct TypeClassTrait<TypeClassT, PausePtrIO<R>>
 // pause = DoneT ()
 const auto pause = toDoneTPtr<IO>(_o_);
 
-const auto example2 =
-  (lift<PauseTPtr> || putStrLn | "Step 1") >>
-  pause >>
-//   (lift<PauseTPtr> || putStrLn | "Step 2") >>
-//   pause >>
-//   (lift<PauseTPtr> || putStrLn | "Step 3");
-
-// const auto example2 = do_(
-//   lift<PauseTPtr> || putStrLn | "Step 1",
-//   pause,
-//   lift<PauseTPtr> || putStrLn | "Step 2",
-//   pause,
+const auto example2 = do_(
+  lift<PauseTPtr> || putStrLn | "Step 1",
+  pause,
+  lift<PauseTPtr> || putStrLn | "Step 2",
+  pause,
   (lift<PauseTPtr> || putStrLn | "Step 3")
-// )
-;
+);
 
 template <template <typename...> class M, typename R>
 constexpr auto runNTImpl(int n, PauseTPtr<M, R> p) -> M<PauseTPtr<M, R>>;

@@ -28,7 +28,7 @@ template <>
 class MonadTrans<MaybeT>
 {
 public:
-    constexpr static auto lift = toMaybeT <o> (liftM | data::just);
+    constexpr static auto lift = data::Compose{}(toMaybeT, (liftM | data::just));
 };
 
 template <template <template<typename...> class, typename...> class M>

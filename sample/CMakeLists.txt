@@ -16,17 +16,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set_tests_properties(pause PROPERTIES PASS_REGULAR_EXPRESSION "")
 else()
 set_tests_properties(pause PROPERTIES PASS_REGULAR_EXPRESSION
-"Let's begin
-Step 1
+"Step 1
 Step 2
 === should print through step 2 ===
 Step 3
-Yay, we're done!
 Step 3
-Yay, we're done!
-Let's begin
 Step 1
 Step 2
-Step 3
-Yay, we're done!")
+Step 3")
 endif()
