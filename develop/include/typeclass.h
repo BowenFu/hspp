@@ -1607,6 +1607,12 @@ constexpr inline auto elem = any <o> data::equalTo;
 
 constexpr inline auto length = getSum <o> (foldMap || data::const_ | (toSum | 1));
 
+// Promote a function to a monad.
+// liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
+constexpr auto liftM = toGFunc<2> | [](auto f, auto m1)
+{
+    return m1 >>= [=](auto x1){ return return_ | f (x1); };
+};
 
 } // namespace hspp
 

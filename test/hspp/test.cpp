@@ -1534,3 +1534,11 @@ TEST(doNotation, func)
     auto result = go | 3;
     EXPECT_EQ(result, std::make_tuple(4, "3"));
 }
+
+TEST(liftM, lst)
+{
+    auto negate = liftM | std::negate<>{};
+    auto result = negate | std::vector{1, 2, 3};
+    auto expected = std::vector{-1, -2, -3};
+    EXPECT_EQ(result, expected);
+}
