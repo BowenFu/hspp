@@ -4,7 +4,8 @@
 #include <variant>
 #include <cassert>
 
-#if !defined(FOR_CLANG)
+// FIXME : fix build on msvc
+#if !defined(FOR_CLANG) && !defined(FOR_MSVC)
 auto expectTrue(bool x)
 {
     if (!x)
@@ -237,4 +238,4 @@ int main()
 {
     return 0;
 }
-#endif // !defined(FOR_CLANG)
+#endif // !defined(FOR_CLANG) && !defined(FOR_MSVC)
