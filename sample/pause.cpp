@@ -5,7 +5,7 @@
 #include <cassert>
 
 // FIXME : fix build on msvc
-#if !defined(FOR_CLANG) && !defined(FOR_MSVC)
+#if !defined(FOR_MSVC)
 auto expectTrue(bool x)
 {
     if (!x)
