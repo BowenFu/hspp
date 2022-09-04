@@ -101,10 +101,10 @@ constexpr auto provide = toGFunc<1> | [](auto p)
   return p.provide;
 };
 
-template <template <typename...> class M, typename O, typename I, typename R>
-constexpr auto toProducingImpl(M<ProducerState<M, O, I, R>> r)
+template <template <typename...> class M, typename O, typename I, typename R, typename... Ts>
+constexpr auto toProducingImpl(M<ProducerState<M, O, I, R>, Ts...> r)
 {
-  return Producing<M, O, I, R>{std::move(r)};
+  return Producing<M, O, I, R>{static_cast<M<ProducerState<M, O, I, R>>>(r)};
 };
 
 constexpr auto toProducing = toGFunc<1> | [](auto r)
@@ -185,11 +185,11 @@ class Functor<ProducingIO> : public FunctorProducing<IO>
 template <typename O, typename I, typename R>
 using ProducerStateIO = ProducerState<IO, O, I, R>;
 
-template <template <typename...> class M>
+template <template <typename...> class M, typename O, typename I>
 class FunctorProducerState
 {
 public:
-  template <typename Func, typename O, typename I, typename R>
+  template <typename Func, typename R>
   constexpr auto static fmap(Func f, ProducerState<M, O, I, R> const& ps)
   {
     return std::visit(overload(
@@ -202,8 +202,8 @@ public:
   };
 };
 
-template <>
-class Functor<ProducerStateIO> : public FunctorProducerState<IO>
+template <typename O, typename I>
+class Functor<ProducerStateIO, O, I> : public FunctorProducerState<IO, O, I>
 {};
 
 // instance (Functor m, Monad m) => Applicative (Producing o i m) where
@@ -259,8 +259,8 @@ class MonadBase<ProducingIO, O, I> : public MonadProducing<IO, O, I>
 // instance MonadTrans (Producing o i) where
 //    lift = Producing . liftM Done
 
-template <typename O, typename I, typename R>
-class MonadTrans<Producing, O, I, R>
+template <typename O, typename I>
+class MonadTrans<Producing, O, I>
 {
 public:
     // use IO for now.
@@ -281,7 +281,7 @@ template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto yield = toFunc<> | [](O o)
 {
   // for IO
-  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr_<IO, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr_<IO, O, I, R> | Monad<ProducingIO, O, I>::return_));
 };
 
 // infixl 0 $$
@@ -318,14 +318,13 @@ constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 
 // using O = std::string;
 // using I = std::string;
-// using R = _O_;
 
 // Id<std::string> name, color;
 // const auto example1 = do_(
-//   name <= (yield<IO, O, I, R> | "What's your name? "),
-//   lift<IO> || putStrLn | ("Hello, " + name),
-//   color <= (yield<IO, std::string, std::string, std::string> | "What's your favorite color? "),
-//   lift<IO> || putStrLn | ("I like " + color + ", too.")
+//   name <= (yield<IO, O, I, std::string> | "What's your name? "),
+//   lift<Producing, O, I> || putStrLn | ("Hello, " + name),
+//   color <= (yield<IO, O, I, std::string> | "What's your favorite color? "),
+//   lift<Producing, O, I> || putStrLn | ("I like " + color + ", too.")
 // );
 
 // -- this comes in handy for defining Consumers
