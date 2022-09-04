@@ -69,9 +69,14 @@ constexpr auto toDone = toGFunc<1> | [](auto r)
 };
 
 template <template <typename...> class M, typename O, typename I, typename R>
-constexpr auto toProduced = toGFunc<2> | [](auto o, auto consuming)
+constexpr auto toProducedImpl(O o, ConsumingPtr<M, O, I, R> consuming)
 {
   return ProducerState<M, O, I, R>{Produced<M, O, I, R>{o, consuming}};
+};
+
+constexpr auto toProduced = toGFunc<2> | [](auto o, auto consuming)
+{
+  return toProducedImpl(o, consuming);
 };
 
 template <template <typename...> class M, typename O, typename I, typename R>
@@ -159,7 +164,7 @@ public:
       [&](Done<R> const& d){ return toDone<M, O, I> | (f | d.r); },
       [&](Produced<M, O, I, R> const& p){
         auto [o, k] = p;
-        return toProduced<M, O, I, R> | o || toConsumingPtr<M, O, I, R> | (::fmap | (f <o> (k.provide)));
+        return toProduced | o || toConsumingPtr<M, O, I, R> | (::fmap | (f <o> (k.provide)));
       }
     ) , ps);
   };
@@ -207,7 +212,7 @@ public:
         [&](Done<R> const& d){ return resume | (f | d.r); },
         [&](Produced<M, O, I, R> const& p){
           auto [o, k] = p;
-          return toProduced<M, O, I, R> | o || toConsumingPtr<M, O, I, R> | ([=](auto m){ return bind(m, f); } <o> (k.provide));
+          return toProduced | o || toConsumingPtr<M, O, I, R> | ([=](auto m){ return bind(m, f); } <o> (k.provide));
         }
       ) , s);
     };
@@ -244,7 +249,7 @@ template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto yield = toGFunc<1> | [](auto o)
 {
   // for IO
-  return toProducing || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
 };
 
 // infixl 0 $$
@@ -257,7 +262,7 @@ constexpr auto yield = toGFunc<1> | [](auto o)
 template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 {
-  return toProducing || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I>::return_));
   return (resume | producing) >>= [=](auto s)
   {
     return std::visit(overload(
