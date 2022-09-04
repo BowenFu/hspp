@@ -39,11 +39,11 @@ using namespace std::literals;
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Producing;
 
-template <template <typename...> class M, typename O, typename I, typename R, typename Func>
+template <template <typename...> class M, typename O, typename I, typename R>
 struct Consuming;
 
-template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
-using ConsumingPtr = std::shared_ptr<Consuming<M, O, I, R, Func>>;
+template <template <typename...> class M, typename O, typename I, typename R>
+using ConsumingPtr = std::shared_ptr<Consuming<M, O, I, R>>;
 
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Produced
@@ -86,7 +86,7 @@ struct Producing
   using IT = I;
   using RT = R;
   template <typename Func>
-  using ConsumingT = Consuming<M, O, I, R, Func>;
+  using ConsumingT = Consuming<M, O, I, R>;
 
   M<ProducerState<M, O, I, R>> resume;
 };
@@ -113,18 +113,10 @@ constexpr auto toProducing = toGFunc<1> | [](auto r)
 };
 
 
-template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
+template <template <typename...> class M, typename O, typename I, typename R>
 struct Consuming
 {
-  Func provide;
-private:
-  static_assert(std::is_invocable_v<Func, I>);
-  using RT = std::invoke_result_t<Func, I>;
-  using P = Producing<M, O, I, R>;
-  constexpr static bool same = std::is_same_v<P, RT>;
-  static_assert(std::is_same_v<P, RT>);
-  constexpr static bool constructible = std::is_constructible_v<P, RT>;
-  static_assert(same || constructible);
+  std::function<Producing<M, O, I, R>(I)> provide;
 };
 
 template <typename Func>
@@ -154,7 +146,7 @@ constexpr auto toConsumingPtr = toGFunc<1> | [](auto provide)
 template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto toConsumingPtr_ = toGFunc<1> | [](auto provide)
 {
-  using ConsumingT = Consuming<M, O, I, R, decltype(provide)>;
+  using ConsumingT = Consuming<M, O, I, R>;
   return std::make_shared<ConsumingT>(provide);
 };
 
