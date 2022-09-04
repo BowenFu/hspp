@@ -1280,9 +1280,9 @@ public:
     {
         return mFunc();
     }
-    operator IO<Data>() const
+    operator IO<Data, std::function<Data()>>() const
     {
-        return IO<Data>{std::function<Data()>(mFunc)};
+        return IO<Data, std::function<Data()>>{std::function<Data()>(mFunc)};
     }
 private:
     Func mFunc;
