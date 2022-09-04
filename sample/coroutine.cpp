@@ -72,7 +72,7 @@ template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto toProducedImpl(O o, ConsumingPtr<M, O, I, R> consuming)
 {
   return ProducerState<M, O, I, R>{Produced<M, O, I, R>{o, consuming}};
-};
+}
 
 constexpr auto toProduced = toGFunc<2> | [](auto o, auto consuming)
 {
@@ -105,7 +105,7 @@ template <template <typename...> class M, typename O, typename I, typename R, ty
 constexpr auto toProducingImpl(M<ProducerState<M, O, I, R>, Ts...> r)
 {
   return Producing<M, O, I, R>{static_cast<M<ProducerState<M, O, I, R>>>(r)};
-};
+}
 
 constexpr auto toProducing = toGFunc<1> | [](auto r)
 {
@@ -141,7 +141,7 @@ constexpr auto toConsumingPtrImpl(Func provide)
 {
   using ConsumingT = typename InferConsuming<Func>::ConsumingT;
   return std::make_shared<ConsumingT>(std::move(provide));
-};
+}
 
 constexpr auto toConsumingPtr = toGFunc<1> | [](auto provide)
 {
@@ -172,7 +172,7 @@ public:
 };
 
 template <>
-class Functor<ProducingIO> : public FunctorProducing<IO>
+class hspp::Functor<ProducingIO> : public FunctorProducing<IO>
 {};
 
 // instance (Functor m) => Functor (ProducerState o i m) where
@@ -197,11 +197,11 @@ public:
         return toProduced | o || toConsumingPtr | (::fmap | (f <o> (provide | k)));
       }
     ) , ps);
-  };
+  }
 };
 
 template <typename O, typename I>
-class Functor<ProducerStateIO, O, I> : public FunctorProducerState<IO, O, I>
+class hspp::Functor<ProducerStateIO, O, I> : public FunctorProducerState<IO, O, I>
 {};
 
 // instance (Functor m, Monad m) => Applicative (Producing o i m) where
@@ -219,7 +219,7 @@ public:
 };
 
 template <typename O, typename I>
-class Applicative<ProducingIO, O, I> : public ApplicativeProducing<IO, O, I>
+class hspp::Applicative<ProducingIO, O, I> : public ApplicativeProducing<IO, O, I>
 {};
 
 // instance (Monad m) => Monad (Producing o i m) where
@@ -253,7 +253,7 @@ public:
 };
 
 template <typename O, typename I>
-class MonadBase<ProducingIO, O, I> : public MonadProducing<IO, O, I>
+class hspp::MonadBase<ProducingIO, O, I> : public MonadProducing<IO, O, I>
 {};
 
 
@@ -261,7 +261,7 @@ class MonadBase<ProducingIO, O, I> : public MonadProducing<IO, O, I>
 //    lift = Producing . liftM Done
 
 template <typename O, typename I>
-class MonadTrans<Producing, O, I>
+class hspp::MonadTrans<Producing, O, I>
 {
 public:
     // use IO for now.
@@ -269,13 +269,13 @@ public:
 };
 
 template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename O, typename I, typename R>
-struct TypeClassTrait<TypeClassT, ProducingIO<O, I, R>>
+struct hspp::TypeClassTrait<TypeClassT, ProducingIO<O, I, R>>
 {
     using Type = TypeClassT<ProducingIO, O, I>;
 };
 
 template <typename O, typename I, typename R>
-struct DataTrait<ProducingIO<O, I, R>>
+struct hspp::DataTrait<ProducingIO<O, I, R>>
 {
     using Type = R;
 };
