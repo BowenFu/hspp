@@ -85,7 +85,6 @@ struct Producing
   using OT = O;
   using IT = I;
   using RT = R;
-  template <typename Func>
   using ConsumingT = Consuming<M, O, I, R>;
 
   M<ProducerState<M, O, I, R>> resume;
@@ -98,7 +97,8 @@ constexpr auto resume = toGFunc<1> | [](auto p)
 
 constexpr auto provide = toGFunc<1> | [](auto p)
 {
-  return p.provide;
+  assert(p);
+  return p->provide;
 };
 
 template <template <typename...> class M, typename O, typename I, typename R, typename... Ts>
@@ -116,7 +116,12 @@ constexpr auto toProducing = toGFunc<1> | [](auto r)
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Consuming
 {
-  std::function<Producing<M, O, I, R>(I)> provide;
+  using Func = std::function<Producing<M, O, I, R>(I)>;
+  Func provide;
+  template <typename F>
+  Consuming(F f)
+  : provide{f}
+  {}
 };
 
 template <typename Func>
@@ -128,14 +133,14 @@ class InferConsuming
   using I_T = typename FuncTrait::template Arg<0>;
   static_assert(std::is_same_v<IT, I_T>);
 public:
-  using ConsumingT = typename ProducingT::template ConsumingT<Func>;
+  using ConsumingT = typename ProducingT::ConsumingT;
 };
 
 template <typename Func>
 constexpr auto toConsumingPtrImpl(Func provide)
 {
   using ConsumingT = typename InferConsuming<Func>::ConsumingT;
-  return std::make_shared<ConsumingT>(provide);
+  return std::make_shared<ConsumingT>(std::move(provide));
 };
 
 constexpr auto toConsumingPtr = toGFunc<1> | [](auto provide)
@@ -147,7 +152,7 @@ template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto toConsumingPtr_ = toGFunc<1> | [](auto provide)
 {
   using ConsumingT = Consuming<M, O, I, R>;
-  return std::make_shared<ConsumingT>(provide);
+  return std::make_shared<ConsumingT>(std::move(provide));
 };
 
 template <typename O, typename I, typename R>
@@ -184,11 +189,12 @@ public:
   template <typename Func, typename R>
   constexpr auto static fmap(Func f, ProducerState<M, O, I, R> const& ps)
   {
+    using RetT = ProducerState<M, O, I, std::invoke_result_t<Func, R>>;
     return std::visit(overload(
-      [&](Done<R> const& d){ return toDone<M, O, I> | (f | d.r); },
-      [&](Produced<M, O, I, R> const& p){
+      [&](Done<R> const& d) -> RetT { return toDone<M, O, I> | (f | d.r); },
+      [&](Produced<M, O, I, R> const& p) -> RetT {
         auto [o, k] = p;
-        return toProduced | o || toConsumingPtr | (::fmap | (f <o> (k.provide)));
+        return toProduced | o || toConsumingPtr | (::fmap | (f <o> (provide | k)));
       }
     ) , ps);
   };
@@ -228,19 +234,22 @@ class MonadProducing
 {
 public:
   template <typename Func, typename R>
-  constexpr auto static bind(Producing<M, O, I, R> p, Func f)
+  constexpr auto static bind(Producing<M, O, I, R> p, Func f) -> Producing<M, O, I, typename std::invoke_result_t<Func, R>::RT>
   {
-    return toProducing || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
+    return toProducing || ((resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
     {
+      using RetT = std::decay_t<decltype(resume | f(std::declval<R>()))>;
       return std::visit(overload(
-        [&](Done<R> const& d){ return resume | (f | d.r); },
-        [&](Produced<M, O, I, R> const& p){
-          auto [o, k] = p;
-          return toProduced | o || toConsumingPtr | ([=](auto m){ return bind(m, f); } <o> (k.provide));
+        [&](Done<R> const& d) -> RetT { return resume | f(d.r); },
+        [&](Produced<M, O, I, R> const& p) -> RetT
+        {
+          auto [o_, k] = p;
+          auto ret = Monad<IO>::return_ || (toProduced | o_ || toConsumingPtr_<M, O, I, typename std::invoke_result_t<Func, R>::RT> | ([=](auto m){ return bind(m, f); } <o> (provide | k)));
+          return static_cast<RetT>(ret);
         }
       ) , s);
-    };
-  };
+    });
+  }
 };
 
 template <typename O, typename I>
@@ -257,6 +266,18 @@ class MonadTrans<Producing, O, I>
 public:
     // use IO for now.
     constexpr static auto lift = toProducing <o> (liftM | toDone<IO, O, I>);
+};
+
+template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename O, typename I, typename R>
+struct TypeClassTrait<TypeClassT, ProducingIO<O, I, R>>
+{
+    using Type = TypeClassT<ProducingIO, O, I>;
+};
+
+template <typename O, typename I, typename R>
+struct DataTrait<ProducingIO<O, I, R>>
+{
+    using Type = R;
 };
 
 // instance MFunctor (Producing o i) where
@@ -286,7 +307,6 @@ constexpr auto yield = toFunc<> | [](O o)
 template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 {
-  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr | Monad<ProducingIO, O, I>::return_));
   return (resume | producing) >>= [=](auto s)
   {
     return std::visit(overload(
@@ -308,16 +328,16 @@ constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 //   color <- yield "What's your favorite color? "
 //   lift $ putStrLn $ "I like " ++ color ++ ", too."
 
-// using O = std::string;
-// using I = std::string;
+using O = std::string;
+using I = std::string;
 
-// Id<std::string> name, color;
-// const auto example1 = do_(
-//   name <= (yield<IO, O, I, std::string> | "What's your name? "),
-//   lift<Producing, O, I> || putStrLn | ("Hello, " + name),
-//   color <= (yield<IO, O, I, std::string> | "What's your favorite color? "),
-//   lift<Producing, O, I> || putStrLn | ("I like " + color + ", too.")
-// );
+Id<std::string> name, color;
+const auto example1 = do_(
+  name <= (yield<IO, O, I, std::string> | "What's your name? "),
+  lift<Producing, O, I> || putStrLn | ("Hello, " + name),
+  color <= (yield<IO, O, I, std::string> | "What's your favorite color? "),
+  lift<Producing, O, I> || putStrLn | ("I like " + color + ", too.")
+);
 
 // -- this comes in handy for defining Consumers
 // foreverK :: Monad m => (a -> m a) -> a -> m r
