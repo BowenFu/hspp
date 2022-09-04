@@ -926,6 +926,7 @@ constexpr auto validateAndAcquireLocks = toFunc<> | [](Integer readStamp, Intege
             auto lockValue = (readLock | lock).run();
             if (isLocked | lockValue)
             {
+                // This assertion can fail.
                 // (hassert | (lockValue != myId) | "validate and lock readset: already locked by me!!!").run();
                 return std::make_pair(false, locks);
             }
