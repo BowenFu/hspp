@@ -91,9 +91,14 @@ constexpr auto provide = toGFunc<1> | [](auto p)
 };
 
 template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto toProducingImpl(M<ProducerState<M, O, I, R>> r)
+{
+  return Producing<M, O, I, R>{std::move(r)};
+};
+
 constexpr auto toProducing = toGFunc<1> | [](auto r)
 {
-  return Producing<M, O, I, R>{r};
+  return toProducingImpl(r);
 };
 
 template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
@@ -128,7 +133,7 @@ class FunctorProducing
 public:
   constexpr auto static fmap = toGFunc<2> | [](auto f, auto p)
   {
-    return toProducing<M, O, I, R> || ::fmap | (::fmap | f) | (resume | p);
+    return toProducing || ::fmap | (::fmap | f) | (resume | p);
   };
 };
 
@@ -174,7 +179,7 @@ class ApplicativeProducing
 public:
   constexpr static auto pure = toGFunc<1> | [](auto r)
   {
-    return toProducing<M, O, I, R> || Monad<M>::return_ | (toDone<M, O, I> | r);
+    return toProducing || Monad<M>::return_ | (toDone<M, O, I> | r);
   };
 };
 
@@ -196,7 +201,7 @@ public:
   template <typename Func>
   constexpr auto static bind(Producing<M, O, I, R> p, Func f)
   {
-    return toProducing<M, O, I, R> || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
+    return toProducing || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
     {
       return std::visit(overload(
         [&](Done<R> const& d){ return resume | (f | d.r); },
@@ -222,7 +227,7 @@ class MonadTrans<Producing, O, I, R>
 {
 public:
     // use IO for now.
-    constexpr static auto lift = toProducing<IO, O, I, R> <o> (liftM | toDone<IO, O, I, R>);
+    constexpr static auto lift = toProducing <o> (liftM | toDone<IO, O, I, R>);
 };
 
 // instance MFunctor (Producing o i) where
@@ -239,7 +244,7 @@ template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto yield = toGFunc<1> | [](auto o)
 {
   // for IO
-  return toProducing<M, O, I, R> || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
 };
 
 // infixl 0 $$
@@ -252,7 +257,7 @@ constexpr auto yield = toGFunc<1> | [](auto o)
 template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 {
-  return toProducing<M, O, I, R> || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I>::return_));
   return (resume | producing) >>= [=](auto s)
   {
     return std::visit(overload(
