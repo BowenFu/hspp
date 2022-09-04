@@ -151,13 +151,20 @@ constexpr auto toConsumingPtr = toGFunc<1> | [](auto provide)
   return toConsumingPtrImpl(provide);
 };
 
+template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto toConsumingPtr_ = toGFunc<1> | [](auto provide)
+{
+  using ConsumingT = Consuming<M, O, I, R, decltype(provide)>;
+  return std::make_shared<ConsumingT>(provide);
+};
+
 template <typename O, typename I, typename R>
 using ProducingIO = Producing<IO, O, I, R>;
 
 // instance (Functor m) => Functor (Producing o i m) where
 //    fmap f p = Producing $ fmap (fmap f) (resume p)
 
-template <template <typename...> class M, typename O, typename I, typename R>
+template <template <typename...> class M>
 class FunctorProducing
 {
 public:
@@ -167,8 +174,8 @@ public:
   };
 };
 
-template <typename O, typename I, typename R>
-class Functor<ProducingIO, O, I, R> : public FunctorProducing<IO, O, I, R>
+template <>
+class Functor<ProducingIO> : public FunctorProducing<IO>
 {};
 
 // instance (Functor m) => Functor (ProducerState o i m) where
@@ -203,7 +210,7 @@ class Functor<ProducerStateIO> : public FunctorProducerState<IO>
 //    pure = return
 //    (<*>) = ap
 
-template <template <typename...> class M, typename O, typename I, typename R>
+template <template <typename...> class M, typename O, typename I>
 class ApplicativeProducing
 {
 public:
@@ -213,8 +220,8 @@ public:
   };
 };
 
-template <typename O, typename I, typename R>
-class Applicative<ProducingIO, O, I, R> : public ApplicativeProducing<IO, O, I, R>
+template <typename O, typename I>
+class Applicative<ProducingIO, O, I> : public ApplicativeProducing<IO, O, I>
 {};
 
 // instance (Monad m) => Monad (Producing o i m) where
@@ -224,11 +231,11 @@ class Applicative<ProducingIO, O, I, R> : public ApplicativeProducing<IO, O, I, 
 //      Produced o k ->
 //       return $ Produced o $ Consuming ((>>= f) . provide k)
 
-template <template <typename...> class M, typename O, typename I, typename R>
+template <template <typename...> class M, typename O, typename I>
 class MonadProducing
 {
 public:
-  template <typename Func>
+  template <typename Func, typename R>
   constexpr auto static bind(Producing<M, O, I, R> p, Func f)
   {
     return toProducing || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
@@ -244,8 +251,8 @@ public:
   };
 };
 
-template <typename O, typename I, typename R>
-class MonadBase<ProducingIO, O, I, R> : public MonadProducing<IO, O, I, R>
+template <typename O, typename I>
+class MonadBase<ProducingIO, O, I> : public MonadProducing<IO, O, I>
 {};
 
 
@@ -257,7 +264,7 @@ class MonadTrans<Producing, O, I, R>
 {
 public:
     // use IO for now.
-    constexpr static auto lift = toProducing <o> (liftM | toDone<IO, O, I, R>);
+    constexpr static auto lift = toProducing <o> (liftM | toDone<IO, O, I>);
 };
 
 // instance MFunctor (Producing o i) where
@@ -271,10 +278,10 @@ public:
 // yield o = Producing $ return $ Produced o $ Consuming return
 
 template <template <typename...> class M, typename O, typename I, typename R>
-constexpr auto yield = toGFunc<1> | [](auto o)
+constexpr auto yield = toFunc<> | [](O o)
 {
   // for IO
-  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr | Monad<ProducingIO, O, I, R>::return_));
+  return toProducing || (Monad<M>::return_ || toProduced | o | (toConsumingPtr_<IO, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
 };
 
 // infixl 0 $$
@@ -311,7 +318,7 @@ constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 
 // using O = std::string;
 // using I = std::string;
-// using R = hspp::data::IO<std::__1::variant<Produced<IO, std::__1::basic_string<char>, std::__1::basic_string<char>, std::__1::basic_string<char> >, Done<std::__1::basic_string<char> > >>;
+// using R = _O_;
 
 // Id<std::string> name, color;
 // const auto example1 = do_(
@@ -338,6 +345,6 @@ constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
 
 int main()
 {
-    (void)FunctorProducing<IO, std::string, std::string, _O_>::fmap;
+    (void)FunctorProducing<IO>::fmap;
     return 0;
 }
