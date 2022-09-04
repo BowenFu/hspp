@@ -39,25 +39,17 @@ using namespace std::literals;
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Producing;
 
-template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
-struct Consuming
-{
-  Func provide;
-  static_assert(std::is_invocable_v<Func, I>);
-  static_assert(std::is_same_v<std::invoke_result_t<Func, I>, Producing<M, O, I, R>>);
-};
+template <template <typename...> class M, typename O, typename I, typename R, typename Func>
+struct Consuming;
 
-template <template <typename...> class M, typename O, typename I, typename R>
-constexpr auto toConsuming = toGFunc<1> | [](auto provide)
-{
-  return Consuming<M, O, I, R, decltype(provide)>{provide};
-};
+template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
+using ConsumingPtr = std::shared_ptr<Consuming<M, O, I, R, Func>>;
 
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Produced
 {
   O o;
-  Consuming<M, O, I, R> consuming;
+  ConsumingPtr<M, O, I, R> consuming;
 };
 
 template <typename R>
@@ -72,13 +64,14 @@ using ProducerState = std::variant<Produced<M, O, I, R>, Done<R>>;
 template <template <typename...> class M, typename O, typename I>
 constexpr auto toDone = toGFunc<1> | [](auto r)
 {
-  return ProducerState{Done{r}};
+  using R = decltype(r);
+  return ProducerState<M, O, I, R>{Done<R>{r}};
 };
 
-template <template <typename...> class M, typename O, typename I>
+template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto toProduced = toGFunc<2> | [](auto o, auto consuming)
 {
-  return ProducerState{Produced{o, consuming}};
+  return ProducerState<M, O, I, R>{Produced<M, O, I, R>{o, consuming}};
 };
 
 template <template <typename...> class M, typename O, typename I, typename R>
@@ -92,9 +85,35 @@ constexpr auto resume = toGFunc<1> | [](auto p)
   return p.resume;
 };
 
+constexpr auto provide = toGFunc<1> | [](auto p)
+{
+  return p.provide;
+};
+
+template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto toProducing = toGFunc<1> | [](auto r)
 {
-  return Producing{r};
+  return Producing<M, O, I, R>{r};
+};
+
+template <template <typename...> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
+struct Consuming
+{
+  Func provide;
+private:
+  static_assert(std::is_invocable_v<Func, I>);
+  using RT = std::invoke_result_t<Func, I>;
+  using P = Producing<M, O, I, R>;
+  constexpr static bool same = std::is_same_v<P, RT>;
+  static_assert(std::is_same_v<P, RT>);
+  constexpr static bool constructible = std::is_constructible_v<P, RT>;
+  static_assert(same || constructible);
+};
+
+template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto toConsumingPtr = toGFunc<1> | [](auto provide)
+{
+  return std::make_shared<Consuming<M, O, I, R, decltype(provide)>>(provide);
 };
 
 template <typename O, typename I, typename R>
@@ -103,17 +122,18 @@ using ProducingIO = Producing<IO, O, I, R>;
 // instance (Functor m) => Functor (Producing o i m) where
 //    fmap f p = Producing $ fmap (fmap f) (resume p)
 
+template <template <typename...> class M, typename O, typename I, typename R>
 class FunctorProducing
 {
 public:
   constexpr auto static fmap = toGFunc<2> | [](auto f, auto p)
   {
-    return toProducing || ::fmap | (::fmap | f) | (resume | p);
+    return toProducing<M, O, I, R> || ::fmap | (::fmap | f) | (resume | p);
   };
 };
 
-template <>
-class Functor<ProducingIO> : public FunctorProducing
+template <typename O, typename I, typename R>
+class Functor<ProducingIO, O, I, R> : public FunctorProducing<IO, O, I, R>
 {};
 
 // instance (Functor m) => Functor (ProducerState o i m) where
@@ -134,7 +154,7 @@ public:
       [&](Done<R> const& d){ return toDone<M, O, I> | (f | d.r); },
       [&](Produced<M, O, I, R> const& p){
         auto [o, k] = p;
-        return toProduced<M, O, I> | o || toConsuming<M, O, I, R> | (::fmap | (f <o> (k.provide)));
+        return toProduced<M, O, I, R> | o || toConsumingPtr<M, O, I, R> | (::fmap | (f <o> (k.provide)));
       }
     ) , ps);
   };
@@ -148,20 +168,18 @@ class Functor<ProducerStateIO> : public FunctorProducerState<IO>
 //    pure = return
 //    (<*>) = ap
 
-template <template <typename...> class M>
+template <template <typename...> class M, typename O, typename I, typename R>
 class ApplicativeProducing
 {
 public:
-  template <typename O, typename I, typename R>
-  constexpr auto static pure(R r)
+  constexpr static auto pure = toGFunc<1> | [](auto r)
   {
-//    return x = Producing $ return (Done x)
-    return toProducing || Monad<M>::return_ | (toDone<M, O, I> | r);
+    return toProducing<M, O, I, R> || Monad<M>::return_ | (toDone<M, O, I> | r);
   };
 };
 
-template <>
-class Applicative<ProducingIO> : public ApplicativeProducing<IO>
+template <typename O, typename I, typename R>
+class Applicative<ProducingIO, O, I, R> : public ApplicativeProducing<IO, O, I, R>
 {};
 
 // instance (Monad m) => Monad (Producing o i m) where
@@ -171,38 +189,41 @@ class Applicative<ProducingIO> : public ApplicativeProducing<IO>
 //      Produced o k ->
 //       return $ Produced o $ Consuming ((>>= f) . provide k)
 
-template <template <typename...> class M>
+template <template <typename...> class M, typename O, typename I, typename R>
 class MonadProducing
 {
 public:
-  template <typename O, typename I, typename R>
-  constexpr auto static return_(R r)
-  {
-    return ApplicativeProducing<M>::pure(r);
-  };
-  template <typename O, typename I, typename R, typename Func>
+  template <typename Func>
   constexpr auto static bind(Producing<M, O, I, R> p, Func f)
   {
-    return toProducing || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
+    return toProducing<M, O, I, R> || (resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
     {
       return std::visit(overload(
         [&](Done<R> const& d){ return resume | (f | d.r); },
         [&](Produced<M, O, I, R> const& p){
           auto [o, k] = p;
-          return toProduced<M, O, I> | o || toConsuming<M, O, I, R> | ([=](auto m){ return bind(m, f); } <o> (k.provide));
+          return toProduced<M, O, I, R> | o || toConsumingPtr<M, O, I, R> | ([=](auto m){ return bind(m, f); } <o> (k.provide));
         }
       ) , s);
     };
   };
 };
 
-template <>
-class MonadBase<ProducingIO> : public MonadProducing<IO>
+template <typename O, typename I, typename R>
+class MonadBase<ProducingIO, O, I, R> : public MonadProducing<IO, O, I, R>
 {};
 
 
 // instance MonadTrans (Producing o i) where
 //    lift = Producing . liftM Done
+
+template <typename O, typename I, typename R>
+class MonadTrans<Producing, O, I, R>
+{
+public:
+    // use IO for now.
+    constexpr static auto lift = toProducing<IO, O, I, R> <o> (liftM | toDone<IO, O, I, R>);
+};
 
 // instance MFunctor (Producing o i) where
 //   hoist f = go where
@@ -210,8 +231,16 @@ class MonadBase<ProducingIO> : public MonadProducing<IO>
 //     map' (Done r) = Done r
 //     map' (Produced o k) = Produced o $ Consuming (go . provide k)
 
+
 // yield :: Monad m => o -> Producing o i m i
 // yield o = Producing $ return $ Produced o $ Consuming return
+
+template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto yield = toGFunc<1> | [](auto o)
+{
+  // for IO
+  return toProducing<M, O, I, R> || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I, R>::return_));
+};
 
 // infixl 0 $$
 
@@ -219,6 +248,22 @@ class MonadBase<ProducingIO> : public MonadProducing<IO>
 // producing $$ consuming = resume producing >>= \s -> case s of
 //   Done r -> return r
 //   Produced o k -> provide consuming o $$ k
+
+template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
+{
+  return toProducing<M, O, I, R> || (Monad<M>::return_ || toProduced<M, O, I, R> | o | (toConsumingPtr<M, O, I, R> | Monad<ProducingIO, O, I>::return_));
+  return (resume | producing) >>= [=](auto s)
+  {
+    return std::visit(overload(
+      [&](Done<R> const& d){ return Monad<M>::return_ | d.r; },
+      [&](Produced<M, O, I, R> const& p){
+        auto [o, k] = p;
+        return SS<M, O, I, R>(provide | consuming | o, k);
+      }
+    ) , s);
+  };
+};
 
 
 // -- show
@@ -228,6 +273,18 @@ class MonadBase<ProducingIO> : public MonadProducing<IO>
 //   lift $ putStrLn $ "Hello, " ++ name
 //   color <- yield "What's your favorite color? "
 //   lift $ putStrLn $ "I like " ++ color ++ ", too."
+
+// using O = std::string;
+// using I = std::string;
+// using R = hspp::data::IO<std::__1::variant<Produced<IO, std::__1::basic_string<char>, std::__1::basic_string<char>, std::__1::basic_string<char> >, Done<std::__1::basic_string<char> > >>;
+
+// Id<std::string> name, color;
+// const auto example1 = do_(
+//   name <= (yield<IO, O, I, R> | "What's your name? "),
+//   lift<IO> || putStrLn | ("Hello, " + name),
+//   color <= (yield<IO, std::string, std::string, std::string> | "What's your favorite color? "),
+//   lift<IO> || putStrLn | ("I like " + color + ", too.")
+// );
 
 // -- this comes in handy for defining Consumers
 // foreverK :: Monad m => (a -> m a) -> a -> m r
@@ -246,6 +303,6 @@ class MonadBase<ProducingIO> : public MonadProducing<IO>
 
 int main()
 {
-    (void)FunctorProducing::fmap;
+    (void)FunctorProducing<IO, std::string, std::string, _O_>::fmap;
     return 0;
 }
