@@ -116,11 +116,11 @@ constexpr auto toProducing = toGFunc<1> | [](auto r)
 template <template <typename...> class M, typename O, typename I, typename R>
 struct Consuming
 {
-  using Func = std::function<Producing<M, O, I, R>(I)>;
+  using Func = TEFunction<Producing<M, O, I, R>, I>;
   Func provide;
   template <typename F>
   Consuming(F f)
-  : provide{f}
+  : provide{toTEFunc<Producing<M, O, I, R>, I>(std::move(f))}
   {}
 };
 
@@ -305,20 +305,28 @@ constexpr auto yield = toFunc<> | [](O o)
 //   Produced o k -> provide consuming o $$ k
 
 template <template <typename...> class M, typename O, typename I, typename R>
-constexpr auto SS = toGFunc<2> | [](auto producing, auto consuming)
+constexpr auto SSImpl(Producing<M, O, I, R> const& producing, ConsumingPtr<M, O, I, R> const& consuming) -> M<R>
 {
-  return (resume | producing) >>= [=](auto s)
+  return (resume | producing) >>= [=](ProducerState<M, O, I, R> const& s)
   {
+    using RetT = M<R>;
     return std::visit(overload(
-      [&](Done<R> const& d){ return Monad<M>::return_ | d.r; },
-      [&](Produced<M, O, I, R> const& p){
+      [&](Done<R> const& d) -> RetT
+      { return Monad<M>::return_ | d.r; },
+      [&](Produced<M, O, I, R> const& p) -> RetT
+      {
         auto [o, k] = p;
-        return SS<M, O, I, R>(provide | consuming | o, k);
+        return SSImpl<M, O, I, R>(provide | consuming | o, k);
       }
     ) , s);
   };
-};
+}
 
+template <template <typename...> class M, typename O, typename I, typename R>
+constexpr auto SS = [](Producing<M, O, I, R> const& producing, ConsumingPtr<M, O, I, R> const& consuming)
+{
+  return SSImpl(producing, consuming);
+};
 
 // -- show
 // example1 :: Producing String String IO ()
@@ -344,18 +352,39 @@ const auto example1 = do_(
 // foreverK f = go where
 //   go a = f a >>= go
 
+constexpr auto foreverK = toGFunc<1> | [](auto f)
+{
+  return yCombinator | [=](auto const& self, auto a) -> ProducingIO<O, I, _O_>
+  {
+    return f(a) >>= self;
+  };
+};
+
 // stdOutIn :: Consuming r IO String String
 // stdOutIn = Consuming $ foreverK $ \str -> do
 //   lift $ putStrLn str
 //   lift getLine >>= yield
 
+// const auto stdOutIn = toConsumingPtr_<IO, O, I, std::string> || foreverK | [](std::string const& str)
+// // const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || [](std::string const& str)
+// {
+//   return do_(
+//     lift<Producing, O, I> || putStrLn | str,
+//     (lift<Producing, O, I> | getLine) >>= yield<IO, O, I, std::string>
+//   );
+// };
+
 // stdInOut :: Producing String String IO r
 // stdInOut = provide stdOutIn ""
+// const auto stdInOut = provide | stdOutIn | "";
 
 // main = example1 $$ stdOutIn
 
 int main()
 {
     (void)FunctorProducing<IO>::fmap;
+    (void)foreverK;
+    // auto io_ = SS<IO, O, I, _O_>(example1, stdOutIn);
+    // io_.run();
     return 0;
 }
