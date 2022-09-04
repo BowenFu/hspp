@@ -1,33 +1,28 @@
 
 // Developed based on Haskell version at: https://www.schoolofhaskell.com/user/school/to-infinity-and-beyond/pick-of-the-week/coroutines-for-streaming/part-3-stacking-interfaces
 
-// import Control.Applicative
-// import Control.Monad
-// import Control.Monad.Morph
-// import Control.Monad.Trans.Class
-
 // newtype Producing o i m r
 //   = Producing { resume :: m (ProducerState o i m r) }
 
 // newtype Consuming r m i o
 //   = Consuming { provide :: i -> Producing o i m r }
 
-template <typename O, typename I, template <typename> class M, typename R>
+template <template <typename> class M, typename O, typename I, typename R>
 struct Producing;
 
-template <typename O, typename I, template <typename> class M, typename R, typename Func = std::function<Producing<O, I, M, R>(I)>>
+template <template <typename> class M, typename O, typename I, typename R, typename Func = std::function<Producing<M, O, I, R>(I)>>
 struct Consuming
 {
   Func provide;
   static_assert(std::is_invocable_v<Func, I>);
-  static_assert(std::is_same_v<std::invoke_result_t<Func, I>, Producing<O, I, M, R>>);
+  static_assert(std::is_same_v<std::invoke_result_t<Func, I>, Producing<M, O, I, R>>);
 };
 
-template <typename O, typename I, template <typename> class M, typename R>
+template <template <typename> class M, typename O, typename I, typename R>
 struct Produced
 {
   O o;
-  Consuming<O, I, M, R> consuming;
+  Consuming<M, O, I, R> consuming;
 };
 
 template <typename R>
@@ -36,13 +31,13 @@ struct Done
   R r;
 };
 
-template <typename O, typename I, template <typename> class M, typename R>
-using ProducerState = std::variant<Produced<O, I, M, R>, Done<R>>;
+template <template <typename> class M, typename O, typename I, typename R>
+using ProducerState = std::variant<Produced<M, O, I, R>, Done<R>>;
 
-template <typename O, typename I, template <typename> class M, typename R>
+template <template <typename> class M, typename O, typename I, typename R>
 struct Producing
 {
-  M<ProducerState<O, I, M, R>> resume;
+  M<ProducerState<M, O, I, R>> resume;
 };
 
 // template <>
