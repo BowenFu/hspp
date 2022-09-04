@@ -85,7 +85,7 @@ constexpr auto toDoneTPtr = toGFunc<1> | [](auto d)
 template <template <typename...> class M, typename R, typename... Ts>
 constexpr auto toRunPtrImpl(M<PauseTPtr<M, R>, Ts...> d) -> PauseTPtr<M, R>
 {
-    return std::make_shared<PauseT<M, R>>(RunT<M, R>{d});
+    return std::make_shared<PauseT<M, R>>(RunT<M, R>{static_cast<M<PauseTPtr<M, R>>>(d)});
 }
 
 constexpr auto toRunTPtr = toGFunc<1> | [](auto d)
