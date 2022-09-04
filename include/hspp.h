@@ -1276,15 +1276,17 @@ public:
     constexpr IO(F func)
     : mFunc{std::move(func)}
     {}
+    template <typename F>
+    constexpr IO(IO<Data, F> other)
+    : mFunc{std::move(other.mFunc)}
+    {}
     Data run() const
     {
         return mFunc();
     }
-    operator IO<Data>() const
-    {
-        return IO<Data>{std::function<Data()>(mFunc)};
-    }
 private:
+    template <typename, typename F>
+    friend class IO;
     Func mFunc;
 };
 
