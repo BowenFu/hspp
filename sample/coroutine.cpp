@@ -298,6 +298,8 @@ constexpr auto yield = toFunc<> | [](O o) {
 //   Done r -> return r
 //   Produced o k -> provide consuming o $$ k
 
+// let the two coroutines hand over control to each other by turn.
+
 template <template <typename...> class M, typename O, typename I, typename R>
 constexpr auto SSImpl(Producing<M, O, I, R> const &producing, ConsumingPtr<M, O, I, R> const &consuming) -> M<R>
 {
@@ -334,6 +336,7 @@ constexpr auto SS = toGFunc<2> | [](auto const &producing, auto const &consuming
 using O = std::string;
 using I = std::string;
 
+// coroutine for handling strings
 Id<std::string> name, color;
 const auto example1 = do_(
     name <= (yield<IO, O, I, std::string> | "What's your name? "),
@@ -371,6 +374,7 @@ const auto foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I
     );
 };
 
+// coroutine for handling io
 const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || foreverKResult;
 
 // stdInOut :: Producing String String IO r
@@ -384,7 +388,8 @@ int main()
     // FIXME: no sure why, but the following line is needed to instantiate some templates, otherwise we will see linker
     // issue.
     (void)foreverKResult("");
-    auto io_ = example1<SS> stdOutIn;
+    // let the two coroutines hand over control to each other by return.
+    auto io_ = example1 <SS> stdOutIn;
     io_.run();
     return 0;
 }
