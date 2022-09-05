@@ -4,25 +4,6 @@
 #include <variant>
 #include <cassert>
 
-auto expectTrue(bool x)
-{
-    if (!x)
-    {
-        throw std::runtime_error{"False in expectedTrue!"};
-    }
-}
-
-template <typename T>
-auto expectEq(T const& l, T const& r)
-{
-    if (l != r)
-    {
-        std::stringstream ss;
-        ss << l << " != " << r;
-        throw std::runtime_error{ss.str()};
-    }
-}
-
 using namespace hspp;
 using namespace hspp::doN;
 using namespace hspp::data;
@@ -128,9 +109,9 @@ template <typename Func>
 class InferConsuming
 {
   using FuncTrait = FunctionTrait<decltype(&Func::operator())>;
-  using ProducingT = typename FuncTrait::Ret;
+  using ProducingT = typename FuncTrait::RetT;
   using IT = typename ProducingT::I;
-  using I_T = typename FuncTrait::template Arg<0>;
+  using I_T = typename FuncTrait::template ArgT<0>;
   static_assert(std::is_same_v<IT, I_T>);
 public:
   using ConsumingT = typename ProducingT::ConsumingT;
@@ -354,7 +335,10 @@ const auto example1 = do_(
 
 constexpr auto foreverK = toGFunc<1> | [](auto f)
 {
-  return yCombinator | [=](auto const& self, auto a) -> ProducingIO<O, I, _O_>
+  using FuncTrait = FunctionTrait<decltype(&decltype(f)::operator())>;
+  using ArgT = typename FuncTrait::template ArgT<0>;
+
+  return yCombinator | [=](auto const& self, ArgT a) -> ProducingIO<O, I, _O_>
   {
     return f(a) >>= self;
   };
@@ -365,14 +349,15 @@ constexpr auto foreverK = toGFunc<1> | [](auto f)
 //   lift $ putStrLn str
 //   lift getLine >>= yield
 
-// const auto stdOutIn = toConsumingPtr_<IO, O, I, std::string> || foreverK | [](std::string const& str)
-// // const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || [](std::string const& str)
-// {
-//   return do_(
-//     lift<Producing, O, I> || putStrLn | str,
-//     (lift<Producing, O, I> | getLine) >>= yield<IO, O, I, std::string>
-//   );
-// };
+const auto foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I, std::string>
+{
+  return do_(
+    lift<Producing, O, I> || putStrLn | str,
+    (lift<Producing, O, I> | getLine) >>= yield<IO, O, I, std::string>
+  );
+};
+
+const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || foreverKResult;
 
 // stdInOut :: Producing String String IO r
 // stdInOut = provide stdOutIn ""
@@ -382,9 +367,9 @@ constexpr auto foreverK = toGFunc<1> | [](auto f)
 
 int main()
 {
-    (void)FunctorProducing<IO>::fmap;
-    (void)foreverK;
-    // auto io_ = SS<IO, O, I, _O_>(example1, stdOutIn);
-    // io_.run();
+    // FIXME: no sure why, but the following line is needed to instantiate some templates, otherwise we will see linker issue.
+    (void)foreverKResult("");
+    auto io_ = SS<IO, O, I, _O_>(example1, stdOutIn);
+    io_.run();
     return 0;
 }
