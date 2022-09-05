@@ -31,20 +31,20 @@ public:
     constexpr static auto lift = toMaybeT <o> (liftM | data::just);
 };
 
-template <template <template<typename...> class, typename...> class M>
+template <template <template<typename...> class, typename...> class M, typename... Ts>
 class Lift
 {
 public:
     template <typename Func>
     constexpr auto operator()(Func const& func) const
     {
-        using MTType = MonadTrans<M>;
+        using MTType = MonadTrans<M, Ts...>;
         return MTType::lift(func);
     }
 };
 
-template <template <template<typename...> class, typename...> class M>
-constexpr inline auto lift = toGFunc<1>(Lift<M>{});
+template <template <template<typename...> class, typename...> class M, typename... Ts>
+constexpr inline auto lift = toGFunc<1>(Lift<M, Ts...>{});
 
 } // namespace hspp
 

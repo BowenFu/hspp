@@ -274,6 +274,48 @@ auto io_ = do_(
 io_.run();
 ```
 
+### Sample 7 for coroutine
+
+```c++
+using O = std::string;
+using I = std::string;
+
+// coroutine for handling strings
+Id<std::string> name, color;
+const auto example1 = do_(
+    name <= (yield<IO, O, I, std::string> | "What's your name? "),
+    lift<Producing, O, I> || putStrLn | ("Hello, " + name),
+    color <= (yield<IO, O, I, std::string> | "What's your favorite color? "),
+    lift<Producing, O, I> || putStrLn | ("I like " + color + ", too.")
+);
+
+const auto foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I, std::string>
+{
+    return do_(
+        lift<Producing, O, I> || putStrLn | str,
+        (lift<Producing, O, I> | getLine) >>= yield<IO, O, I, std::string>
+    );
+};
+
+// coroutine for handling io
+const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || foreverKResult;
+
+// let the two coroutines hand over control to each other by turn.
+auto io_ = example1 <SS> stdOutIn;
+io_.run();
+
+```
+
+The sample running would be like
+```
+> What's your name?
+< Bob
+> Hello, Bob
+> What's your favorite color?
+< Red
+> I like Red, too.
+```
+
 ## Haskell vs Hspp (Incomplete list)
 
 | Haskell       | Hspp |
@@ -311,3 +353,7 @@ Discussions / issues / PRs are welcome.
 ## Related
 
 Haskell pattern matching is not covered in this repo. You may be interested in [match(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.
+
+## Support this project
+
+Please star the repo, share the repo, or sponsor $1 to let me know this project matters.
