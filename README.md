@@ -353,3 +353,7 @@ Discussions / issues / PRs are welcome.
 ## Related
 
 Haskell pattern matching is not covered in this repo. You may be interested in [match(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.
+
+## Support this project
+
+Please star the repo, share the repo, or sponsor $1 to let me know this project matters.
