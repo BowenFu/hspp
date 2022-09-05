@@ -217,7 +217,6 @@ public:
   template <typename Func, typename R>
   constexpr auto static bind(Producing<M, O, I, R> p, Func f) -> Producing<M, O, I, typename std::invoke_result_t<Func, R>::RT>
   {
-    using RetT = Producing<M, O, I, typename std::invoke_result_t<Func, R>::RT>;
     auto result = toProducing || ((resume | p) >>= [=](ProducerState<M, O, I, R> const& s)
     {
       using RetT = std::decay_t<decltype(resume | f(std::declval<R>()))>;
@@ -231,6 +230,7 @@ public:
         }
       ) , s);
     });
+    using RetT = Producing<M, O, I, typename std::invoke_result_t<Func, R>::RT>;
     return static_cast<RetT>(std::move(result));
   }
 };
