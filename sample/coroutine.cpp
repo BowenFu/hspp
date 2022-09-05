@@ -4,6 +4,8 @@
 #include <variant>
 #include <cassert>
 
+#if !defined(FOR_WIN)
+
 using namespace hspp;
 using namespace hspp::doN;
 using namespace hspp::data;
@@ -375,3 +377,10 @@ int main()
     io_.run();
     return 0;
 }
+
+#else
+int main()
+{
+    return 0;
+}
+#endif // !defined(FOR_WIN)
