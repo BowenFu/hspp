@@ -30,6 +30,7 @@ Step 2
 Step 3")
 endif()
 
+if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 build(coroutine)
 add_test(coroutine ${PROJECT_SOURCE_DIR}/sample/coroutine.sh)
 set_tests_properties(coroutine PROPERTIES PASS_REGULAR_EXPRESSION
@@ -37,3 +38,4 @@ set_tests_properties(coroutine PROPERTIES PASS_REGULAR_EXPRESSION
 Hello, Bob
 What's your favorite color. 
 I like Red, too.")
+endif()
