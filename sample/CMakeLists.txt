@@ -2,6 +2,7 @@ set(SAMPLES_no_inputs
 parse_expr
 pause
 walk_the_line
+lyahfgg
 )
 
 macro (build sample)
