@@ -32,7 +32,7 @@ constexpr auto landLeft = toFunc<>([](Birds n, Pole p)
     auto [left, right] = p;
     if (std::abs((left + n) - right) < 4) 
     {
-        return Maybe<Pole>{Pole{left + n, right}};
+        return just | Pole{left + n, right};
     }
     return nothing<Pole>;
 });
