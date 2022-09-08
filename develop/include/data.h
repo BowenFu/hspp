@@ -908,7 +908,8 @@ public:
     using RetT = Ret;
     using ArgsT = std::tuple<Args...>;
     template <size_t I>
-    using Arg = std::tuple_element_t<I, ArgsT>;
+    using ArgT = std::tuple_element_t<I, ArgsT>;
+    constexpr static auto nbArgsV = sizeof...(Args);
 };
 
 template <typename A, typename Func, typename Handler>
@@ -916,7 +917,7 @@ constexpr auto catchImpl(data::IO<A, Func> const& io_, Handler handler)
 {
     // extract exception type from Hanlder arg
     using HandlerTrait = FunctionTrait<decltype(&Handler::operator())>;
-    using ExceptionT = typename HandlerTrait::template Arg<0>;
+    using ExceptionT = typename HandlerTrait::template ArgT<0>;
     return data::io([=]{
         try
         {
