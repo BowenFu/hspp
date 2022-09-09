@@ -30,9 +30,9 @@ using Pole = std::pair<Birds, Birds>;
 constexpr auto landLeft = toFunc<>([](Birds n, Pole p)
 {
     auto [left, right] = p;
-    if (std::abs((left + n) - right) < 4) 
+    if (std::abs((left + n) - right) < 4)
     {
-        return Maybe<Pole>{Pole{left + n, right}};
+        return just | Pole{left + n, right};
     }
     return nothing<Pole>;
 });
@@ -40,9 +40,9 @@ constexpr auto landLeft = toFunc<>([](Birds n, Pole p)
 constexpr auto landRight = toFunc<>([](Birds n, Pole p)
 {
     auto [left, right] = p;
-    if (std::abs((right + n) - left) < 4) 
+    if (std::abs((right + n) - left) < 4)
     {
-        return Maybe<Pole>{Pole{left, right + n}};
+        return just | Pole{left, right + n};
     }
     return nothing<Pole>;
 });

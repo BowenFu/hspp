@@ -94,6 +94,12 @@ class Maybe;
 
 class Nothing final
 {
+public:
+    template <typename Data>
+    constexpr operator Maybe<Data> () const
+    {
+        return Maybe<Data>{};
+    }
 };
 
 template <typename Data>
@@ -107,31 +113,24 @@ public:
 };
 
 template <typename Data>
-using MaybeBase = std::variant<Nothing, Just<Data>>;
-
-template <typename Data>
-class Maybe : public MaybeBase<Data>
+class Maybe
 {
+    std::optional<Data> mData;
 public:
-    using std::variant<Nothing, Just<Data>>::variant;
-
+    constexpr Maybe()
+    : mData{}
+    {}
+    constexpr Maybe(Data data)
+    : mData{std::move(data)}
+    {}
     bool hasValue() const
     {
-        return std::visit(overload(
-            [](Nothing)
-            {
-                return false;
-            },
-            [](Just<Data> const&)
-            {
-                return true;
-            }
-        ), static_cast<MaybeBase<Data> const&>(*this));
+        return mData.has_value();
     }
 
     auto const& value() const
     {
-        return std::get<Just<Data>>(*this).data;
+        return mData.value();
     }
 };
 
@@ -141,22 +140,11 @@ const inline Maybe<T> nothing;
 template <typename T>
 constexpr bool operator== (Maybe<T> const& lhs, Maybe<T> const& rhs)
 {
-    return std::visit(overload(
-        [](Nothing, Nothing)
-        {
-            return true;
-        },
-        [](Just<T> const& l, Just<T> const& r)
-        {
-            return l.data == r.data;
-        },
-        [](auto, auto)
-        {
-            return false;
-        }
-    ),
-    static_cast<MaybeBase<T> const&>(lhs),
-    static_cast<MaybeBase<T> const&>(rhs));
+    if (lhs.hasValue() && rhs.hasValue())
+    {
+        return lhs.value() == rhs.value();
+    }
+    return lhs.hasValue() == rhs.hasValue();
 }
 
 template <typename T>
@@ -377,7 +365,7 @@ constexpr inline auto id = toGFunc<1>([](auto data)
 
 constexpr auto just = toGFunc<1>([](auto d)
 {
-    return Maybe<decltype(d)>{Just{std::move(d)}};
+    return Maybe<decltype(d)>{std::move(d)};
 });
 
 template <typename T>
@@ -908,7 +896,8 @@ public:
     using RetT = Ret;
     using ArgsT = std::tuple<Args...>;
     template <size_t I>
-    using Arg = std::tuple_element_t<I, ArgsT>;
+    using ArgT = std::tuple_element_t<I, ArgsT>;
+    constexpr static auto nbArgsV = sizeof...(Args);
 };
 
 template <typename A, typename Func, typename Handler>
@@ -916,7 +905,7 @@ constexpr auto catchImpl(data::IO<A, Func> const& io_, Handler handler)
 {
     // extract exception type from Hanlder arg
     using HandlerTrait = FunctionTrait<decltype(&Handler::operator())>;
-    using ExceptionT = typename HandlerTrait::template Arg<0>;
+    using ExceptionT = typename HandlerTrait::template ArgT<0>;
     return data::io([=]{
         try
         {

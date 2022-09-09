@@ -572,23 +572,16 @@ public:
 
     constexpr static auto mappend = data::toFunc<>([](data::Maybe<Data> const& lhs, data::Maybe<Data> const& rhs)
     {
-        return std::visit(overload(
-            [](data::Just<Data> const& l, data::Just<Data> const& r) -> data::Maybe<Data>
-            {
-                using MType = MonoidType<Data>;
-                return data::Just{MType::mappend | l.data | r.data};
-            },
-            [&](data::Nothing, data::Just<Data> const&)
-            {
-                return rhs;
-            },
-            [&](auto, data::Nothing)
-            {
-                return lhs;
-            }
-        ),
-        static_cast<data::MaybeBase<Data> const&>(lhs),
-        static_cast<data::MaybeBase<Data> const&>(rhs));
+        if (lhs.hasValue() && rhs.hasValue())
+        {
+            using MType = MonoidType<Data>;
+            return data::just || MType::mappend | lhs.value() | rhs.value();
+        }
+        if (!lhs.hasValue())
+        {
+            return rhs;
+        }
+        return lhs;
     });
 };
 
@@ -735,7 +728,7 @@ class FoldableBase<data::Maybe>
 public:
     constexpr static auto foldr = toGFunc<3>([](auto&& func, auto&& z, auto&& ta)
     {
-        if (ta == data::Nothing{})
+        if (!ta.hasValue())
         {
             return z;
         }
@@ -808,16 +801,11 @@ public:
     constexpr static auto fmap(Func const& func, data::Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
-        return std::visit(overload(
-            [](data::Nothing) -> data::Maybe<R>
-            {
-                return data::nothing<R>;
-            },
-            [func](data::Just<Arg> const& j) -> data::Maybe<R>
-            {
-                return data::Just<R>(func(j.data));
-            }
-        ), static_cast<data::MaybeBase<Arg>const &>(in));
+        if (in.hasValue())
+        {
+            return data::just | func(in.value());
+        }
+        return data::nothing<R>;
     }
 };
 
@@ -952,19 +940,11 @@ public:
     constexpr static auto ap(data::Maybe<Func> const& func, data::Maybe<Arg> const& in)
     {
         using R = std::invoke_result_t<Func, Arg>;
-        return std::visit(overload(
-            [](data::Just<Func> const& f, data::Just<Arg> const& a) -> data::Maybe<R>
-            {
-                return data::Just<R>{f.data(a.data)};
-            },
-            [](auto, auto) -> data::Maybe<R>
-            {
-                return data::nothing<R>;
-            }
-        ),
-        static_cast<data::MaybeBase<Func>const &>(func),
-        static_cast<data::MaybeBase<Arg>const &>(in)
-        );
+        if (func.hasValue() && in.hasValue())
+        {
+            return data::just | func.value()(in.value());
+        }
+        return data::nothing<R>;
     }
 };
 
@@ -1177,16 +1157,11 @@ public:
     constexpr static auto bind(data::Maybe<Arg> const& arg, Func const& func)
     {
         using R = std::invoke_result_t<Func, Arg>;
-        return std::visit(overload(
-            [=](data::Nothing) -> R
-            {
-                return data::Nothing{};
-            },
-            [func](data::Just<Arg> const& j) -> R
-            {
-                return func(j.data);
-            }
-        ), static_cast<data::MaybeBase<Arg> const&>(arg));
+        if (arg.hasValue())
+        {
+            return func(arg.value());
+        }
+        return static_cast<R>(data::Nothing{});
     }
 };
 
@@ -1402,7 +1377,7 @@ class Traversable<data::Maybe, Args...> : public TraversableBase<data::Maybe, Ar
 public:
     constexpr static auto traverse = toGFunc<2>([](auto&& f, auto&& ta)
     {
-        if (ta == data::Nothing{})
+        if (!ta.hasValue())
         {
             using ResultDataType = decltype(f | ta.value());
             using DataT = DataType<ResultDataType>;
