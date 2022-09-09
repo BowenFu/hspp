@@ -3097,7 +3097,7 @@ public:
         {
             return func(arg.value());
         }
-        return R{};
+        return static_cast<R>(data::Nothing{});
     }
 };
 
