@@ -945,6 +945,34 @@ public:
     constexpr Maybe(Data data)
     : mData{std::move(data)}
     {}
+
+    static constexpr auto fromOptional(std::optional<Data> data)
+    {
+        if (data.has_value())
+        {
+            return Maybe{std::move(data.value())};
+        }
+        return Maybe{};
+    }
+
+    constexpr operator std::optional<Data>() &&
+    {
+        if (hasValue())
+        {
+            return std::optional<Data>{std::move(value())};
+        }
+        return std::optional<Data>{};
+    }
+
+    constexpr operator std::optional<Data>() const &
+    {
+        if (hasValue())
+        {
+            return std::optional<Data>{value()};
+        }
+        return std::optional<Data>{};
+    }
+
     bool hasValue() const
     {
         return mData.has_value();
@@ -1003,22 +1031,42 @@ class Function;
 template <typename Ret, typename... Args>
 using TEFunction = Function<std::function<Ret(Args...)>, Ret, Args...>;
 
-template <bool TE, typename Func, typename Ret, typename... Args>
-class ToFunction<TE, Ret(Func::*)(Args...) const>
+template <bool TE, typename Class, typename Ret, typename... Args>
+class ToFunction<TE, Ret(Class::*)(Args...) const>
 {
 public:
-    using Sig = Ret(Args...);
-    static constexpr auto run(Func const& func)
+    static constexpr auto run(Class const& func)
     {
         if constexpr (!TE)
         {
-            return Function<Func, Ret, Args...>{func};
+            return Function<Class, Ret, Args...>{func};
         }
         else
         {
             return TEFunction<Ret, Args...>{func};
         }
     }
+    using MemFunc = Ret(Class::*)(Args...) const;
+    static constexpr auto fromMemFunc(MemFunc const& func)
+    {
+        auto const f = [=](Class const& c, Args const&... args)
+        {
+            return std::invoke(func, c, args...);
+        };
+        if constexpr (!TE)
+        {
+            return Function<decltype(f), Ret, Class, Args...>{f};
+        }
+        else
+        {
+            return TEFunction<Ret, Class, Args...>{f};
+        }
+    }
+};
+
+template <bool TE, typename Class, typename Ret, typename... Args>
+class ToFunction<TE, Ret(Class::*)(Args...) const noexcept> : public ToFunction<TE, Ret(Class::*)(Args...) const>
+{
 };
 
 template <typename F>
@@ -1082,7 +1130,14 @@ constexpr auto toFuncImpl(Func const& func)
 {
     if constexpr(sizeof...(Args) == 0)
     {
-        return ToFunction<false, decltype(&Func::operator())>::run(func);
+        if constexpr(std::is_member_function_pointer_v<Func>)
+        {
+            return ToFunction<false, Func>::fromMemFunc(func);
+        }
+        else
+        {
+            return ToFunction<false, decltype(&Func::operator())>::run(func);
+        }
     }
     else
     {
@@ -1245,7 +1300,10 @@ public:
     template <typename F, typename G>
     constexpr auto operator()(F&& f, G&&g) const
     {
-        return toGFunc<1>([=](auto x){ return f(g(x));});
+        return toGFunc<1>([=](auto x)
+        {
+            return f(g(x));
+        });
     }
 };
 
@@ -2689,7 +2747,7 @@ public:
     {
         using R = std::invoke_result_t<Func, Arg>;
         Type<R> result;
-        std::transform(in.begin(), in.end(), std::back_inserter(result), [&](auto e){ return func(e); });
+        std::transform(in.begin(), in.end(), std::back_inserter(result), [&](auto e){ return std::invoke(func, e); });
         return result;
     }
 };
@@ -2725,7 +2783,7 @@ public:
     {
         constexpr auto sizeMinusOne = sizeof...(Init);
         auto const last = std::get<sizeMinusOne>(in);
-        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(func(std::move(last))));
+        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(std::invoke(func, std::move(last))));
     }
 };
 
@@ -2739,7 +2797,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (in.hasValue())
         {
-            return data::just | func(in.value());
+            return data::just | std::invoke(func, in.value());
         }
         return data::nothing<R>;
     }
@@ -2863,7 +2921,7 @@ public:
         auto const func = std::get<sizeMinusOne>(funcs);
         auto const last = std::get<sizeMinusOne>(args);
         auto const init = mappend | takeTuple<sizeMinusOne>(funcs) | takeTuple<sizeMinusOne>(args);
-        return std::tuple_cat(init, std::make_tuple(func(last)));
+        return std::tuple_cat(init, std::make_tuple(std::invoke(func, last)));
     }
 };
 
@@ -2878,7 +2936,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (func.hasValue() && in.hasValue())
         {
-            return data::just | func.value()(in.value());
+            return data::just | std::invoke(func.value(), in.value());
         }
         return data::nothing<R>;
     }
@@ -2895,7 +2953,7 @@ public:
     template <typename Func, typename Arg, typename Func1, typename Func2>
     constexpr static auto ap(data::IO<Func, Func1> const& func, data::IO<Arg, Func2> const& in)
     {
-        return data::io([=]{ return func.run()(in.run()); });
+        return data::io([=]{ return std::invoke(func.run(), in.run()); });
     }
 };
 
@@ -3095,7 +3153,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (arg.hasValue())
         {
-            return func(arg.value());
+            return std::invoke(func, arg.value());
         }
         return static_cast<R>(data::Nothing{});
     }
@@ -3123,7 +3181,7 @@ public:
     template <typename Arg, typename Func1, typename Func>
     constexpr static auto bind(data::IO<Arg, Func1> const& arg, Func const& func)
     {
-        return data::io([=]{ return func(arg.run()).run(); });
+        return data::io([=]{ return std::invoke(func, arg.run()).run(); });
     }
 };
 
@@ -3437,7 +3495,7 @@ template <typename MonadData, typename Func>
 constexpr auto operator>>=(MonadData const& data, Func const& func)
 {
     using MType = MonadType<MonadData>;
-    return MType::bind(data, evalDeferred<MonadData> <o> func);
+    return MType::bind(data, o | evalDeferred<MonadData> | func);
 }
 
 template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred>, void>>

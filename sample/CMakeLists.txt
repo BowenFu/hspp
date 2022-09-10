@@ -3,6 +3,7 @@ parse_expr
 pause
 walk_the_line
 lyahfgg
+proposal
 )
 
 macro (build sample)
