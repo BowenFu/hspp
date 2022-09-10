@@ -16,8 +16,8 @@ auto expectTrue(bool x)
     }
 }
 
-template <typename T>
-auto expectEq(T const& l, T const& r)
+template <typename T, typename U>
+auto expectEq(T const& l, U const& r)
 {
     if (l != r)
     {
