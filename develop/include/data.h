@@ -478,7 +478,10 @@ public:
     template <typename F, typename G>
     constexpr auto operator()(F&& f, G&&g) const
     {
-        return toGFunc<1>([=](auto x){ return f(g(x));});
+        return toGFunc<1>([=](auto x)
+        {
+            return f(g(x));
+        });
     }
 };
 

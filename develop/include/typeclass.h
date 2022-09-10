@@ -1501,7 +1501,7 @@ template <typename MonadData, typename Func>
 constexpr auto operator>>=(MonadData const& data, Func const& func)
 {
     using MType = MonadType<MonadData>;
-    return MType::bind(data, evalDeferred<MonadData> <o> func);
+    return MType::bind(data, o | evalDeferred<MonadData> | func);
 }
 
 template <typename Deferred, typename MonadData, typename = std::enable_if_t<isDeferredV<Deferred>, void>>
