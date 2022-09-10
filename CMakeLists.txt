@@ -24,7 +24,7 @@ list(APPEND
     BASE_COMPILE_FLAGS
     "$<$<CXX_COMPILER_ID:Clang>:-DFOR_CLANG>"
     "$<$<CXX_COMPILER_ID:AppleClang>:-DFOR_APPLECLANG>"
-    "$<$<CXX_COMPILER_ID:GNU>:-DFOR_GNU>"
+    "$<$<CXX_COMPILER_ID:GNU>:-DFOR_GNU;-Wno-maybe-uninitialized>"
     "$<$<CXX_COMPILER_ID:MSVC>:-DFOR_MSVC>"
     )
 
