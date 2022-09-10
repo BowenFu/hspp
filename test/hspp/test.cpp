@@ -1148,6 +1148,26 @@ TEST(Maybe, 1)
     EXPECT_EQ(result, just("123xxx"s));
 }
 
+TEST(Maybe, fromOptional)
+{
+    auto fromRValue = Maybe<std::string>::fromOptional(std::make_optional("andy"s));
+    EXPECT_EQ(fromRValue, just("andy"s));
+
+    auto value = std::make_optional("andy"s);
+    auto fromLValue = Maybe<std::string>::fromOptional(value);
+    EXPECT_EQ(fromLValue, just("andy"s));
+}
+
+TEST(Maybe, toOptional)
+{
+    auto value = just | "andy"s;
+    std::optional<std::string> fromLvalue = value;
+    EXPECT_EQ(fromLvalue, std::make_optional("andy"s));
+
+    std::optional<std::string> fromRvalue = just | "andy"s;
+    EXPECT_EQ(fromRvalue, std::make_optional("andy"s));
+}
+
 TEST(Monad, vec)
 {
     auto const result = std::vector{1,2}

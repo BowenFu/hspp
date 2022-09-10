@@ -123,6 +123,34 @@ public:
     constexpr Maybe(Data data)
     : mData{std::move(data)}
     {}
+
+    static constexpr auto fromOptional(std::optional<Data> data)
+    {
+        if (data.has_value())
+        {
+            return Maybe{std::move(data.value())};
+        }
+        return Maybe{};
+    }
+
+    constexpr operator std::optional<Data>() &&
+    {
+        if (hasValue())
+        {
+            return std::optional<Data>{std::move(value())};
+        }
+        return std::optional<Data>{};
+    }
+
+    constexpr operator std::optional<Data>() const &
+    {
+        if (hasValue())
+        {
+            return std::optional<Data>{value()};
+        }
+        return std::optional<Data>{};
+    }
+
     bool hasValue() const
     {
         return mData.has_value();
