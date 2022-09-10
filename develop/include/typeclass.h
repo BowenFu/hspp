@@ -753,7 +753,7 @@ public:
     {
         using R = std::invoke_result_t<Func, Arg>;
         Type<R> result;
-        std::transform(in.begin(), in.end(), std::back_inserter(result), [&](auto e){ return func(e); });
+        std::transform(in.begin(), in.end(), std::back_inserter(result), [&](auto e){ return std::invoke(func, e); });
         return result;
     }
 };
@@ -789,7 +789,7 @@ public:
     {
         constexpr auto sizeMinusOne = sizeof...(Init);
         auto const last = std::get<sizeMinusOne>(in);
-        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(func(std::move(last))));
+        return std::tuple_cat(subtuple<0, sizeMinusOne>(std::move(in)), std::make_tuple(std::invoke(func, std::move(last))));
     }
 };
 
@@ -803,7 +803,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (in.hasValue())
         {
-            return data::just | func(in.value());
+            return data::just | std::invoke(func, in.value());
         }
         return data::nothing<R>;
     }
@@ -927,7 +927,7 @@ public:
         auto const func = std::get<sizeMinusOne>(funcs);
         auto const last = std::get<sizeMinusOne>(args);
         auto const init = mappend | takeTuple<sizeMinusOne>(funcs) | takeTuple<sizeMinusOne>(args);
-        return std::tuple_cat(init, std::make_tuple(func(last)));
+        return std::tuple_cat(init, std::make_tuple(std::invoke(func, last)));
     }
 };
 
@@ -942,7 +942,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (func.hasValue() && in.hasValue())
         {
-            return data::just | func.value()(in.value());
+            return data::just | std::invoke(func.value(), in.value());
         }
         return data::nothing<R>;
     }
@@ -959,7 +959,7 @@ public:
     template <typename Func, typename Arg, typename Func1, typename Func2>
     constexpr static auto ap(data::IO<Func, Func1> const& func, data::IO<Arg, Func2> const& in)
     {
-        return data::io([=]{ return func.run()(in.run()); });
+        return data::io([=]{ return std::invoke(func.run(), in.run()); });
     }
 };
 
@@ -1159,7 +1159,7 @@ public:
         using R = std::invoke_result_t<Func, Arg>;
         if (arg.hasValue())
         {
-            return func(arg.value());
+            return std::invoke(func, arg.value());
         }
         return static_cast<R>(data::Nothing{});
     }
@@ -1187,7 +1187,7 @@ public:
     template <typename Arg, typename Func1, typename Func>
     constexpr static auto bind(data::IO<Arg, Func1> const& arg, Func const& func)
     {
-        return data::io([=]{ return func(arg.run()).run(); });
+        return data::io([=]{ return std::invoke(func, arg.run()).run(); });
     }
 };
 

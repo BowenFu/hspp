@@ -209,22 +209,42 @@ class Function;
 template <typename Ret, typename... Args>
 using TEFunction = Function<std::function<Ret(Args...)>, Ret, Args...>;
 
-template <bool TE, typename Func, typename Ret, typename... Args>
-class ToFunction<TE, Ret(Func::*)(Args...) const>
+template <bool TE, typename Class, typename Ret, typename... Args>
+class ToFunction<TE, Ret(Class::*)(Args...) const>
 {
 public:
-    using Sig = Ret(Args...);
-    static constexpr auto run(Func const& func)
+    static constexpr auto run(Class const& func)
     {
         if constexpr (!TE)
         {
-            return Function<Func, Ret, Args...>{func};
+            return Function<Class, Ret, Args...>{func};
         }
         else
         {
             return TEFunction<Ret, Args...>{func};
         }
     }
+    using MemFunc = Ret(Class::*)(Args...) const;
+    static constexpr auto fromMemFunc(MemFunc const& func)
+    {
+        auto const f = [=](Class const& c, Args const&... args)
+        {
+            return std::invoke(func, c, args...);
+        };
+        if constexpr (!TE)
+        {
+            return Function<decltype(f), Ret, Class, Args...>{f};
+        }
+        else
+        {
+            return TEFunction<Ret, Class, Args...>{f};
+        }
+    }
+};
+
+template <bool TE, typename Class, typename Ret, typename... Args>
+class ToFunction<TE, Ret(Class::*)(Args...) const noexcept> : public ToFunction<TE, Ret(Class::*)(Args...) const>
+{
 };
 
 template <typename F>
@@ -288,7 +308,14 @@ constexpr auto toFuncImpl(Func const& func)
 {
     if constexpr(sizeof...(Args) == 0)
     {
-        return ToFunction<false, decltype(&Func::operator())>::run(func);
+        if constexpr(std::is_member_function_pointer_v<Func>)
+        {
+            return ToFunction<false, Func>::fromMemFunc(func);
+        }
+        else
+        {
+            return ToFunction<false, decltype(&Func::operator())>::run(func);
+        }
     }
     else
     {
