@@ -234,10 +234,11 @@ auto f2(int i, int j, int k) -> Either<arithmetic_errc, int>
 
 auto f2_(int i, int j, int k) -> Either<arithmetic_errc, int>
 {
-    Id<int> q;
+    Id<int> q1, q2;
     return do_(
-        q <= safe_divide(j, k),
-        return_ || i + q
+        q1 <= safe_divide(i, k),
+        q2 <= safe_divide(j, k),
+        return_ || q1 + q2
     );
 }
 
@@ -268,11 +269,11 @@ void testSafeDivideInt()
     expectEq(result3_.left(), arithmetic_errc::not_integer_division);
 }
 
-
 int main()
 {
     optionalMap();
     optionalAndThen();
     testSafeDivideDouble();
+    testSafeDivideInt();
     return 0;
 }

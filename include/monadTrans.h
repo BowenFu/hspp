@@ -1,3 +1,7 @@
+/*
+ *  Copyright (c) 2022 Bowen Fu
+ *  Distributed Under The Apache-2.0 License
+ */
 
 #ifndef HSPP_MONAD_TRANS_H
 #define HSPP_MONAD_TRANS_H
