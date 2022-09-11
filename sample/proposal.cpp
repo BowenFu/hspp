@@ -146,6 +146,7 @@ auto safe_divide(double i, double j) -> Either<arithmetic_errc, double>
 }
 
 #if 0 // proposal p0323r0
+// i + j / k
 expected<double, error_condition> f1(double i, double j, double k)
 {
     return safe_divide(j, k).map([&](double q)
@@ -187,6 +188,86 @@ void testSafeDivideDouble()
     expectTrue(!result2_.isRight());
     expectEq(result2_.left(), arithmetic_errc::divide_by_zero);
 }
+
+#if 0 // proposal p0323r0
+expected<int, error_condition> safe_divide(int i, int j)
+{
+    if (j == 0) return make_unexpected(arithmetic_errc::divide_by_zero);
+    if (i%j != 0) return make_unexpected(arithmetic_errc::not_integer_division);
+    else return i / j;
+}
+#endif // proposal p0323r0
+
+auto safe_divide(int i, int j) -> Either<arithmetic_errc, int>
+{
+    if (j == 0) return toLeft | arithmetic_errc::divide_by_zero;
+    if (i%j != 0) return toLeft | arithmetic_errc::not_integer_division;
+    else return toRight || i / j;
+}
+
+#if 0 // proposal p0323r0
+// i / k + j / k
+expected<int, error_condition> f(int i, int j, int k)
+{
+    return safe_divide(i, k).bind([=](int q1)
+    {
+        return safe_divide(j,k).bind([=](int q2)
+        {
+            return q1+q2;
+        });
+    });
+}
+#endif // proposal p0323r0
+
+auto f2(int i, int j, int k) -> Either<arithmetic_errc, int>
+{
+    return safe_divide(i, k) >>= [=](int q1)
+    {
+        return [=](int q2)
+        {
+            return q1+q2;
+        }
+        <fmap>
+        safe_divide(j,k);
+    };
+}
+
+auto f2_(int i, int j, int k) -> Either<arithmetic_errc, int>
+{
+    Id<int> q;
+    return do_(
+        q <= safe_divide(j, k),
+        return_ || i + q
+    );
+}
+
+void testSafeDivideInt()
+{
+    auto result1 = f2(6, 4, 2);
+    expectTrue(result1.isRight());
+    expectEq(result1.right(), 5);
+
+    auto result1_ = f2_(6, 4, 2);
+    expectTrue(result1_.isRight());
+    expectEq(result1_.right(), 5);
+
+    auto result2 = f2(2, 4, 0);
+    expectTrue(!result2.isRight());
+    expectEq(result2.left(), arithmetic_errc::divide_by_zero);
+
+    auto result2_ = f2_(2, 4, 0);
+    expectTrue(!result2_.isRight());
+    expectEq(result2_.left(), arithmetic_errc::divide_by_zero);
+
+    auto result3 = f2(2, 4, 3);
+    expectTrue(!result3.isRight());
+    expectEq(result3.left(), arithmetic_errc::not_integer_division);
+
+    auto result3_ = f2_(2, 4, 3);
+    expectTrue(!result3_.isRight());
+    expectEq(result3_.left(), arithmetic_errc::not_integer_division);
+}
+
 
 int main()
 {
