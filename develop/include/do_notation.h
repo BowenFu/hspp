@@ -249,9 +249,12 @@ BIN_OP_FOR_NULLARY(>>)
 BIN_OP_FOR_NULLARY(*)
 BIN_OP_FOR_NULLARY(+)
 BIN_OP_FOR_NULLARY(==)
+BIN_OP_FOR_NULLARY(!=)
 BIN_OP_FOR_NULLARY(%)
 BIN_OP_FOR_NULLARY(<)
 BIN_OP_FOR_NULLARY(>)
+BIN_OP_FOR_NULLARY(<=)
+BIN_OP_FOR_NULLARY(>=)
 BIN_OP_FOR_NULLARY(&&)
 BIN_OP_FOR_NULLARY(-)
 
@@ -400,8 +403,18 @@ constexpr auto if_ = guard;
 // used for doN, so that Id/Nullary can be used with ifThenElse.
 constexpr auto ifThenElse = toGFunc<3> | [](auto pred, auto then_, auto else_)
 {
-    using MClass = MonadClassType<decltype(evaluate_(then_)), decltype(evaluate_(else_))>;
-    return nullary([pred=std::move(pred), then_=std::move(then_), else_=std::move(else_)] { return evaluate_(pred) ? (evalDeferred<MClass> | evaluate_(then_)) : (evalDeferred<MClass> | evaluate_(else_)); });
+    using ThenResultT = decltype(evaluate_(then_));
+    using ElseResultT = decltype(evaluate_(else_));
+    if constexpr (isMonadV<ThenResultT>)
+    {
+        using MClass = MonadClassType<ThenResultT, ElseResultT>;
+        return nullary([pred=std::move(pred), then_=std::move(then_), else_=std::move(else_)] { return evaluate_(pred) ? (evalDeferred<MClass> | evaluate_(then_)) : (evalDeferred<MClass> | evaluate_(else_)); });
+    }
+    else
+    {
+        static_assert(std::is_same_v<ThenResultT, ElseResultT>);
+        return nullary([pred=std::move(pred), then_=std::move(then_), else_=std::move(else_)] { return evaluate_(pred) ? evaluate_(then_) : evaluate_(else_); });
+    }
 };
 
 } // namespace doN

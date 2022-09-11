@@ -1,25 +1,7 @@
 #include "hspp.h"
 #include "parser.h"
 #include <cassert>
-
-auto expectTrue(bool x)
-{
-    if (!x)
-    {
-        throw std::runtime_error{"False in expectedTrue!"};
-    }
-}
-
-template <typename T>
-auto expectEq(T const& l, T const& r)
-{
-    if (l != r)
-    {
-        std::stringstream ss;
-        ss << l << " != " << r;
-        throw std::runtime_error{ss.str()};
-    }
-}
+#include "common.h"
 
 using namespace hspp;
 using namespace hspp::parser;

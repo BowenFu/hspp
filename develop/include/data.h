@@ -759,6 +759,11 @@ constexpr inline auto iota = toGFunc<2>([](auto start, auto end)
     return ownedRange(IotaView{start, end});
 });
 
+constexpr inline auto within = toGFunc<2>([](auto start, auto end)
+{
+    return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end});
+});
+
 constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
 {
     return ownedRange(TakeView{r, num});

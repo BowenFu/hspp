@@ -148,7 +148,7 @@ private:
     Base mBase;
 };
 
-template <typename Num = int32_t>
+template <typename Num = int32_t, bool includeUpperbound = false>
 class IotaView
 {
 public:
@@ -170,7 +170,14 @@ public:
         }
         bool hasValue() const
         {
-            return mNum < mBound;
+            if constexpr(includeUpperbound)
+            {
+                return mNum <= mBound;
+            }
+            else
+            {
+                return mNum < mBound;
+            }
         }
     private:
         Num mNum;

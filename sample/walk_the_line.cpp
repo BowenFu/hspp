@@ -1,22 +1,6 @@
 #include "hspp.h"
 #include <cassert>
-
-auto expectTrue(bool x)
-{
-    if (!x)
-    {
-        throw std::runtime_error{"False in expectedTrue!"};
-    }
-}
-
-template <typename T>
-auto expectEq(T const& l, T const& r)
-{
-    if (!(l == r))
-    {
-        throw std::runtime_error{"Values are not equal!"};
-    }
-}
+#include "common.h"
 
 using namespace hspp;
 using namespace hspp::doN;
