@@ -86,9 +86,28 @@ constexpr decltype(auto) takeTuple(Tuple &&t)
 template <std::size_t len, class Tuple>
 using TakeTupleType = std::decay_t<decltype(takeTuple<len>(std::declval<Tuple>()))>;
 
-
 namespace data
 {
+template <typename Data>
+class DataHolder
+{
+    Data mData;
+public:
+    constexpr DataHolder(Data data)
+    : mData{std::move(data)}
+    {}
+    auto const& get() const
+    {
+        return mData;
+    }
+};
+
+template <typename T>
+constexpr auto operator==(DataHolder<T> const& l, DataHolder<T> const& r)
+{
+    return l.get() == r.get();
+}
+
 template <typename Data>
 class Maybe;
 
@@ -103,19 +122,17 @@ public:
 };
 
 template <typename Data>
-class Just final
+class Just final : public DataHolder<Data>
 {
-public:
-    constexpr Just(Data d)
-    : data{std::move(d)}
-    {}
-    Data data;
 };
 
 template <typename Data>
 class Maybe
 {
     std::optional<Data> mData;
+    constexpr Maybe(std::optional<Data> data)
+    : mData{std::move(data)}
+    {}
 public:
     constexpr Maybe()
     : mData{}
@@ -126,29 +143,17 @@ public:
 
     static constexpr auto fromOptional(std::optional<Data> data)
     {
-        if (data.has_value())
-        {
-            return Maybe{std::move(data.value())};
-        }
-        return Maybe{};
+        return Maybe<Data>{std::move(data)};
     }
 
-    constexpr operator std::optional<Data>() &&
+    constexpr operator std::optional<Data>&& () &&
     {
-        if (hasValue())
-        {
-            return std::optional<Data>{std::move(value())};
-        }
-        return std::optional<Data>{};
+        return std::move(mData);
     }
 
-    constexpr operator std::optional<Data>() const &
+    constexpr operator std::optional<Data> const& () const &
     {
-        if (hasValue())
-        {
-            return std::optional<Data>{value()};
-        }
-        return std::optional<Data>{};
+        return mData;
     }
 
     bool hasValue() const
@@ -173,30 +178,6 @@ constexpr bool operator== (Maybe<T> const& lhs, Maybe<T> const& rhs)
         return lhs.value() == rhs.value();
     }
     return lhs.hasValue() == rhs.hasValue();
-}
-
-template <typename T>
-constexpr bool operator== (Maybe<T> const& lhs, Just<T> const& rhs)
-{
-    return lhs == Maybe<T>{rhs};
-}
-
-template <typename T>
-constexpr bool operator== (Maybe<T> const& lhs, Nothing)
-{
-    return !lhs.hasValue();
-}
-
-template <typename T>
-constexpr bool operator== (Just<T> const& lhs, Maybe<T> const& rhs)
-{
-    return Maybe<T>{lhs} == rhs;
-}
-
-template <typename T>
-constexpr bool operator== (Nothing, Maybe<T> const& rhs)
-{
-    return !rhs.hasValue();
 }
 
 template <bool TE, typename Func>
@@ -831,26 +812,6 @@ constexpr inline auto deref = toGFunc<1>([](auto e)
 {
     return *e;
 });
-
-template <typename Data>
-class DataHolder
-{
-    Data mData;
-public:
-    constexpr DataHolder(Data data)
-    : mData{std::move(data)}
-    {}
-    auto const& get() const
-    {
-        return mData;
-    }
-};
-
-template <typename T>
-constexpr auto operator==(DataHolder<T> const& l, DataHolder<T> const& r)
-{
-    return l.get() == r.get();
-}
 
 template <template <typename...> typename Type>
 constexpr auto toType = toGFunc<1>([](auto data)
