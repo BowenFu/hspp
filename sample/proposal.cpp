@@ -16,14 +16,46 @@ auto expectTrue(bool x)
     }
 }
 
+template <typename T, typename Enable = void>
+struct IsPrintable : std::false_type
+{};
+
+template <typename T>
+struct IsPrintable<T, std::void_t<decltype(std::cout << std::declval<T>())>> : std::true_type
+{};
+
+template <typename T>
+constexpr bool isPrintableV = IsPrintable<std::decay_t<T>>::value;
+
 template <typename T, typename U>
-auto expectEq(T const& l, U const& r)
+auto equal(T l, U r) -> std::enable_if_t<std::is_floating_point_v<T> || std::is_floating_point_v<U>, bool>
 {
-    if (l != r)
+    return (std::abs(l - r) < 0.005);
+}
+
+template <typename T, typename U>
+auto equal(T l, U r) -> std::enable_if_t<!std::is_floating_point_v<T> && !std::is_floating_point_v<U>, bool>
+{
+    return l == r;
+}
+
+template <typename T, typename U>
+auto expectEq(T const& l, U const& r) -> std::enable_if_t<(isPrintableV<T> && isPrintableV<U>)>
+{
+    if (!equal(l, r))
     {
         std::stringstream ss;
         ss << l << " != " << r;
         throw std::runtime_error{ss.str()};
+    }
+}
+
+template <typename T, typename U>
+auto expectEq(T const& l, U const& r) -> std::enable_if_t<!(isPrintableV<T> && isPrintableV<U>)>
+{
+    if (!equal(l, r))
+    {
+        throw std::runtime_error{"Not equal. Types not printable"};
     }
 }
 
@@ -88,9 +120,159 @@ void optionalAndThen()
     expectEq(s1.value(), 123);
 }
 
+// p0323r0 https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0323r0.pdf
+
+enum class arithmetic_errc
+{
+    divide_by_zero, // 9/0 == ?
+    not_integer_division // 5/2 == 2.5 (which is not an integer)
+};
+
+#if 0 // proposal p0323r0
+expected<double,error_condition> safe_divide(double i, double j)
+{
+    if (j==0) return make_unexpected(arithmetic_errc::divide_by_zero); // (1)
+    else return i / j; // (2)
+}
+#endif // proposal p0323r0
+
+auto safe_divide(double i, double j) -> Either<arithmetic_errc, double>
+{
+    if (j == 0)
+    {
+        return toLeft | arithmetic_errc::divide_by_zero;
+    }
+    return toRight || i / j;
+}
+
+#if 0 // proposal p0323r0
+// i + j / k
+expected<double, error_condition> f1(double i, double j, double k)
+{
+    return safe_divide(j, k).map([&](double q)
+    {
+        return i + q;
+    });
+}
+#endif // proposal p0323r0
+
+auto f1(double i, double j, double k) -> Either<arithmetic_errc, double>
+{
+    return [&](double q) { return i + q; } <fmap> safe_divide(j, k);
+}
+
+auto f1_(double i, double j, double k) -> Either<arithmetic_errc, double>
+{
+    Id<double> q;
+    return do_(
+        q <= safe_divide(j, k),
+        return_ || i + q
+    );
+}
+
+void testSafeDivideDouble()
+{
+    auto result1 = f1(2, 4, 5);
+    expectTrue(result1.isRight());
+    expectEq(result1.right(), 2.8f);
+
+    auto result1_ = f1_(2, 4, 5);
+    expectTrue(result1_.isRight());
+    expectEq(result1_.right(), 2.8f);
+
+    auto result2 = f1(2, 4, 0);
+    expectTrue(!result2.isRight());
+    expectEq(result2.left(), arithmetic_errc::divide_by_zero);
+
+    auto result2_ = f1_(2, 4, 0);
+    expectTrue(!result2_.isRight());
+    expectEq(result2_.left(), arithmetic_errc::divide_by_zero);
+}
+
+#if 0 // proposal p0323r0
+expected<int, error_condition> safe_divide(int i, int j)
+{
+    if (j == 0) return make_unexpected(arithmetic_errc::divide_by_zero);
+    if (i%j != 0) return make_unexpected(arithmetic_errc::not_integer_division);
+    else return i / j;
+}
+#endif // proposal p0323r0
+
+auto safe_divide(int i, int j) -> Either<arithmetic_errc, int>
+{
+    if (j == 0) return toLeft | arithmetic_errc::divide_by_zero;
+    if (i%j != 0) return toLeft | arithmetic_errc::not_integer_division;
+    else return toRight || i / j;
+}
+
+#if 0 // proposal p0323r0
+// i / k + j / k
+expected<int, error_condition> f(int i, int j, int k)
+{
+    return safe_divide(i, k).bind([=](int q1)
+    {
+        return safe_divide(j,k).bind([=](int q2)
+        {
+            return q1+q2;
+        });
+    });
+}
+#endif // proposal p0323r0
+
+auto f2(int i, int j, int k) -> Either<arithmetic_errc, int>
+{
+    return safe_divide(i, k) >>= [=](int q1)
+    {
+        return [=](int q2)
+        {
+            return q1+q2;
+        }
+        <fmap>
+        safe_divide(j,k);
+    };
+}
+
+auto f2_(int i, int j, int k) -> Either<arithmetic_errc, int>
+{
+    Id<int> q;
+    return do_(
+        q <= safe_divide(j, k),
+        return_ || i + q
+    );
+}
+
+void testSafeDivideInt()
+{
+    auto result1 = f2(6, 4, 2);
+    expectTrue(result1.isRight());
+    expectEq(result1.right(), 5);
+
+    auto result1_ = f2_(6, 4, 2);
+    expectTrue(result1_.isRight());
+    expectEq(result1_.right(), 5);
+
+    auto result2 = f2(2, 4, 0);
+    expectTrue(!result2.isRight());
+    expectEq(result2.left(), arithmetic_errc::divide_by_zero);
+
+    auto result2_ = f2_(2, 4, 0);
+    expectTrue(!result2_.isRight());
+    expectEq(result2_.left(), arithmetic_errc::divide_by_zero);
+
+    auto result3 = f2(2, 4, 3);
+    expectTrue(!result3.isRight());
+    expectEq(result3.left(), arithmetic_errc::not_integer_division);
+
+    auto result3_ = f2_(2, 4, 3);
+    expectTrue(!result3_.isRight());
+    expectEq(result3_.left(), arithmetic_errc::not_integer_division);
+}
+
+
 int main()
 {
     optionalMap();
     optionalAndThen();
+    testSafeDivideDouble();
     return 0;
 }
