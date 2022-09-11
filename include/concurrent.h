@@ -1,4 +1,9 @@
 /*
+ *  Copyright (c) 2022 Bowen Fu
+ *  Distributed Under The Apache-2.0 License
+ */
+
+/*
 Reference:
 
 Du Bois, A.R. (2011). An Implementation of Composable Memory Transactions in Haskell. In: Apel, S., Jackson, E. (eds) Software Composition. SC 2011. Lecture Notes in Computer Science, vol 6708. Springer, Berlin, Heidelberg. https://doi.org/10.1007/978-3-642-22045-6_3
