@@ -904,6 +904,66 @@ constexpr auto toState = toGFunc<1>([](auto func)
 
 constexpr auto runState = from;
 
+template <typename L, typename R>
+class Either;
+
+template <typename Data>
+class Left final : public DataHolder<Data>
+{};
+
+template <typename Data>
+class Right final : public DataHolder<Data>
+{};
+
+template <typename LData, typename RData>
+class Either
+{
+    using VT = std::variant<LData, RData>;
+    VT mData;
+    constexpr Either(VT v)
+    : mData{std::move(v)}
+    {}
+public:
+    constexpr Either(LData l)
+    : mData{std::move(l)}
+    {}
+    constexpr Either(RData r)
+    : mData{std::move(r)}
+    {}
+
+    static constexpr auto fromVariant(std::variant<LData, RData> v)
+    {
+        return Either{std::move(v)};
+    }
+
+    constexpr operator std::variant<LData, RData>&& () &&
+    {
+        return std::move(mData);
+    }
+
+    constexpr operator std::variant<LData, RData> const& () const &
+    {
+        return mData;
+    }
+
+    bool isRight() const
+    {
+        constexpr auto kRIGHT_INDEX = 1;
+        return mData.index() == kRIGHT_INDEX;
+    }
+
+    auto const& left() const
+    {
+        return std::get<0>(mData);
+    }
+
+    auto const& right() const
+    {
+        return std::get<1>(mData);
+    }
+};
+
+
 } // namespace data
 
 using data::o;
