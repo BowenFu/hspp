@@ -26,8 +26,6 @@ Here you are!
 
 ### Sample 1 for Maybe (similar to std::optional) Monad used in do notation
 
-We have two functions, plus1, and showStr. With do notation we construct a new function that will accept an integer as argument and return a tuple of results of the two functions.
-
 The sample is originated from Learn You a Haskell for Great Good!
 
 "Pierre has decided to take a break from his job at the fish farm and try tightrope walking. He's not that bad at it, but he does have one problem: birds keep landing on his balancing pole!
