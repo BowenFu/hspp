@@ -43,6 +43,12 @@ struct DataTrait<data::Range<A, Repr>>
     using Type = A;
 };
 
+template <typename LeftT, typename RightT>
+struct DataTrait<data::Either<LeftT, RightT>>
+{
+    using Type = RightT;
+};
+
 template <typename T>
 using DataType = typename DataTrait<std::decay_t<T>>::Type;
 
@@ -78,13 +84,19 @@ struct TypeClassTrait<TypeClassT, data::Range<Args...>>
     using Type = TypeClassT<data::Range>;
 };
 
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+template <template <template<typename...> typename, typename...> class TypeClassT, typename... Args>
 struct TypeClassTrait<TypeClassT, data::Maybe<Args...>>
 {
     using Type = TypeClassT<data::Maybe>;
 };
 
-template <template <template<typename...> typename Type, typename... Ts> class TypeClassT, typename... Args>
+template <template <template<typename...> typename, typename...> class TypeClassT, typename LeftT, typename RightT>
+struct TypeClassTrait<TypeClassT, data::Either<LeftT, RightT>>
+{
+    using Type = TypeClassT<data::Either, LeftT>;
+};
+
+template <template <template<typename...> typename, typename...> class TypeClassT, typename... Args>
 struct TypeClassTrait<TypeClassT, data::IO<Args...>>
 {
     using Type = TypeClassT<data::IO>;
@@ -809,6 +821,23 @@ public:
     }
 };
 
+template <typename LeftT>
+class Functor<data::Either, LeftT>
+{
+public:
+    template <typename Func, typename RightT>
+    constexpr static auto fmap(Func const& func, data::Either<LeftT, RightT> const& in)
+    {
+        using NewRightT = std::invoke_result_t<Func, RightT>;
+        using ResultT = data::Either<LeftT, NewRightT>;
+        if (in.isRight())
+        {
+            return static_cast<ResultT>(std::invoke(func, in.right()));
+        }
+        return static_cast<ResultT>(in.left());
+    }
+};
+
 template <typename FirstArg>
 class Functor<data::Function, FirstArg>
 {
@@ -945,6 +974,26 @@ public:
             return data::just | std::invoke(func.value(), in.value());
         }
         return data::nothing<R>;
+    }
+};
+
+template <typename LeftT>
+class Applicative<data::Either, LeftT> : public Functor<data::Either, LeftT>
+{
+public:
+    constexpr static auto pure = [](auto r)
+    {
+        return static_cast<data::Either<LeftT, decltype(r)>>(data::toRight | r);
+    };
+    template <typename Func, typename Arg>
+    constexpr static auto ap(data::Either<LeftT, Func> const& func, data::Either<LeftT, Arg> const& in)
+    {
+        using NewRightT = std::invoke_result_t<Func, Arg>;
+        if (func.isRight())
+        {
+            return func <fmap> in;
+        }
+        return static_cast<data::Either<LeftT, NewRightT>>(data::toLeft | func.left());
     }
 };
 
@@ -1162,6 +1211,22 @@ public:
             return std::invoke(func, arg.value());
         }
         return static_cast<R>(data::Nothing{});
+    }
+};
+
+template <typename LeftT>
+class MonadBase<data::Either, LeftT>
+{
+public:
+    template <typename RightT, typename Func>
+    constexpr static auto bind(data::Either<LeftT, RightT> const& arg, Func const& func)
+    {
+        using R = std::invoke_result_t<Func, RightT>;
+        if (arg.isRight())
+        {
+            return std::invoke(func, arg.right());
+        }
+        return static_cast<R>(data::toLeft | arg.left());
     }
 };
 

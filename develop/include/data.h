@@ -881,15 +881,15 @@ class Either
 {
     using VT = std::variant<LData, RData>;
     VT mData;
+public:
     constexpr Either(VT v)
     : mData{std::move(v)}
     {}
-public:
-    constexpr Either(LData l)
-    : mData{std::move(l)}
+    constexpr Either(Left<LData> l)
+    : mData{std::move(l.get())}
     {}
-    constexpr Either(RData r)
-    : mData{std::move(r)}
+    constexpr Either(Right<RData> r)
+    : mData{std::move(r.get())}
     {}
 
     static constexpr auto fromVariant(std::variant<LData, RData> v)
@@ -924,6 +924,9 @@ public:
     }
 };
 
+constexpr auto toLeft = data::toType<Left>;
+
+constexpr auto toRight = data::toType<Right>;
 
 } // namespace data
 
