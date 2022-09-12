@@ -250,7 +250,7 @@ public:
     constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
     {
         using MType = MonoidType<MData1>;
-        static_assert(std::is_same_v<MType, MonoidType<MData2>>);
+        static_assert((data::isGenericFunctionV<MData1> && data::isGenericFunctionV<MData2>) || std::is_same_v<MType, MonoidType<MData2>>);
         return MType::mappend | lhs | rhs;
     }
 };

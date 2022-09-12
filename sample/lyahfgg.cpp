@@ -415,6 +415,7 @@ int main()
     anIntroToLists5();
     anIntroToLists6();
     anIntroToLists7();
+    anIntroToLists8();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
