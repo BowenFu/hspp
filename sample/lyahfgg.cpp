@@ -254,6 +254,23 @@ void anIntroToLists9()
     expectEq(result2, expected2);
 }
 
+void anIntroToLists10()
+{
+#if 0
+    // haskell version
+    ghci> 4 `elem` [3,4,5,6] True
+    ghci> 10 `elem` [3,4,5,6] False
+#endif // 0
+
+    auto const result0 = 4 <elem> within(3, 6);
+    auto const expected0 = true;
+    expectEq(result0, expected0);
+
+    auto const result1 = 10 <elem> within(3, 6);
+    auto const expected1 = false;
+    expectEq(result1, expected1);
+}
+
 void texasRanges()
 {
 #if 0
@@ -442,6 +459,7 @@ int main()
     anIntroToLists7();
     anIntroToLists8();
     anIntroToLists9();
+    anIntroToLists10();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
