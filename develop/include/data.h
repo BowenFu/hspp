@@ -485,8 +485,20 @@ public:
 
 constexpr inline auto o = toGFunc<2>(Compose{});
 
-using _O_ = std::tuple<>;
+class _O_ final{};
 constexpr inline _O_ _o_;
+
+constexpr inline bool operator== (_O_, _O_)
+{
+    return true;
+}
+
+constexpr inline bool operator!= (_O_, _O_)
+{
+    return false;
+}
+
+static_assert(std::is_standard_layout_v<_O_>);
 
 template <typename Data, typename Func = std::function<Data()>>
 class IO
