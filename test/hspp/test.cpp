@@ -143,6 +143,24 @@ TEST(RepeatView, 1)
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
+TEST(CycleView, 1)
+{
+    std::list<int> b = {3, 4, 5};
+    auto v = take | 5U || cycle | RefView{b};
+    auto result = toVector(v);
+    auto expected = std::vector{3, 4, 5, 3, 4};
+    EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
+}
+
+TEST(CycleView, 2)
+{
+    std::list<int> b = {};
+    auto v = take | 5U || cycle | RefView{b};
+    auto result = toVector(v);
+    auto expected = std::vector<int>{};
+    EXPECT_EQ(result, expected);
+}
+
 TEST(TakeView, 1)
 {
     auto v = TakeView{RepeatView{"3"}, 4U};

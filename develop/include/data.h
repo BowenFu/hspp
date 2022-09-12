@@ -773,6 +773,11 @@ constexpr inline auto repeat = toGFunc<1>([](auto data)
     return ownedRange(RepeatView{std::move(data)});
 });
 
+constexpr inline auto cycle = toGFunc<1>([](auto data)
+{
+    return ownedRange(CycleView{std::move(data)});
+});
+
 #if 0
 // TODO: implement CycleView when needed.
 constexpr inline auto cycle = toGFunc<1>([](auto data)
