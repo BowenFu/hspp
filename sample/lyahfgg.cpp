@@ -293,14 +293,20 @@ void texasRanges()
     [3,6..20]
 #endif // 0
 
-    auto result2 = toVector || within_ | 2 | 4 | 20;
-    auto result3 = toVector || within_ | 3 | 6 | 20;
+    auto result2 = toVector || within_(2, 4, 20);
+    auto result3 = toVector || within_(3, 6, 20);
 
     auto const expected2 = std::vector{2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
     auto const expected3 = std::vector{3, 6, 9, 12, 15, 18};
     expectEq(result2, expected2);
     expectEq(result3, expected3);
 }
+
+// TODO: Add CycleView
+//   ghci> take 10 (cycle [1,2,3])
+//   [1,2,3,1,2,3,1,2,3,1]
+//   ghci> take 12 (cycle "LOL ")
+//   "LOL LOL LOL "
 
 void imAListComprehension1()
 {
