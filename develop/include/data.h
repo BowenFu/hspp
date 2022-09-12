@@ -259,14 +259,22 @@ public:
     : mFunc{std::move(func)}
     {
     }
-    constexpr auto operator()(Arg const& arg) const
+    template <typename... Ts>
+    constexpr auto operator()(Arg const& arg, Ts&&... ts) const
     {
         if constexpr (sizeof...(Rest) == 0)
         {
+            static_assert(sizeof...(Ts) == 0);
             return mFunc(arg);
+        }
+        else if constexpr (sizeof...(Rest) == sizeof...(Ts))
+        {
+            static_assert((std::is_same_v<Rest, Ts> && ...));
+            return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
         {
+            static_assert(sizeof...(Ts) == 0);
             auto lamb = [=, func=mFunc](Rest const&... rest){ return func(arg, rest...); };
             return Function<decltype(lamb), Ret , Rest...>{lamb};
         }
@@ -325,17 +333,26 @@ public:
     : mFunc{std::move(func)}
     {
     }
-    template <typename Arg>
-    constexpr auto operator()(Arg const& arg) const
+    template <typename Arg, typename... Ts>
+    constexpr auto operator()(Arg const& arg, Ts&&... ts) const
     {
-        if constexpr (nbArgs == 1)
+        if constexpr (sizeof...(Ts) > 0)
         {
-            return mFunc(arg);
+            static_assert(nbArgs == sizeof...(Ts) + 1);
+            return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
         {
-            auto lamb = [=, func=mFunc](auto const&... rest){ return func(arg, rest...); };
-            return GenericFunction<nbArgs-1, std::decay_t<decltype(lamb)>>{std::move(lamb)};
+            if constexpr (nbArgs == 1)
+            {
+                static_assert(sizeof...(Ts) == 0);
+                return mFunc(arg);
+            }
+            else
+            {
+                auto lamb = [=, func=mFunc](auto const&... rest){ return func(arg, rest...); };
+                return GenericFunction<nbArgs-1, std::decay_t<decltype(lamb)>>{std::move(lamb)};
+            }
         }
     }
 private:

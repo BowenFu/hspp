@@ -141,7 +141,7 @@ void anIntroToLists5()
     auto const expected3 = std::vector{5, 4, 3, 2};
     expectEq(toVector | result3, expected3);
 
-    auto const result4 = length || within_ | 5 | 4 | 1;
+    auto const result4 = length || within_(5, 4, 1);
     auto const expected4 = 5U;
     expectEq(result4, expected4);
 
