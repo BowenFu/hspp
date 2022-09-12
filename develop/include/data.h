@@ -999,7 +999,7 @@ constexpr auto init = toGFunc<1> | [](auto v)
 {
     constexpr auto length = toGFunc<1> | [](auto v)
     {
-        auto i = 0;
+        auto i = 0U;
         for (auto const& e: v)
         {
             static_cast<void>(e);
