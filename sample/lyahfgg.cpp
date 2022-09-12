@@ -380,6 +380,7 @@ int main()
     anIntroToLists2();
     anIntroToLists3();
     anIntroToLists4();
+    anIntroToLists5();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();

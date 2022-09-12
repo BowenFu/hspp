@@ -174,11 +174,25 @@ public:
         {
             if constexpr(includeUpperbound)
             {
-                return mNum <= mBound;
+                if (mStep > 0)
+                {
+                    return mNum <= mBound;
+                }
+                else
+                {
+                    return mNum >= mBound;
+                }
             }
             else
             {
-                return mNum < mBound;
+                if (mStep > 0)
+                {
+                    return mNum < mBound;
+                }
+                else
+                {
+                    return mNum > mBound;
+                }
             }
         }
     private:
