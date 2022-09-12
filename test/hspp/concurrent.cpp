@@ -132,7 +132,7 @@ constexpr auto toLogger = toFunc<> | [](MVar<LogCommand> mlc)
     return Logger{std::move(mlc)};
 };
 
-const auto logger = toFunc<> | [] (Logger m)
+auto const logger = toFunc<> | [] (Logger m)
 {
     auto const dispatchCmd = toGFunc<2> | [](LogCommand const& lc, auto const& loop)
     {

@@ -250,6 +250,7 @@ public:
     constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
     {
         using MType = MonoidType<MData1>;
+        static_assert((data::isGenericFunctionV<MData1> && data::isGenericFunctionV<MData2>) || std::is_same_v<MType, MonoidType<MData2>>);
         return MType::mappend | lhs | rhs;
     }
 };
@@ -339,6 +340,30 @@ public:
     constexpr static auto mappend = data::toFunc<>([](Sum<Data> const& lhs, Sum<Data> const& rhs)
     {
         return Sum<Data>{lhs.get() + rhs.get()};
+    });
+};
+
+template <typename Data>
+class MonoidBase<Max, Data>
+{
+public:
+    constexpr static auto mempty = Max<Data>{std::numeric_limits<Data>::min()};
+
+    constexpr static auto mappend = data::toFunc<>([](Max<Data> const& lhs, Max<Data> const& rhs)
+    {
+        return Max<Data>{std::max(lhs.get(), rhs.get())};
+    });
+};
+
+template <typename Data>
+class MonoidBase<Min, Data>
+{
+public:
+    constexpr static auto mempty = Min<Data>{std::numeric_limits<Data>::max()};
+
+    constexpr static auto mappend = data::toFunc<>([](Min<Data> const& lhs, Min<Data> const& rhs)
+    {
+        return Min<Data>{std::min(lhs.get(), rhs.get())};
     });
 };
 
@@ -631,6 +656,12 @@ template <typename Data>
 struct MonoidTrait<Product<Data>> : MonoidTraitImpl<Product, Data> {};
 
 template <typename Data>
+struct MonoidTrait<Max<Data>> : MonoidTraitImpl<Max, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Min<Data>> : MonoidTraitImpl<Min, Data> {};
+
+template <typename Data>
 struct MonoidTrait<First<Data>> : MonoidTraitImpl<First, Data> {};
 
 template <typename Data>
@@ -779,6 +810,10 @@ class Functor<std::vector, Ts...> : public ContainerFunctor<std::vector, Ts...>
 
 template <typename... Ts>
 class Functor<std::list, Ts...> : public ContainerFunctor<std::list, Ts...>
+{};
+
+template <typename... Ts>
+class Functor<std::basic_string, Ts...> : public ContainerFunctor<std::basic_string, Ts...>
 {};
 
 template <>
@@ -1191,8 +1226,22 @@ class MonadBase<std::list, Ts...> : public ContainerMonadBase<std::list, Ts...>
 {};
 
 template <typename... Ts>
-class MonadBase<std::basic_string, Ts...> : public ContainerMonadBase<std::basic_string, Ts...>
-{};
+class MonadBase<std::basic_string, Ts...>
+{
+public:
+    template <typename Arg, typename... Rest, typename Func>
+    constexpr static auto bind(std::basic_string<Arg, Rest...> const& arg, Func const& func)
+    {
+        using R = std::invoke_result_t<Func, Arg>;
+        R result{};
+        for (auto const e : arg)
+        {
+            result += std::invoke(func, e);
+        }
+        return result;
+    }
+};
+
 
 template <typename... Ts>
 class MonadBase<data::Range, Ts...> : public ContainerMonadBase<data::Range, Ts...>
@@ -1383,7 +1432,7 @@ constexpr auto failIO = toFunc<> | [](std::string s)
     );
 };
 
-inline const auto failIOMZero = failIO | "mzero";
+inline auto const failIOMZero = failIO | "mzero";
 
 template <typename A>
 class MonadZero<data::IO, A>
@@ -1643,9 +1692,13 @@ constexpr auto sum = getSum <o> (foldMap | toSum);
 
 constexpr auto product = getProduct <o> (foldMap | toProduct);
 
+constexpr auto maximum = getMax <o> (foldMap | toMax);
+
+constexpr auto minimum = getMin <o> (foldMap | toMin);
+
 constexpr inline auto elem = any <o> data::equalTo;
 
-constexpr inline auto length = getSum <o> (foldMap || data::const_ | (toSum | 1));
+constexpr inline auto length = getSum <o> (foldMap || data::const_ | (toSum | 1U));
 
 // Promote a function to a monad.
 // liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r

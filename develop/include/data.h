@@ -259,14 +259,22 @@ public:
     : mFunc{std::move(func)}
     {
     }
-    constexpr auto operator()(Arg const& arg) const
+    template <typename... Ts>
+    constexpr auto operator()(Arg const& arg, Ts&&... ts) const
     {
         if constexpr (sizeof...(Rest) == 0)
         {
+            static_assert(sizeof...(Ts) == 0);
             return mFunc(arg);
+        }
+        else if constexpr (sizeof...(Rest) == sizeof...(Ts))
+        {
+            static_assert((std::is_same_v<Rest, Ts> && ...));
+            return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
         {
+            static_assert(sizeof...(Ts) == 0);
             auto lamb = [=, func=mFunc](Rest const&... rest){ return func(arg, rest...); };
             return Function<decltype(lamb), Ret , Rest...>{lamb};
         }
@@ -325,17 +333,26 @@ public:
     : mFunc{std::move(func)}
     {
     }
-    template <typename Arg>
-    constexpr auto operator()(Arg const& arg) const
+    template <typename Arg, typename... Ts>
+    constexpr auto operator()(Arg const& arg, Ts&&... ts) const
     {
-        if constexpr (nbArgs == 1)
+        if constexpr (sizeof...(Ts) > 0)
         {
-            return mFunc(arg);
+            static_assert(nbArgs == sizeof...(Ts) + 1);
+            return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
         {
-            auto lamb = [=, func=mFunc](auto const&... rest){ return func(arg, rest...); };
-            return GenericFunction<nbArgs-1, std::decay_t<decltype(lamb)>>{std::move(lamb)};
+            if constexpr (nbArgs == 1)
+            {
+                static_assert(sizeof...(Ts) == 0);
+                return mFunc(arg);
+            }
+            else
+            {
+                auto lamb = [=, func=mFunc](auto const&... rest){ return func(arg, rest...); };
+                return GenericFunction<nbArgs-1, std::decay_t<decltype(lamb)>>{std::move(lamb)};
+            }
         }
     }
 private:
@@ -468,8 +485,20 @@ public:
 
 constexpr inline auto o = toGFunc<2>(Compose{});
 
-using _O_ = std::tuple<>;
+class _O_ final{};
 constexpr inline _O_ _o_;
+
+constexpr inline bool operator== (_O_, _O_)
+{
+    return true;
+}
+
+constexpr inline bool operator!= (_O_, _O_)
+{
+    return false;
+}
+
+static_assert(std::is_standard_layout_v<_O_>);
 
 template <typename Data, typename Func = std::function<Data()>>
 class IO
@@ -744,6 +773,14 @@ constexpr inline auto repeat = toGFunc<1>([](auto data)
     return ownedRange(RepeatView{std::move(data)});
 });
 
+#if 0
+// TODO: implement CycleView when needed.
+constexpr inline auto cycle = toGFunc<1>([](auto data)
+{
+    return ownedRange(CycleView{std::move(data)});
+});
+#endif // 0
+
 constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
@@ -764,17 +801,22 @@ constexpr inline auto within = toGFunc<2>([](auto start, auto end)
     return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end});
 });
 
-constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto within_ = toGFunc<3>([](auto start, auto next, auto end)
+{
+    return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end, next - start});
+});
+
+constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(TakeView{r, num});
 });
 
-constexpr inline auto drop = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(DropView{r, num});
 });
 
-constexpr inline auto splitAt = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto splitAt = toGFunc<2>([](size_t num, auto r)
 {
     return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
 });
@@ -784,10 +826,25 @@ constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
     return r;
 });
 
+constexpr inline auto chain = toGFunc<2>([](auto l, auto r)
+{
+    if constexpr(isRangeV<decltype(l)>)
+    {
+        static_assert(std::is_same_v<decltype(*l.begin()), std::decay_t<decltype(*r.begin())>>);
+        return ownedRange(ChainView{std::move(l), std::move(r)});
+    }
+    else
+    {
+        l.insert(l.end(), r.begin(), r.end());
+        return l;
+    }
+});
+
 constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
 {
     if constexpr(isRangeV<decltype(l)>)
     {
+        static_assert(std::is_same_v<decltype(e), std::decay_t<decltype(*l.begin())>>);
         return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
     }
     else
@@ -933,6 +990,70 @@ constexpr auto toLeft = data::toType<Left>;
 
 constexpr auto toRight = data::toType<Right>;
 
+template <typename T>
+constexpr auto cast = toGFunc<1> | [](auto v)
+{
+    return static_cast<T>(v);
+};
+
+constexpr auto null = toGFunc<1> | [](auto v)
+{
+    return !(v.begin() != v.end());
+};
+
+constexpr auto head = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    return *v.begin();
+};
+
+constexpr auto tail = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    return data::drop | 1U | v;
+};
+
+constexpr auto last = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    auto result = *v.begin();
+    for (auto const& e: v)
+    {
+        result = e;
+    }
+    return result;
+};
+
+constexpr auto init = toGFunc<1> | [](auto v)
+{
+    constexpr auto length = toGFunc<1> | [](auto v)
+    {
+        auto i = 0U;
+        for (auto const& e: v)
+        {
+            static_cast<void>(e);
+            ++i;
+        }
+        return i;
+    };
+
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+
+    return take | static_cast<size_t>((length | v) - 1) | v;
+};
+
 } // namespace data
 
 using data::o;
@@ -1058,6 +1179,20 @@ public:
 };
 
 template <typename Data>
+class Max : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class Min : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
 class AllImpl : public data::DataHolder<Data>
 {
 public:
@@ -1166,6 +1301,8 @@ public:
 
 constexpr auto toProduct = data::toType<Product>;
 constexpr auto toSum = data::toType<Sum>;
+constexpr auto toMax = data::toType<Max>;
+constexpr auto toMin = data::toType<Min>;
 constexpr auto toAll = data::toType<AllImpl>;
 constexpr auto toAny = data::toType<AnyImpl>;
 constexpr auto toFirst = toGFunc<1>([](auto data)
@@ -1186,6 +1323,8 @@ constexpr auto toEndo = data::toType<Endo>;
 
 constexpr auto getProduct = data::from;
 constexpr auto getSum = data::from;
+constexpr auto getMax = data::from;
+constexpr auto getMin = data::from;
 constexpr auto getAll = data::from;
 constexpr auto getAny = data::from;
 constexpr auto getFirst = data::from;

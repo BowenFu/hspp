@@ -492,7 +492,7 @@ constexpr auto incrementGlobalClockImpl = yCombinator | [](auto const& self) -> 
     );
 };
 
-const auto incrementGlobalClock = incrementGlobalClockImpl();
+auto const incrementGlobalClock = incrementGlobalClockImpl();
 
 template <typename A>
 class Valid : public std::pair<TState, A>
@@ -1185,7 +1185,7 @@ constexpr auto toTMVar = toGFunc<1> | [](auto t)
 };
 
 template <typename A>
-const auto newEmptyTMVar = ((newTVar | data::nothing<A>) >>= (Monad<STM>::return_ <o> toTMVar));
+auto const newEmptyTMVar = ((newTVar | data::nothing<A>) >>= (Monad<STM>::return_ <o> toTMVar));
 
 template <typename A>
 constexpr auto takeTMVarImpl(TMVar<A> const& t)
@@ -1282,12 +1282,6 @@ constexpr auto toStreamPtr = toGFunc<1> | [](auto sb)
 };
 
 template <typename T>
-constexpr auto cast = toGFunc<1> | [](auto v)
-{
-    return static_cast<T>(v);
-};
-
-template <typename T>
 constexpr auto makeShared = toGFunc<1> | [](auto v)
 {
     return std::make_shared<T>(std::move(v));
@@ -1332,7 +1326,7 @@ constexpr auto newChanImpl()
 }
 
 template <typename A>
-inline const auto newChan = newChanImpl<A>();
+inline auto const newChan = newChanImpl<A>();
 
 template <typename A>
 constexpr auto writeChanImpl(Chan<A> chan, A val)

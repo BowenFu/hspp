@@ -281,7 +281,7 @@ constexpr auto isSpace = toFunc<> | [](char c)
     return isspace(c);
 };
 
-inline const auto space = many || sat | isSpace;
+inline auto const space = many || sat | isSpace;
 
 // This will fail some tests.
 constexpr auto token = toGFunc<1> | [](auto p)
