@@ -991,19 +991,28 @@ constexpr auto null = toGFunc<1> | [](auto v)
 
 constexpr auto head = toGFunc<1> | [](auto v)
 {
-    assert(v.begin() != v.end());
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
     return *v.begin();
 };
 
 constexpr auto tail = toGFunc<1> | [](auto v)
 {
-    assert(v.begin() != v.end());
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
     return data::drop | 1U | v;
 };
 
 constexpr auto last = toGFunc<1> | [](auto v)
 {
-    assert(v.begin() != v.end());
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
     auto result = *v.begin();
     for (auto const& e: v)
     {
@@ -1025,7 +1034,10 @@ constexpr auto init = toGFunc<1> | [](auto v)
         return i;
     };
 
-    assert(v.begin() != v.end());
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
 
     return take | static_cast<size_t>((length | v) - 1) | v;
 };
