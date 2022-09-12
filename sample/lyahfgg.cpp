@@ -61,7 +61,7 @@ void anIntroToLists1()
     [1,2,3,4,9,10,11,12]
 #endif // 0
 
-    auto const result = chain | (within | 1 | 4) | (within | 9 | 12);
+    auto const result = chain | within(1, 4) | within(9, 12);
     auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
     expectEq(toVector | result, expected);
 }
@@ -100,7 +100,7 @@ void anIntroToLists4()
     [5,1,2,3,4,5]
 #endif // 0
 
-    auto const result = 5 <cons> (within | 1 | 5);
+    auto const result = 5 <cons> within(1, 5);
     auto const expected = std::vector{5, 1, 2, 3, 4, 5};
     expectEq(toVector | result, expected);
 }
@@ -125,19 +125,19 @@ void anIntroToLists5()
     True
 #endif // 0
 
-    auto const result0 = head || within_ | 5 | 4 | 1;
+    auto const result0 = head || within_(5, 4, 1);
     auto const expected0 = 5;
     expectEq(result0, expected0);
 
-    auto const result1 = tail || within_ | 5 | 4 | 1;
+    auto const result1 = tail || within_(5, 4, 1);
     auto const expected1 = std::vector{4, 3, 2, 1};
     expectEq(toVector | result1, expected1);
 
-    auto const result2 = last || within_ | 5 | 4 | 1;
+    auto const result2 = last || within_(5, 4, 1);
     auto const expected2 = 1;
     expectEq(result2, expected2);
 
-    auto const result3 = init || within_ | 5 | 4 | 1;
+    auto const result3 = init || within_(5, 4, 1);
     auto const expected3 = std::vector{5, 4, 3, 2};
     expectEq(toVector | result3, expected3);
 
@@ -168,23 +168,23 @@ void anIntroToLists5()
 //     []
 // #endif // 0
 
-//     auto const result0 = take || within_ | 5 | 4 | 1;
+//     auto const result0 = take || within_(5, 4, 1);
 //     auto const expected0 = 5;
 //     expectEq(result0, expected0);
 
-//     auto const result1 = tail || within_ | 5 | 4 | 1;
+//     auto const result1 = tail || within_(5, 4, 1);
 //     auto const expected1 = std::vector{4, 3, 2, 1};
 //     expectEq(toVector | result1, expected1);
 
-//     auto const result2 = last || within_ | 5 | 4 | 1;
+//     auto const result2 = last || within_(5, 4, 1);
 //     auto const expected2 = 1;
 //     expectEq(result2, expected2);
 
-//     auto const result3 = init || within_ | 5 | 4 | 1;
+//     auto const result3 = init || within_(5, 4, 1);
 //     auto const expected3 = std::vector{5, 4, 3, 2};
 //     expectEq(toVector | result3, expected3);
 
-//     auto const result4 = length || within_ | 5 | 4 | 1;
+//     auto const result4 = length || within_(5, 4, 1);
 //     auto const expected4 = 5U;
 //     expectEq(result4, expected4);
 
@@ -205,8 +205,8 @@ void texasRanges()
     ['a'..'z']
 #endif // 0
 
-    auto result0 = toVector || within | 1 | 20;
-    auto result1 = toString || within | 'a' | 'z';
+    auto result0 = toVector || within(1, 20);
+    auto result1 = toString || within('a', 'z');
 
     auto const expected0 = std::vector{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
     auto const expected1 = "abcdefghijklmnopqrstuvwxyz";
@@ -238,7 +238,7 @@ void imAListComprehension1()
     Id<int> x;
     auto const result = _(
         x * 2,
-        x <= (within | 1 | 10),
+        x <= within(1, 10),
         if_ | (x*2 >= 12)
     );
     auto const expected = std::vector{12, 14, 16, 18, 20};
@@ -255,7 +255,7 @@ void imAListComprehension2()
     Id<int> x;
     auto const result = _(
         x,
-        x <= (within | 50 | 100),
+        x <= within(50, 100),
         if_ | (x%7 == 3)
     );
     auto const expected = std::vector{52, 59, 66, 73, 80, 87, 94};
@@ -277,7 +277,7 @@ void imAListComprehension3()
             if_ || odd | x
         );
     };
-    auto const result = toVector(boomBangs || (within | 7 | 13));
+    auto const result = toVector(boomBangs || within(7, 13));
     auto const expected = std::vector{"BOOM!"sv, "BOOM!"sv,"BANG!"sv,"BANG!"sv};
     expectEq(result, expected);
 }
@@ -291,7 +291,7 @@ void imAListComprehension4()
     Id<int> x;
     auto const rng = _(
         x,
-        x <= (within | 10 | 20),
+        x <= within(10, 20),
         if_ || x != 13,
         if_ || x != 15,
         if_ || x != 19
