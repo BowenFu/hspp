@@ -9,19 +9,43 @@ using namespace hspp::data;
 using namespace std::literals;
 
 
-
+// Baby's first functions
 void example1()
 {
 #if 0
     // haskell version
     doubleMe x = x + x
 #endif // 0
+
     constexpr auto doubleMe = toGFunc<1> | [](auto x)
     {
         return x + x;
     };
     expectEq(doubleMe | 9, 18);
     expectEq(doubleMe | 8.3, 16.6);
+
+#if 0
+    // haskell version
+    doubleUs x y = doubleMe x + doubleMe y
+#endif // 0
+
+    constexpr auto doubleUs = toGFunc<2> | [=](auto x, auto y)
+    {
+        return (doubleMe | x) + (doubleMe | y);
+    };
+    expectEq(doubleUs | 3 | 4, 14);
+
+#if 0
+    // haskell version
+    doubleSmallNumber x = if x > 100 then x else x*2
+#endif // 0
+
+    constexpr auto doubleSmallNumber = toGFunc<1> | [](auto x)
+    {
+        return x > 100 ? x : x*2;
+    };
+    expectEq(doubleSmallNumber | 30, 60);
+    expectEq(doubleSmallNumber | 130, 130);
 }
 
 constexpr auto toVector = data::to<std::vector>;
