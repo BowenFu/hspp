@@ -797,6 +797,20 @@ constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
     return r;
 });
 
+constexpr inline auto chain = toGFunc<2>([](auto l, auto r)
+{
+    if constexpr(isRangeV<decltype(l)>)
+    {
+        static_assert(std::is_same_v<decltype(*l.begin()), std::decay_t<decltype(*r.begin())>>);
+        return ownedRange(ChainView{std::move(l), std::move(r)});
+    }
+    else
+    {
+        l.insert(l.begin(), r.begin(), r.end());
+        return l;
+    }
+});
+
 constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
 {
     if constexpr(isRangeV<decltype(l)>)

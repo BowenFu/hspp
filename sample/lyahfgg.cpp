@@ -53,6 +53,18 @@ void babysFirstFunctions()
 constexpr auto toVector = data::to<std::vector>;
 constexpr auto toString = data::to<std::basic_string>;
 
+void anIntroToLists()
+{
+#if 0
+    // haskell version
+    [1,2,3,4] ++ [9,10,11,12]
+#endif // 0
+
+    auto const result = chain | std::vector{1, 2, 3, 4} | std::vector{9, 10, 11, 12};
+    auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
+    expectEq(toVector | result, expected);
+}
+
 void texasRanges()
 {
 #if 0
