@@ -1155,6 +1155,20 @@ public:
 };
 
 template <typename Data>
+class Max : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
+class Min : public data::DataHolder<Data>
+{
+public:
+    using data::DataHolder<Data>::DataHolder;
+};
+
+template <typename Data>
 class AllImpl : public data::DataHolder<Data>
 {
 public:
@@ -1263,6 +1277,8 @@ public:
 
 constexpr auto toProduct = data::toType<Product>;
 constexpr auto toSum = data::toType<Sum>;
+constexpr auto toMax = data::toType<Max>;
+constexpr auto toMin = data::toType<Min>;
 constexpr auto toAll = data::toType<AllImpl>;
 constexpr auto toAny = data::toType<AnyImpl>;
 constexpr auto toFirst = toGFunc<1>([](auto data)
@@ -1283,6 +1299,8 @@ constexpr auto toEndo = data::toType<Endo>;
 
 constexpr auto getProduct = data::from;
 constexpr auto getSum = data::from;
+constexpr auto getMax = data::from;
+constexpr auto getMin = data::from;
 constexpr auto getAll = data::from;
 constexpr auto getAny = data::from;
 constexpr auto getFirst = data::from;

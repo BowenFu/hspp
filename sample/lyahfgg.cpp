@@ -210,6 +210,25 @@ void anIntroToLists7()
     expectEq(toVector | result2, expected2);
 }
 
+void anIntroToLists8()
+{
+#if 0
+    // haskell version
+    ghci> minimum [8,4,2,1,5,6]
+    1
+    ghci> maximum [1,9,2,3,4]
+    9
+#endif // 0
+
+    auto const result0 = minimum | std::vector{8, 4, 2, 1, 5, 6};
+    auto const expected0 = 1;
+    expectEq(result0, expected0);
+
+    auto const result1 = maximum | std::vector{1, 9, 2, 3, 4};
+    auto const expected1 = 9;
+    expectEq(result1, expected1);
+}
+
 void texasRanges()
 {
 #if 0

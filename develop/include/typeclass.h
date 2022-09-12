@@ -250,6 +250,7 @@ public:
     constexpr auto operator()(MData1 const& lhs, MData2 const& rhs) const
     {
         using MType = MonoidType<MData1>;
+        static_assert(std::is_same_v<MType, MonoidType<MData2>>);
         return MType::mappend | lhs | rhs;
     }
 };
@@ -339,6 +340,30 @@ public:
     constexpr static auto mappend = data::toFunc<>([](Sum<Data> const& lhs, Sum<Data> const& rhs)
     {
         return Sum<Data>{lhs.get() + rhs.get()};
+    });
+};
+
+template <typename Data>
+class MonoidBase<Max, Data>
+{
+public:
+    constexpr static auto mempty = Max<Data>{std::numeric_limits<Data>::min()};
+
+    constexpr static auto mappend = data::toFunc<>([](Max<Data> const& lhs, Max<Data> const& rhs)
+    {
+        return Max<Data>{std::max(lhs.get(), rhs.get())};
+    });
+};
+
+template <typename Data>
+class MonoidBase<Min, Data>
+{
+public:
+    constexpr static auto mempty = Min<Data>{std::numeric_limits<Data>::max()};
+
+    constexpr static auto mappend = data::toFunc<>([](Min<Data> const& lhs, Min<Data> const& rhs)
+    {
+        return Min<Data>{std::min(lhs.get(), rhs.get())};
     });
 };
 
@@ -629,6 +654,12 @@ struct MonoidTrait<Sum<Data>> : MonoidTraitImpl<Sum, Data> {};
 
 template <typename Data>
 struct MonoidTrait<Product<Data>> : MonoidTraitImpl<Product, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Max<Data>> : MonoidTraitImpl<Max, Data> {};
+
+template <typename Data>
+struct MonoidTrait<Min<Data>> : MonoidTraitImpl<Min, Data> {};
 
 template <typename Data>
 struct MonoidTrait<First<Data>> : MonoidTraitImpl<First, Data> {};
@@ -1660,6 +1691,10 @@ constexpr auto any = toGFunc<1>([](auto p)
 constexpr auto sum = getSum <o> (foldMap | toSum);
 
 constexpr auto product = getProduct <o> (foldMap | toProduct);
+
+constexpr auto maximum = getMax <o> (foldMap | toMax);
+
+constexpr auto minimum = getMin <o> (foldMap | toMin);
 
 constexpr inline auto elem = any <o> data::equalTo;
 
