@@ -142,9 +142,9 @@ struct TypeClassTrait<TypeClassT, PausePtrIO<R>>
 
 // pause :: Monad m => PauseT m ()
 // pause = DoneT ()
-const auto pause = toDoneTPtr<IO>(_o_);
+auto const pause = toDoneTPtr<IO>(_o_);
 
-const auto example2 = do_(
+auto const example2 = do_(
   lift<PauseTPtr> || putStrLn | "Step 1",
   pause,
   lift<PauseTPtr> || putStrLn | "Step 2",

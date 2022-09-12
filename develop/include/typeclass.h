@@ -781,6 +781,10 @@ template <typename... Ts>
 class Functor<std::list, Ts...> : public ContainerFunctor<std::list, Ts...>
 {};
 
+template <typename... Ts>
+class Functor<std::basic_string, Ts...> : public ContainerFunctor<std::basic_string, Ts...>
+{};
+
 template <>
 class Functor<data::Range>
 {
@@ -1191,8 +1195,22 @@ class MonadBase<std::list, Ts...> : public ContainerMonadBase<std::list, Ts...>
 {};
 
 template <typename... Ts>
-class MonadBase<std::basic_string, Ts...> : public ContainerMonadBase<std::basic_string, Ts...>
-{};
+class MonadBase<std::basic_string, Ts...>
+{
+public:
+    template <typename Arg, typename... Rest, typename Func>
+    constexpr static auto bind(std::basic_string<Arg, Rest...> const& arg, Func const& func)
+    {
+        using R = std::invoke_result_t<Func, Arg>;
+        R result{};
+        for (auto const e : arg)
+        {
+            result += std::invoke(func, e);
+        }
+        return result;
+    }
+};
+
 
 template <typename... Ts>
 class MonadBase<data::Range, Ts...> : public ContainerMonadBase<data::Range, Ts...>
@@ -1383,7 +1401,7 @@ constexpr auto failIO = toFunc<> | [](std::string s)
     );
 };
 
-inline const auto failIOMZero = failIO | "mzero";
+inline auto const failIOMZero = failIO | "mzero";
 
 template <typename A>
 class MonadZero<data::IO, A>

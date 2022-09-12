@@ -332,14 +332,14 @@ using I = std::string;
 
 // coroutine for handling strings
 Id<std::string> name, color;
-const auto example1 = do_(
+auto const example1 = do_(
     name <= (yield<IO, O, I, std::string> | "What's your name? "),
     lift<Producing, O, I> || putStrLn | ("Hello, " + name),
     color <= (yield<IO, O, I, std::string> | "What's your favorite color? "),
     lift<Producing, O, I> || putStrLn | ("I like " + color + ", too.")
 );
 
-const auto foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I, std::string>
+auto const foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I, std::string>
 {
     return do_(
         lift<Producing, O, I> || putStrLn | str,
@@ -348,7 +348,7 @@ const auto foreverKResult = foreverK | [](std::string str) -> Producing<IO, O, I
 };
 
 // coroutine for handling io
-const auto stdOutIn = toConsumingPtr_<IO, O, I, _O_> || foreverKResult;
+auto const stdOutIn = toConsumingPtr_<IO, O, I, _O_> || foreverKResult;
 
 // let the two coroutines hand over control to each other by turn.
 auto io_ = example1 <SS> stdOutIn;

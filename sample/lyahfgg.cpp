@@ -1,4 +1,5 @@
 // Learn you a hspp for great good.
+// The samples are originated from Learn you a Haskell for great good.
 
 #include "hspp.h"
 #include "common.h"
@@ -81,13 +82,13 @@ void texasRanges()
     auto const expected3 = std::vector{3, 6, 9, 12, 15, 18};
     expectEq(result2, expected2);
     expectEq(result3, expected3);
-
 }
 
-void example2()
+void imAListComprehension1()
 {
 #if 0
     // haskell version
+    [x*2 | x <- [1..10]]
     [x*2 | x <- [1..10], x*2 >= 12]
 #endif // 0
     Id<int> x;
@@ -100,7 +101,24 @@ void example2()
     expectEq(toVector(result), expected);
 }
 
-void example3()
+void imAListComprehension2()
+{
+#if 0
+    // haskell version
+    [ x | x <- [50..100], x `mod` 7 == 3]
+#endif // 0
+
+    Id<int> x;
+    auto const result = _(
+        x,
+        x <= (within | 50 | 100),
+        if_ | (x%7 == 3)
+    );
+    auto const expected = std::vector{52, 59, 66, 73, 80, 87, 94};
+    expectEq(toVector(result), expected);
+}
+
+void imAListComprehension3()
 {
 #if 0
     // haskell version
@@ -120,14 +138,14 @@ void example3()
     expectEq(result, expected);
 }
 
-void example4()
+void imAListComprehension4()
 {
 #if 0
     // haskell version
     [ x | x <- [10..20], x /= 13, x /= 15, x /= 19] [10,11,12,14,16,17,18,20]
 #endif // 0
     Id<int> x;
-    const auto rng = _(
+    auto const rng = _(
         x,
         x <= (within | 10 | 20),
         if_ || x != 13,
@@ -139,14 +157,15 @@ void example4()
     expectEq(result, expected);
 }
 
-void example5()
+void imAListComprehension5()
 {
 #if 0
     // haskell version
+    [ x*y | x <- [2,5,10], y <- [8,10,11]]
     [ x*y | x <- [2,5,10], y <- [8,10,11], x*y > 50]
 #endif // 0
     Id<int> x, y;
-    const auto rng = _(
+    auto const rng = _(
         x*y,
         x <= std::vector{2, 5, 10},
         y <= std::vector{8, 10, 11},
@@ -157,13 +176,69 @@ void example5()
     expectEq(result, expected);
 }
 
+void imAListComprehension6()
+{
+#if 0
+    // haskell version
+    ghci> let nouns = ["hobo","frog","pope"]
+    ghci> let adjectives = ["lazy","grouchy","scheming"]
+    ghci> [adjective ++ " " ++ noun | adjective <- adjectives, noun <- nouns]
+    ["lazy hobo","lazy frog","lazy pope","grouchy hobo","grouchy frog",
+    "grouchy pope","scheming hobo","scheming frog","scheming pope"]
+#endif // 0
+
+    auto const nouns = std::vector{"hobo", "frog", "pope"};
+    auto const adjectives = std::vector{"lazy", "grouchy", "scheming"};
+    Id<char const*> adjective, noun;
+    auto const rng = _(
+        (cast<std::string> | adjective) + " " + noun,
+        adjective <= adjectives,
+        noun <= nouns
+    );
+    auto const result = toVector(rng);
+    auto const expected = std::vector{"lazy hobo"s, "lazy frog"s, "lazy pope"s, "grouchy hobo"s, "grouchy frog"s, "grouchy pope"s, "scheming hobo"s, "scheming frog"s, "scheming pope"s};
+    expectEq(result, expected);
+}
+
+void imAListComprehension7()
+{
+#if 0
+    // haskell version
+    removeNonUppercase st = [ c | c <- st, c `elem` ['A'..'Z']]
+    ghci> removeNonUppercase "Hahaha! Ahahaha!"
+    "HA"
+    ghci> removeNonUppercase "IdontLIKEFROGS"
+    "ILIKEFROGS"
+#endif // 0
+
+    constexpr auto removeNonUppercase = toGFunc<1> | [](auto st)
+    {
+        Id<char> c;
+        return _(
+            c,
+            c <= st,
+            if_ || (c >= 'A' && c <= 'Z')
+        );
+    };
+    auto const result1 = removeNonUppercase | "Hahaha! Ahahaha!"s;
+    auto const expected1 = "HA"sv;
+    expectEq(result1, expected1);
+
+    auto const result2 = removeNonUppercase | "IdontLIKEFROGS"s;
+    auto const expected2 = "ILIKEFROGS"sv;
+    expectEq(result2, expected2);
+}
+
 int main()
 {
     babysFirstFunctions();
     texasRanges();
-    example2();
-    example3();
-    example4();
-    example5();
+    imAListComprehension1();
+    imAListComprehension2();
+    imAListComprehension3();
+    imAListComprehension4();
+    imAListComprehension5();
+    imAListComprehension6();
+    imAListComprehension7();
     return 0;
 }

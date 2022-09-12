@@ -744,6 +744,14 @@ constexpr inline auto repeat = toGFunc<1>([](auto data)
     return ownedRange(RepeatView{std::move(data)});
 });
 
+#if 0
+// TODO: implement CycleView when needed.
+constexpr inline auto cycle = toGFunc<1>([](auto data)
+{
+    return ownedRange(CycleView{std::move(data)});
+});
+#endif // 0
+
 constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
@@ -1201,6 +1209,12 @@ constexpr auto appEndo = data::from;
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
+
+template <typename T>
+constexpr auto cast = toGFunc<1> | [](auto v)
+{
+    return static_cast<T>(v);
+};
 
 } // namespace hspp
 
