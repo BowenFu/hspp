@@ -61,7 +61,7 @@ void anIntroToLists1()
     [1,2,3,4,9,10,11,12]
 #endif // 0
 
-    auto const result = chain | std::vector{1, 2, 3, 4} | std::vector{9, 10, 11, 12};
+    auto const result = chain | (within | 1 | 4) | (within | 9 | 12);
     auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
     expectEq(toVector | result, expected);
 }
@@ -77,6 +77,32 @@ void anIntroToLists2()
     auto const result = "hello"s <chain> " "s <chain> "world"s;
     auto const expected = "hello world"s;
     expectEq(toString | result, expected);
+}
+
+void anIntroToLists3()
+{
+#if 0
+    // haskell version
+    ghci> 'A':" SMALL CAT"
+    "A SMALL CAT"
+#endif // 0
+
+    auto const result = 'A' <cons> " SMALL CAT"s;
+    auto const expected = "A SMALL CAT"s;
+    expectEq(toString | result, expected);
+}
+
+void anIntroToLists4()
+{
+#if 0
+    // haskell version
+    ghci> 5:[1,2,3,4,5]
+    [5,1,2,3,4,5]
+#endif // 0
+
+    auto const result = 5 <cons> (within | 1 | 5);
+    auto const expected = std::vector{5, 1, 2, 3, 4, 5};
+    expectEq(toVector | result, expected);
 }
 
 void texasRanges()
@@ -260,6 +286,8 @@ int main()
     babysFirstFunctions();
     anIntroToLists1();
     anIntroToLists2();
+    anIntroToLists3();
+    anIntroToLists4();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
