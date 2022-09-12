@@ -271,7 +271,7 @@ void anIntroToLists10()
     expectEq(result1, expected1);
 }
 
-void texasRanges()
+void texasRanges1()
 {
 #if 0
     // haskell version
@@ -291,22 +291,50 @@ void texasRanges()
     // haskell version
     [2,4..20]
     [3,6..20]
+    [20,19..1]
+    // [0.1, 0.3 .. 1]
 #endif // 0
 
     auto result2 = toVector || within_(2, 4, 20);
     auto result3 = toVector || within_(3, 6, 20);
+    auto result4 = toVector || within_(20, 19, 1);
+    // auto result5 = toVector || within_(0.1, 0.3, 1.0);
 
     auto const expected2 = std::vector{2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
     auto const expected3 = std::vector{3, 6, 9, 12, 15, 18};
+    auto const expected4 = std::vector{20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+    // auto const expected5 = std::vector{0.1,0.3,0.5,0.7, 0.9};
+
     expectEq(result2, expected2);
     expectEq(result3, expected3);
+    expectEq(result4, expected4);
+    // expectEq(result5, expected5);
 }
 
-// TODO: Add CycleView
-//   ghci> take 10 (cycle [1,2,3])
-//   [1,2,3,1,2,3,1,2,3,1]
-//   ghci> take 12 (cycle "LOL ")
-//   "LOL LOL LOL "
+void texasRanges2()
+{
+#if 0
+    // haskell version
+    ghci> take 10 (cycle [1,2,3])
+    [1,2,3,1,2,3,1,2,3,1]
+    ghci> take 12 (cycle "LOL ")
+    "LOL LOL LOL "
+#endif // 0
+
+    auto result0 = toVector || take | 10U | (cycle | within(1, 3));
+    auto const expected0 = std::vector{1, 2, 3, 1, 2, 3, 1, 2, 3, 1};
+    expectEq(result0, expected0);
+
+#if 0
+    // haskell version
+    ghci> take 10 (repeat 5)
+    [5,5,5,5,5,5,5,5,5,5]
+#endif // 0
+
+    auto result1 = toVector || take | 10U | (repeat | 5);
+    auto const expected1 = std::vector{5, 5, 5, 5, 5, 5, 5, 5, 5, 5};
+    expectEq(result1, expected1);
+}
 
 void imAListComprehension1()
 {
@@ -453,6 +481,28 @@ void imAListComprehension7()
     expectEq(result2, expected2);
 }
 
+// nested list compression not supported yet
+#if 0
+void imAListComprehension8()
+{
+#if 0
+    // haskell version
+    ghci> let xxs = [[1,3,5,2,3,1,2,4,5], [1,2,3,4,5,6,7,8,9], [1,2,4,2,1,6,3,1,3,2,3,6]]
+    ghci> [ [ x | x <- xs, even x ] | xs <- xxs] [[2,2,4],[2,4,6,8],[2,4,2,6,2,6]]
+#endif // 0
+
+    const auto xxs = std::vector{std::vector{1, 3, 5, 2, 3, 1, 2, 4, 5}, std::vector{1, 2, 3, 4, 5, 6, 7, 8, 9}, std::vector{1, 2, 4, 2, 1, 6, 3, 1, 3, 2, 3, 6}};
+    Id<std::vector<int>> xs;
+    Id<int> x;
+    auto const result = _(
+        _(x, x <= xs, if_ || even | x),
+        xs <= xxs
+    );
+    auto const expected = std::vector{std::vector{2, 2, 4}, std::vector{2, 4, 6, 8}, std::vector{2, 4, 2, 6, 2, 6}};
+    expectEq(result, expected);
+}
+#endif
+
 int main()
 {
     babysFirstFunctions();
@@ -466,7 +516,8 @@ int main()
     anIntroToLists8();
     anIntroToLists9();
     anIntroToLists10();
-    texasRanges();
+    texasRanges1();
+    texasRanges2();
     imAListComprehension1();
     imAListComprehension2();
     imAListComprehension3();
@@ -474,5 +525,6 @@ int main()
     imAListComprehension5();
     imAListComprehension6();
     imAListComprehension7();
+    // imAListComprehension8();
     return 0;
 }

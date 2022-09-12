@@ -476,6 +476,66 @@ private:
 };
 
 template <typename Base>
+class CycleView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(CycleView const& cycleView)
+        : mView{cycleView}
+        , mBaseIter{mView.get().mBase.begin()}
+        , mEmpty{!(mBaseIter != mView.get().mBase.end())}
+        {
+        }
+        auto& operator++()
+        {
+            if (mEmpty)
+            {
+                return *this;
+            }
+            ++mBaseIter;
+            if (!((mBaseIter != mView.get().mBase.end())))
+            {
+                mBaseIter = mView.get().mBase.begin();
+            }
+            return *this;
+        }
+        auto operator*() const
+        {
+            return *mBaseIter;
+        }
+        bool hasValue() const
+        {
+            return !mEmpty;
+        }
+    private:
+        std::reference_wrapper<CycleView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+        bool mEmpty;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr CycleView(Base base)
+    : mBase{std::move(base)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Base mBase;
+};
+
+template <typename Base>
 class JoinView
 {
 public:
