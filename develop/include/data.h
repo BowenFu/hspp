@@ -961,6 +961,57 @@ constexpr auto toLeft = data::toType<Left>;
 
 constexpr auto toRight = data::toType<Right>;
 
+template <typename T>
+constexpr auto cast = toGFunc<1> | [](auto v)
+{
+    return static_cast<T>(v);
+};
+
+constexpr auto null = toGFunc<1> | [](auto v)
+{
+    return !(v.begin() != v.end());
+};
+
+constexpr auto head = toGFunc<1> | [](auto v)
+{
+    assert(v.begin() != v.end());
+    return *v.begin();
+};
+
+constexpr auto tail = toGFunc<1> | [](auto v)
+{
+    assert(v.begin() != v.end());
+    return data::drop | v | 1;
+};
+
+constexpr auto last = toGFunc<1> | [](auto v)
+{
+    assert(v.begin() != v.end());
+    auto result = *v.begin();
+    for (auto const& e: v)
+    {
+        result = e;
+    }
+    return result;
+};
+
+constexpr auto init = toGFunc<1> | [](auto v)
+{
+    constexpr auto length = toGFunc<1> | [](auto v)
+    {
+        auto i = 0;
+        for (auto const& e: v)
+        {
+            ++i;
+        }
+        return i;
+    };
+
+    assert(v.begin() != v.end());
+
+    return take | v | (length - 1);
+};
+
 } // namespace data
 
 using data::o;
@@ -1223,12 +1274,6 @@ constexpr auto appEndo = data::from;
 
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
-
-template <typename T>
-constexpr auto cast = toGFunc<1> | [](auto v)
-{
-    return static_cast<T>(v);
-};
 
 } // namespace hspp
 

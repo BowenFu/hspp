@@ -105,6 +105,19 @@ void anIntroToLists4()
     expectEq(toVector | result, expected);
 }
 
+void anIntroToLists5()
+{
+#if 0
+    // haskell version
+    ghci> head [5,4,3,2,1]
+    5
+#endif // 0
+
+    auto const result = 5 <cons> (within | 1 | 5);
+    auto const expected = std::vector{5, 1, 2, 3, 4, 5};
+    expectEq(toVector | result, expected);
+}
+
 void texasRanges()
 {
 #if 0
