@@ -151,17 +151,19 @@ private:
 template <typename Num = int32_t, bool includeUpperbound = false>
 class IotaView
 {
+    using StepT = decltype(std::declval<Num>() - std::declval<Num>());
 public:
     class Iter
     {
     public:
-        constexpr Iter(Num start, Num end)
+        constexpr Iter(Num start, Num end, StepT step)
         : mNum{start}
         , mBound{end}
+        , mStep{step}
         {}
         auto& operator++()
         {
-            ++mNum;
+            mNum += mStep;
             return *this;
         }
         auto operator*() const
@@ -182,6 +184,7 @@ public:
     private:
         Num mNum;
         Num mBound;
+        StepT mStep;
     };
     class Sentinel
     {};
@@ -189,16 +192,17 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr IotaView(Num begin, Num end)
+    constexpr IotaView(Num begin, Num end, StepT step = 1)
     : mBegin{begin}
     , mEnd{end}
+    , mStep{step}
     {}
     constexpr IotaView(Num begin)
     : IotaView{begin, std::numeric_limits<Num>::max()}
     {}
     auto begin() const
     {
-        return Iter(mBegin, mEnd);
+        return Iter(mBegin, mEnd, mStep);
     }
     auto end() const
     {
@@ -207,6 +211,7 @@ public:
 private:
     Num mBegin;
     Num mEnd;
+    StepT mStep;
 };
 
 template <typename Base>

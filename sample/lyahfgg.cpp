@@ -2,6 +2,7 @@
 
 #include "hspp.h"
 #include "common.h"
+#include <string>
 
 using namespace hspp;
 using namespace hspp::doN;
@@ -10,7 +11,7 @@ using namespace std::literals;
 
 
 // Baby's first functions
-void example1()
+void babysFirstFunctions()
 {
 #if 0
     // haskell version
@@ -49,6 +50,39 @@ void example1()
 }
 
 constexpr auto toVector = data::to<std::vector>;
+constexpr auto toString = data::to<std::basic_string>;
+
+void texasRanges()
+{
+#if 0
+    // haskell version
+    [1..20]
+    ['a'..'z']
+#endif // 0
+
+    auto result0 = toVector || within | 1 | 20;
+    auto result1 = toString || within | 'a' | 'z';
+
+    auto const expected0 = std::vector{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+    auto const expected1 = "abcdefghijklmnopqrstuvwxyz";
+    expectEq(result0, expected0);
+    expectEq(result1, expected1);
+
+#if 0
+    // haskell version
+    [2,4..20]
+    [3,6..20]
+#endif // 0
+
+    auto result2 = toVector || within_ | 2 | 4 | 20;
+    auto result3 = toVector || within_ | 3 | 6 | 20;
+
+    auto const expected2 = std::vector{2, 4, 6, 8, 10, 12, 14, 16, 18, 20};
+    auto const expected3 = std::vector{3, 6, 9, 12, 15, 18};
+    expectEq(result2, expected2);
+    expectEq(result3, expected3);
+
+}
 
 void example2()
 {
@@ -125,7 +159,8 @@ void example5()
 
 int main()
 {
-    example1();
+    babysFirstFunctions();
+    texasRanges();
     example2();
     example3();
     example4();

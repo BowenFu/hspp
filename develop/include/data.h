@@ -764,6 +764,11 @@ constexpr inline auto within = toGFunc<2>([](auto start, auto end)
     return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end});
 });
 
+constexpr inline auto within_ = toGFunc<3>([](auto start, auto next, auto end)
+{
+    return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end, next - start});
+});
+
 constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
 {
     return ownedRange(TakeView{r, num});
@@ -788,6 +793,7 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
 {
     if constexpr(isRangeV<decltype(l)>)
     {
+        static_assert(std::is_same_v<decltype(e), std::decay_t<decltype(*l.begin())>>);
         return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
     }
     else
