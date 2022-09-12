@@ -806,7 +806,7 @@ constexpr inline auto chain = toGFunc<2>([](auto l, auto r)
     }
     else
     {
-        l.insert(l.begin(), r.begin(), r.end());
+        l.insert(l.end(), r.begin(), r.end());
         return l;
     }
 });

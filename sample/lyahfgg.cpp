@@ -53,16 +53,30 @@ void babysFirstFunctions()
 constexpr auto toVector = data::to<std::vector>;
 constexpr auto toString = data::to<std::basic_string>;
 
-void anIntroToLists()
+void anIntroToLists1()
 {
 #if 0
     // haskell version
-    [1,2,3,4] ++ [9,10,11,12]
+    ghci> [1,2,3,4] ++ [9,10,11,12]
+    [1,2,3,4,9,10,11,12]
 #endif // 0
 
     auto const result = chain | std::vector{1, 2, 3, 4} | std::vector{9, 10, 11, 12};
     auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
     expectEq(toVector | result, expected);
+}
+
+void anIntroToLists2()
+{
+#if 0
+    // haskell version
+    ghci> "hello" ++ " " ++ "world"
+    "hello world"
+#endif // 0
+
+    auto const result = "hello"s <chain> " "s <chain> "world"s;
+    auto const expected = "hello world"s;
+    expectEq(toString | result, expected);
 }
 
 void texasRanges()
@@ -244,6 +258,8 @@ void imAListComprehension7()
 int main()
 {
     babysFirstFunctions();
+    anIntroToLists1();
+    anIntroToLists2();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
