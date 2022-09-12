@@ -154,48 +154,36 @@ void anIntroToLists5()
     expectEq(result6, expected6);
 }
 
-// void anIntroToLists6()
-// {
-// #if 0
-//     // haskell version
-//     ghci> take 3 [5,4,3,2,1]
-//     [5,4,3]
-//     ghci> take 1 [3,9,3]
-//     [3]
-//     ghci> take 5 [1,2]
-//     [1,2]
-//     ghci> take 0 [6,6,6]
-//     []
-// #endif // 0
+void anIntroToLists6()
+{
+#if 0
+    // haskell version
+    ghci> take 3 [5,4,3,2,1]
+    [5,4,3]
+    ghci> take 1 [3,9,3]
+    [3]
+    ghci> take 5 [1,2]
+    [1,2]
+    ghci> take 0 [6,6,6]
+    []
+#endif // 0
 
-//     auto const result0 = take || within_(5, 4, 1);
-//     auto const expected0 = 5;
-//     expectEq(result0, expected0);
+    auto const result0 = take | 3U | within_(5, 4, 1);
+    auto const expected0 = std::vector{5, 4, 3};
+    expectEq(toVector | result0, expected0);
 
-//     auto const result1 = tail || within_(5, 4, 1);
-//     auto const expected1 = std::vector{4, 3, 2, 1};
-//     expectEq(toVector | result1, expected1);
+    auto const result1 = take | 1U | std::vector{3, 9, 3};
+    auto const expected1 = std::vector{3};
+    expectEq(toVector | result1, expected1);
 
-//     auto const result2 = last || within_(5, 4, 1);
-//     auto const expected2 = 1;
-//     expectEq(result2, expected2);
+    auto const result2 = take | 5U | std::vector{1, 2};
+    auto const expected2 = std::vector{1, 2};
+    expectEq(toVector | result2, expected2);
 
-//     auto const result3 = init || within_(5, 4, 1);
-//     auto const expected3 = std::vector{5, 4, 3, 2};
-//     expectEq(toVector | result3, expected3);
-
-//     auto const result4 = length || within_(5, 4, 1);
-//     auto const expected4 = 5U;
-//     expectEq(result4, expected4);
-
-//     auto const result5 = null || std::vector{1, 2, 3};
-//     auto const expected5 = false;
-//     expectEq(result5, expected5);
-
-//     auto const result6 = null || std::vector<int>{};
-//     auto const expected6 = true;
-//     expectEq(result6, expected6);
-// }
+    auto const result3 = take | 0U | std::vector{6, 6, 6};
+    auto const expected3 = std::vector<int>{};
+    expectEq(toVector | result3, expected3);
+}
 
 void texasRanges()
 {
@@ -381,6 +369,7 @@ int main()
     anIntroToLists3();
     anIntroToLists4();
     anIntroToLists5();
+    anIntroToLists6();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
