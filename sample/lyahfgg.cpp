@@ -185,6 +185,31 @@ void anIntroToLists6()
     expectEq(toVector | result3, expected3);
 }
 
+void anIntroToLists7()
+{
+#if 0
+    // haskell version
+    ghci> drop 3 [8,4,2,1,5,6]
+    [1,5,6]
+    ghci> drop 0 [1,2,3,4]
+    [1,2,3,4]
+    ghci> drop 100 [1,2,3,4]
+    []
+#endif // 0
+
+    auto const result0 = drop | 3U | std::vector{8, 4, 2, 1, 5, 6};
+    auto const expected0 = std::vector{1, 5, 6};
+    expectEq(toVector | result0, expected0);
+
+    auto const result1 = drop | 0U | within(1, 4);
+    auto const expected1 = std::vector{1, 2, 3, 4};
+    expectEq(toVector | result1, expected1);
+
+    auto const result2 = drop | 100U | within(1, 4);
+    auto const expected2 = std::vector<int>{};
+    expectEq(toVector | result2, expected2);
+}
+
 void texasRanges()
 {
 #if 0
