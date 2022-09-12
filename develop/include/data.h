@@ -777,17 +777,17 @@ constexpr inline auto within_ = toGFunc<3>([](auto start, auto next, auto end)
     return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end, next - start});
 });
 
-constexpr inline auto take = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(TakeView{r, num});
 });
 
-constexpr inline auto drop = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(DropView{r, num});
 });
 
-constexpr inline auto splitAt = toGFunc<2>([](auto r, size_t num)
+constexpr inline auto splitAt = toGFunc<2>([](size_t num, auto r)
 {
     return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
 });
@@ -981,7 +981,7 @@ constexpr auto head = toGFunc<1> | [](auto v)
 constexpr auto tail = toGFunc<1> | [](auto v)
 {
     assert(v.begin() != v.end());
-    return data::drop | v | 1U;
+    return data::drop | 1U | v;
 };
 
 constexpr auto last = toGFunc<1> | [](auto v)
@@ -1010,7 +1010,7 @@ constexpr auto init = toGFunc<1> | [](auto v)
 
     assert(v.begin() != v.end());
 
-    return take | v | static_cast<size_t>((length | v) - 1);
+    return take | static_cast<size_t>((length | v) - 1) | v;
 };
 
 } // namespace data

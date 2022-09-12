@@ -161,7 +161,7 @@ TEST(IotaView, 1)
 
 TEST(TakeView, 2)
 {
-    auto v = TakeView{IotaView<int>{3, 4}, 4U};
+    auto v = take | 4U | IotaView<int>{3, 4};
     auto const result = toVector(v);
     auto const expected = {3, 4};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
@@ -169,7 +169,7 @@ TEST(TakeView, 2)
 
 TEST(DropView, 1)
 {
-    auto v = DropView{IotaView<int>{3, 6}, 2};
+    auto v = drop | 2 | IotaView<int>{3, 6};
     auto const result = toVector(v);
     auto const expected = {5, 6};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
@@ -177,7 +177,7 @@ TEST(DropView, 1)
 
 TEST(splitAt, 1)
 {
-    auto [p1, p2] = splitAt | IotaView<int>{3, 7} | 2U;
+    auto [p1, p2] = splitAt | 2U | IotaView<int>{3, 7};
     auto const result1 = toVector(p1);
     auto const result2 = toVector(p2);
     auto const expected1 = {3, 4};
@@ -1474,7 +1474,7 @@ TEST(do_, comprehension3)
         j <= (iota | i | k),
         if_ || (i*i + j*j == k*k)
     );
-    auto const result = toVector || take | rng | 5U;
+    auto const result = toVector || take | 5U | rng;
     auto const expected = std::vector<std::tuple<int, int, int>>{ { 3, 4, 5 }, { 6, 8, 10 }, { 5, 12, 13 }, { 9, 12, 15 }, { 8, 15, 17 } };
     EXPECT_EQ(result, expected);
 }
