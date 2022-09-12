@@ -163,7 +163,7 @@ public:
         {}
         auto& operator++()
         {
-            mNum += mStep;
+            mNum = static_cast<Num>(mNum + mStep);
             return *this;
         }
         auto operator*() const
