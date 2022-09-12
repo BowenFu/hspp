@@ -111,11 +111,29 @@ void anIntroToLists5()
     // haskell version
     ghci> head [5,4,3,2,1]
     5
+    ghci> tail [5,4,3,2,1]
+    [4,3,2,1]
+    ghci> last [5,4,3,2,1]
+    1
+    ghci> init [5,4,3,2,1]
+    [5,4,3,2]
 #endif // 0
 
-    auto const result = 5 <cons> (within | 1 | 5);
-    auto const expected = std::vector{5, 1, 2, 3, 4, 5};
-    expectEq(toVector | result, expected);
+    auto const result0 = head || within_ | 5 | 4 | 1;
+    auto const expected0 = 5;
+    expectEq(result0, expected0);
+
+    auto const result1 = tail || within_ | 5 | 4 | 1;
+    auto const expected1 = std::vector{4, 3, 2, 1};
+    expectEq(toVector | result1, expected1);
+
+    auto const result2 = last || within_ | 5 | 4 | 1;
+    auto const expected2 = 1;
+    expectEq(result2, expected2);
+
+    auto const result3 = init || within_ | 5 | 4 | 1;
+    auto const expected3 = std::vector{5, 4, 3, 2};
+    expectEq(toVector | result3, expected3);
 }
 
 void texasRanges()

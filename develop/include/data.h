@@ -981,7 +981,7 @@ constexpr auto head = toGFunc<1> | [](auto v)
 constexpr auto tail = toGFunc<1> | [](auto v)
 {
     assert(v.begin() != v.end());
-    return data::drop | v | 1;
+    return data::drop | v | 1U;
 };
 
 constexpr auto last = toGFunc<1> | [](auto v)
@@ -1002,6 +1002,7 @@ constexpr auto init = toGFunc<1> | [](auto v)
         auto i = 0;
         for (auto const& e: v)
         {
+            static_cast<void>(e);
             ++i;
         }
         return i;
@@ -1009,7 +1010,7 @@ constexpr auto init = toGFunc<1> | [](auto v)
 
     assert(v.begin() != v.end());
 
-    return take | v | (length - 1);
+    return take | v | static_cast<size_t>((length | v) - 1);
 };
 
 } // namespace data
