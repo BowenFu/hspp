@@ -481,6 +481,28 @@ void imAListComprehension7()
     expectEq(result2, expected2);
 }
 
+// nested list compression not supported yet
+#if 0
+void imAListComprehension8()
+{
+#if 0
+    // haskell version
+    ghci> let xxs = [[1,3,5,2,3,1,2,4,5], [1,2,3,4,5,6,7,8,9], [1,2,4,2,1,6,3,1,3,2,3,6]]
+    ghci> [ [ x | x <- xs, even x ] | xs <- xxs] [[2,2,4],[2,4,6,8],[2,4,2,6,2,6]]
+#endif // 0
+
+    const auto xxs = std::vector{std::vector{1, 3, 5, 2, 3, 1, 2, 4, 5}, std::vector{1, 2, 3, 4, 5, 6, 7, 8, 9}, std::vector{1, 2, 4, 2, 1, 6, 3, 1, 3, 2, 3, 6}};
+    Id<std::vector<int>> xs;
+    Id<int> x;
+    auto const result = _(
+        _(x, x <= xs, if_ || even | x),
+        xs <= xxs
+    );
+    auto const expected = std::vector{std::vector{2, 2, 4}, std::vector{2, 4, 6, 8}, std::vector{2, 4, 2, 6, 2, 6}};
+    expectEq(result, expected);
+}
+#endif
+
 int main()
 {
     babysFirstFunctions();
@@ -503,5 +525,6 @@ int main()
     imAListComprehension5();
     imAListComprehension6();
     imAListComprehension7();
+    // imAListComprehension8();
     return 0;
 }
