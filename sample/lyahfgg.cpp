@@ -229,6 +229,31 @@ void anIntroToLists8()
     expectEq(result1, expected1);
 }
 
+void anIntroToLists9()
+{
+#if 0
+    // haskell version
+    ghci> sum [5,2,1,6,3,2,5,7]
+    31
+    ghci> product [6,2,1,2]
+    24
+    ghci> product [1,2,5,6,7,9,2,0]
+    0
+#endif // 0
+
+    auto const result0 = sum | std::vector{5, 2, 1, 6, 3, 2, 5, 7};
+    auto const expected0 = 31;
+    expectEq(result0, expected0);
+
+    auto const result1 = product | std::vector{6, 2, 1, 2};
+    auto const expected1 = 24;
+    expectEq(result1, expected1);
+
+    auto const result2 = product | std::vector{1, 2, 5, 6, 7, 9, 2, 0};
+    auto const expected2 = 0;
+    expectEq(result2, expected2);
+}
+
 void texasRanges()
 {
 #if 0
@@ -416,6 +441,7 @@ int main()
     anIntroToLists6();
     anIntroToLists7();
     anIntroToLists8();
+    anIntroToLists9();
     texasRanges();
     imAListComprehension1();
     imAListComprehension2();
