@@ -154,6 +154,12 @@ void anIntroToLists5()
     expectEq(result6, expected6);
 }
 
+// not supported yet
+#if 0
+ghci> reverse [5,4,3,2,1]
+[1,2,3,4,5]
+#endif
+
 void anIntroToLists6()
 {
 #if 0
@@ -503,6 +509,81 @@ void imAListComprehension8()
 }
 #endif
 
+void tuples1()
+{
+#if 0
+    // haskell version
+    ghci> fst (8,11)
+    8
+    ghci> fst ("Wow", False)
+    "Wow"
+    ghci> snd (8,11)
+    11
+    ghci> snd ("Wow", False)
+    False
+#endif
+
+    auto const result0 = fst | std::make_tuple(8, 11);
+    auto const result1 = fst | std::make_tuple("Wow", false);
+
+    expectEq(result0, 8);
+    expectEq(result1, "Wow");
+
+    auto const result2 = snd | std::make_tuple(8, 11);
+    auto const result3 = snd | std::make_tuple("Wow", false);
+
+    expectEq(result2, 11);
+    expectEq(result3, false);
+}
+
+void tuples2()
+{
+#if 0
+    // haskell version
+    ghci> zip [1,2,3,4,5] [5,5,5,5,5]
+    [(1,5),(2,5),(3,5),(4,5),(5,5)]
+    ghci> zip [1 .. 5] ["one", "two", "three", "four", "five"]
+    [(1,"one"),(2,"two"),(3,"three"),(4,"four"),(5,"five")]
+    ghci> zip [5,3,2,6,2,7,2,5,4,6,6] ["im","a","turtle"]
+    [(5,"im"),(3,"a"),(2,"turtle")]
+    ghci> zip [1..] ["apple", "orange", "cherry", "mango"]
+    [(1,"apple"),(2,"orange"),(3,"cherry"),(4,"mango")]
+#endif
+
+    auto const result0 = zip | std::vector{1, 2, 3, 4, 5} | std::vector{5, 5, 5, 5, 5};
+    auto const result1 = zip | within(1, 5) | std::vector{"one", "two", "three", "four", "five"};
+    auto const result2 = zip | std::vector{5, 3, 2, 6, 2, 7, 2, 5, 4, 6, 6} | std::vector{"im", "a", "turtle"};
+    auto const result3 = zip | enumFrom(1) | std::vector{"apple", "orange", "cherry", "mango"};
+
+    expectEq(toVector(result0), std::vector{std::tuple{1, 5}, std::tuple{2, 5}, std::tuple{3, 5}, std::tuple{4, 5}, std::tuple{5, 5}});
+    expectEq(toVector(result1), std::vector{std::make_tuple(1, "one"), std::make_tuple(2, "two"), std::make_tuple(3, "three"), std::make_tuple(4, "four"), std::make_tuple(5, "five")});
+    expectEq(toVector(result2), std::vector{std::make_tuple(5, "im"), std::make_tuple(3, "a"), std::make_tuple(2, "turtle")});
+    expectEq(toVector(result3), std::vector{std::make_tuple(1, "apple"), std::make_tuple(2, "orange"), std::make_tuple(3, "cherry"), std::make_tuple(4, "mango")});
+}
+
+void tuples3()
+{
+#if 0
+    // haskell version
+    ghci> let triangles = [ (a,b,c) | c <- [1..10], b <- [1..10], a <- [1..10] ]
+    ghci> let rightTriangles = [ (a,b,c) | c <- [1..10], b <- [1..c], a <- [1..b], a^2 + b^2 == c^2]
+    ghci> let rightTriangles_ = [ (a,b,c) | c <- [1..10], b <- [1..c], a <- [1..b], a^2 + b^2 == c^2, a+b+c == 24]
+    ghci> rightTriangles_
+    [(6,8,10)]
+#endif
+
+    Id<int> a, b, c;
+    auto const rightTriangles_ = _(
+        makeTuple<3> | a | b | c,
+        c <= (within | 1 | 10),
+        b <= (within | 1 | c),
+        a <= (within | 1 | b),
+        if_ || (a*a + b*b == c*c),
+        if_ || (a + b + c == 24)
+    );
+    expectEq(toVector | rightTriangles_, std::vector{std::tuple{6, 8, 10}});
+}
+
 int main()
 {
     babysFirstFunctions();
@@ -526,5 +607,8 @@ int main()
     imAListComprehension6();
     imAListComprehension7();
     // imAListComprehension8();
+    tuples1();
+    tuples2();
+    tuples3();
     return 0;
 }

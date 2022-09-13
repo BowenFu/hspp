@@ -404,6 +404,10 @@ Discussions / issues / PRs are welcome.
 
 Haskell pattern matching is not covered in this repo. You may be interested in [match(it)](https://github.com/BowenFu/matchit.cpp) if you want to see how pattern matching works in C++.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=bowenfu/hspp&type=Date)](https://star-history.com/#bowenfu/hspp&Date)
+
 ## Support this project
 
 Please star the repo, share the repo, or [sponsor $1](https://github.com/sponsors/BowenFu) to let me know this project matters.
