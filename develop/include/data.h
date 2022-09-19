@@ -1340,6 +1340,50 @@ constexpr auto appEndo = data::from;
 using All = AllImpl<bool>;
 using Any = AnyImpl<bool>;
 
+enum class Ordering
+{
+    kLT,
+    kEQ,
+    kGT
+};
+
+constexpr auto compare = toGFunc<2>([](auto lhs, auto rhs)
+{
+    if (lhs < rhs)
+    {
+        return Ordering::kLT;
+    }
+    if (lhs == rhs)
+    {
+        return Ordering::kEQ;
+    }
+    return Ordering::kGT;
+});
+
+namespace operators
+{
+template <typename T>
+inline constexpr bool operator<(T const& lhs, T const& rhs)
+{
+    auto result = (lhs <compare> rhs);
+    return result == Ordering::kLT;
+}
+
+template <typename T>
+inline constexpr bool operator>(T const& lhs, T const& rhs)
+{
+    auto result = (lhs <compare> rhs);
+    return result == Ordering::kGT;
+}
+
+template <typename T>
+inline constexpr bool operator==(T const& lhs, T const& rhs)
+{
+    auto result = (lhs <compare> rhs);
+    return result == Ordering::kEQ;
+}
+} // namespace operators
+
 } // namespace hspp
 
 #endif // HSPP_DATA_H
