@@ -41,7 +41,7 @@ void believeTheType1()
         constexpr float kPI = 3.14159265F;
         return 2 * kPI * r;
     };
-    expectEq(circumference | 4, 25.13274F);
+    expectEq(circumference | 4.F, 25.13274F);
 }
 
 void typeclasses101_0()
