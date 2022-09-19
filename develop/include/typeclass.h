@@ -443,26 +443,6 @@ public:
     });
 };
 
-enum class Ordering
-{
-    kLT,
-    kEQ,
-    kGT
-};
-
-constexpr auto compare = toGFunc<2>([](auto lhs, auto rhs)
-{
-    if (lhs < rhs)
-    {
-        return Ordering::kLT;
-    }
-    if (lhs == rhs)
-    {
-        return Ordering::kEQ;
-    }
-    return Ordering::kGT;
-});
-
 template <>
 class MonoidBase<DummyTemplateClass, Ordering>
 {
@@ -1568,7 +1548,7 @@ constexpr auto read = data::toFunc<>([](std::string const& d)
 {
     std::stringstream is{d};
     T t;
-    is >> t;
+    is >> std::boolalpha >> t;
 
     if (is.bad())
     {
