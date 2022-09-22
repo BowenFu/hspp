@@ -4,6 +4,7 @@ pause
 walk_the_line
 lyahfgg
 lyahfgg2
+lyahfgg6
 proposal
 )
 
