@@ -1,4 +1,5 @@
 // Learn you a hspp for great good.
+// Chapter 3 Types and Typeclasses
 // The samples are originated from Learn you a Haskell for great good.
 
 #include "hspp.h"
