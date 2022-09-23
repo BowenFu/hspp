@@ -706,14 +706,14 @@ private:
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
-template <typename... Bases>
-class ZipView
+template <typename Func, typename... Bases>
+class ZipWithView
 {
 public:
     class Iter
     {
     public:
-        constexpr Iter(ZipView const& view)
+        constexpr Iter(ZipWithView const& view)
         : mView{view}
         , mIters{impl::getBegins(mView.get().mBases)}
         {
@@ -728,9 +728,9 @@ public:
         }
         auto operator*() const
         {
-            return std::apply([](auto&&... iters)
+            return std::apply([&](auto&&... iters)
             {
-                return std::make_tuple(((*iters))...);
+                return mView.get().mFunc(((*iters))...);
             }, mIters);
         }
         bool hasValue() const
@@ -751,7 +751,7 @@ public:
             }
         }
 
-        std::reference_wrapper<ZipView const> mView;
+        std::reference_wrapper<ZipWithView const> mView;
         std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
     };
     class Sentinel
@@ -760,8 +760,9 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr ZipView(Bases... bases)
-    : mBases{std::make_tuple(std::move(bases)...)}
+    constexpr ZipWithView(Func func, Bases... bases)
+    : mFunc{std::move(func)}
+    , mBases{std::make_tuple(std::move(bases)...)}
     {}
     auto begin() const
     {
@@ -772,6 +773,7 @@ public:
         return Sentinel{};
     }
 private:
+    Func mFunc;
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
@@ -1177,7 +1179,7 @@ public:
         }
         else if constexpr (sizeof...(Rest) == sizeof...(Ts))
         {
-            static_assert((std::is_same_v<Rest, Ts> && ...));
+            static_assert((std::is_same_v<std::decay_t<Rest>, std::decay_t<Ts>> && ...));
             return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
@@ -1666,14 +1668,20 @@ constexpr inline auto map = toGFunc<2>([](auto func, auto data)
     return ownedRange(MapView{std::move(data), std::move(func)});
 });
 
+template <size_t N=2>
+constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
+{
+    return std::make_tuple(std::move(e), std::move(l)...);
+});
+
 constexpr inline auto zip = toGFunc<2>([](auto lhs, auto rhs)
 {
-    return ownedRange(ZipView{std::move(lhs), std::move(rhs)});
+    return ownedRange(ZipWithView{makeTuple<>, std::move(lhs), std::move(rhs)});
 });
 
 constexpr inline auto zipWith = toGFunc<3>([](auto func, auto lhs, auto rhs)
 {
-    return ownedRange(MapView{ZipView{std::move(lhs), std::move(rhs)}, [func=std::move(func)](auto tu) { return func | std::get<0>(tu) | std::get<1>(tu);}});
+    return ownedRange(ZipWithView{func, std::move(lhs), std::move(rhs)});
 });
 
 constexpr inline auto repeat = toGFunc<1>([](auto data)
@@ -1765,12 +1773,6 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
         l.insert(l.begin(), e);
         return l;
     }
-});
-
-template <size_t N=2>
-constexpr inline auto makeTuple = toGFunc<N>([](auto e, auto... l)
-{
-    return std::make_tuple(std::move(e), std::move(l)...);
 });
 
 constexpr inline auto fst = toGFunc<1>([](auto e)

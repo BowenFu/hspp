@@ -706,14 +706,14 @@ private:
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
-template <typename... Bases>
-class ZipView
+template <typename Func, typename... Bases>
+class ZipWithView
 {
 public:
     class Iter
     {
     public:
-        constexpr Iter(ZipView const& view)
+        constexpr Iter(ZipWithView const& view)
         : mView{view}
         , mIters{impl::getBegins(mView.get().mBases)}
         {
@@ -728,9 +728,9 @@ public:
         }
         auto operator*() const
         {
-            return std::apply([](auto&&... iters)
+            return std::apply([&](auto&&... iters)
             {
-                return std::make_tuple(((*iters))...);
+                return mView.get().mFunc(((*iters))...);
             }, mIters);
         }
         bool hasValue() const
@@ -751,7 +751,7 @@ public:
             }
         }
 
-        std::reference_wrapper<ZipView const> mView;
+        std::reference_wrapper<ZipWithView const> mView;
         std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
     };
     class Sentinel
@@ -760,8 +760,9 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr ZipView(Bases... bases)
-    : mBases{std::make_tuple(std::move(bases)...)}
+    constexpr ZipWithView(Func func, Bases... bases)
+    : mFunc{std::move(func)}
+    , mBases{std::make_tuple(std::move(bases)...)}
     {}
     auto begin() const
     {
@@ -772,6 +773,7 @@ public:
         return Sentinel{};
     }
 private:
+    Func mFunc;
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
