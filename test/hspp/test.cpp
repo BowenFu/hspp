@@ -114,7 +114,7 @@ TEST(ProductView, 2)
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
 }
 
-TEST(ZipView, 1)
+TEST(ZipWithView, 1)
 {
     std::list<int> a = {1, 2};
     std::list<int> b = {3, 4, 5};
@@ -137,7 +137,7 @@ TEST(zipWith, 1)
 TEST(RepeatView, 1)
 {
     std::list<int> b = {3, 4, 5};
-    auto v = ZipView{RepeatView{1}, RefView{b}};
+    auto v = zip(RepeatView{1}, RefView{b});
     std::vector<std::tuple<int, int>> result = toVector(v);
     std::vector<std::tuple<int, int>> expected = {{1, 3,}, {1, 4}, {1, 5}};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
