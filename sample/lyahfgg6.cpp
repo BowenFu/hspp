@@ -253,13 +253,17 @@ void mapsAndFilters2()
 
     ghci> sum (takeWhile (<10000) [n^2 | n <- [1..], odd (n^2)])
     166650
+
+    ghci> let listOfFuns = map (*) [0..]
+    ghci> (listOfFuns !! 4) 5
+    20
 #endif // 0
 
     auto const largestDivisible = head || filter | [](auto x){ return x % 3824 == 0; } | within_(1000000, 99999, 0);
     expectEq(largestDivisible, 99554);
 
-    // auto const result1 = sum | (takeWhile ());
-    // expectEq(to<std::vector> | result1, std::vector{3});
+    auto const result1 = sum | (takeWhile | [](int x){ return x < 10000; } | (filter | odd | (map | [](auto x){ return x*x; } | enumFrom(1))));
+    expectEq(result1, 166650);
 
     // auto const result2 = filter | even | within(1, 10);
     // expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
@@ -272,6 +276,10 @@ void mapsAndFilters2()
 
     auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
     expectEq(to<std::basic_string> | result5, "GAYBALLS");
+
+    auto const listOfFuns = map | (toGFunc<2> | std::multiplies<>{}) | enumFrom(0);
+    auto const result6 = (listOfFuns <idx> 4U) | 5;
+    expectEq(result6, 20);
 }
 
 int main()
