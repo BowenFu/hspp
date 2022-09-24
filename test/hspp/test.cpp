@@ -419,16 +419,15 @@ TEST(Applicative, range2)
 {
     auto const test = [=](auto f)
     {
-        const std::list<int> x = {3, 4};
-        const std::list<size_t> y = {1U, 2U};
+        const std::list<size_t> x = {1U, 2U};
+        const std::list<int> y = {3, 4};
         auto const z0 = pure(f) <ap> nonOwnedRange(x);
         auto result0 = toVector(z0);
         EXPECT_EQ(result0.size(), 2);
         auto const z = z0 <ap> nonOwnedRange(y);
         auto result = toVector(toVector <fmap> z);
-        EXPECT_EQ(result.size(), 4);
-        const std::vector<std::vector<int>> u = {{3}, {3, 3}, {4}, {4, 4}};
-        EXPECT_TRUE(std::equal(result.begin(), result.end(), u.begin()));
+        const std::vector<std::vector<int>> expected = {{3}, {4}, {3, 3}, {4, 4}};
+        EXPECT_EQ(result, expected);
     };
     test(replicate);
 }
@@ -773,7 +772,7 @@ TEST(map, 1)
 TEST(replicate, 1)
 {
     auto const str = "3";
-    auto const x = replicate | str | 4U;
+    auto const x = replicate | 4U | str;
     auto const z = toVector(x);
     for (auto i : z)
     {
