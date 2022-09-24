@@ -1702,7 +1702,7 @@ constexpr inline auto cycle = toGFunc<1>([](auto data)
 });
 #endif // 0
 
-constexpr inline auto replicate = toGFunc<2>([](auto data, size_t times)
+constexpr inline auto replicate = toGFunc<2>([](size_t times, auto data)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
 });

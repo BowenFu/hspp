@@ -87,7 +87,6 @@ void curriedFunctions3()
     expectEq(isUpperAlphanum | 'S', true);
 }
 
-
 void someHigherOrderismIsInOrder0()
 {
 #if 0
@@ -118,6 +117,58 @@ void someHigherOrderismIsInOrder0()
     expectEq(result, std::vector{3, 3, 1});
 }
 
+void someHigherOrderismIsInOrder1()
+{
+#if 0
+    // haskell version
+    ghci> zipWith (+) [4,2,5,6] [2,6,2,3]
+    [6,8,7,9]
+    ghci> zipWith max [6,3,2,1] [7,3,1,5]
+    [7,3,2,5]
+    ghci> zipWith (++) ["foo ", "bar ", "baz "] ["fighters", "hoppers", "aldrin"]
+    ["foo fighters","bar hoppers","baz aldrin"]
+    ghci> zipWith (*) (replicate 5 2) [1..]
+    [2,4,6,8,10]
+    ghci> zipWith (zipWith (*)) [[1,2,3],[3,5,6],[2,3,4]] [[3,2,2],[3,4,5],[5,4,3]]
+    [[3,4,6],[9,20,30],[10,12,12]]
+#endif // 0
+
+    auto result0 = zipWith | std::plus<>{} | std::vector{4, 2, 5, 6} | std::vector{2, 6, 2, 3};
+    expectEq(to<std::vector> | result0, std::vector{6, 8, 7, 9});
+
+    constexpr auto max = toFunc<> | [](int a, int b) { return std::max(a, b); };
+    auto result1 = zipWith | max | std::vector{6, 3, 2, 1} | std::vector{7, 3, 1, 5};
+    expectEq(to<std::vector> | result1, std::vector{7, 3, 2, 5});
+
+    auto result2 = zipWith | chain | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
+    expectEq(to<std::vector> | result2, std::vector{"foo fighters"s, "bar hoppers"s, "baz aldrin"s});
+
+    auto result3 = zipWith | std::multiplies<>{} | replicate(5U, 2) | enumFrom(1);
+    expectEq(to<std::vector> | result3, std::vector{2, 4, 6, 8, 10});
+
+    auto result4 = zipWith | (zipWith | std::multiplies<>{})
+        | std::vector{std::vector{1, 2, 3}, std::vector{3, 5, 6}, std::vector{2, 3, 4}}
+        | std::vector{std::vector{3, 2, 2}, std::vector{3, 4, 5}, std::vector{5, 4, 3}};
+    expectEq(to<std::vector> || to<std::vector> <fmap> result4, std::vector{std::vector{3, 4, 6}, std::vector{9, 20, 30}, std::vector{10, 12, 12}});
+}
+
+void someHigherOrderismIsInOrder2()
+{
+#if 0
+    // haskell version
+    ghci> flip zip [1,2,3,4,5] "hello"
+    [('h',1),('e',2),('l',3),('l',4),('o',5)]
+    ghci> zipWith (flip div) [2,2..] [10,8,6,4,2]
+    [5,4,3,2,1]
+#endif // 0
+
+    auto const result0 = flip | zip | within(1, 5) | "hello"s;
+    expectEq(to<std::vector> | result0, std::vector{std::tuple{'h', 1}, std::tuple{'e', 2}, std::tuple{'l', 3}, std::tuple{'l', 4}, std::tuple{'o', 5}});
+
+    auto const result1 = zipWith | (flip | (toGFunc<2> | std::divides<>{})) | repeat(2) | within_(10, 8, 2);
+    expectEq(to<std::vector> | result1, std::vector{5, 4, 3, 2, 1});
+}
+
 int main()
 {
     curriedFunctions0();
@@ -125,5 +176,7 @@ int main()
     curriedFunctions2();
     curriedFunctions3();
     someHigherOrderismIsInOrder0();
+    someHigherOrderismIsInOrder1();
+    someHigherOrderismIsInOrder2();
     return 0;
 }
