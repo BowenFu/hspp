@@ -778,13 +778,13 @@ private:
 };
 
 template <typename... Bases>
-class ChainView
+class ConcatView
 {
 public:
     class Iter
     {
     public:
-        constexpr Iter(ChainView const& view)
+        constexpr Iter(ConcatView const& view)
         : mView{view}
         , mIters{impl::getBegins(mView.get().mBases)}
         {
@@ -803,7 +803,7 @@ public:
             return hasValueImpl();
         }
     private:
-        std::reference_wrapper<ChainView const> mView;
+        std::reference_wrapper<ConcatView const> mView;
         std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
 
         template <size_t I = 0>
@@ -859,7 +859,7 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr ChainView(Bases... bases)
+    constexpr ConcatView(Bases... bases)
     : mBases{std::make_tuple(std::move(bases)...)}
     {}
     auto begin() const
@@ -1747,12 +1747,12 @@ constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
     return r;
 });
 
-constexpr inline auto chain = toGFunc<2>([](auto l, auto r)
+constexpr inline auto concat = toGFunc<2>([](auto l, auto r)
 {
     if constexpr(isRangeV<decltype(l)>)
     {
         static_assert(std::is_same_v<decltype(*l.begin()), std::decay_t<decltype(*r.begin())>>);
-        return ownedRange(ChainView{std::move(l), std::move(r)});
+        return ownedRange(ConcatView{std::move(l), std::move(r)});
     }
     else
     {
@@ -1766,7 +1766,7 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
     if constexpr(isRangeV<decltype(l)>)
     {
         static_assert(std::is_same_v<decltype(e), std::decay_t<decltype(*l.begin())>>);
-        return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
+        return ownedRange(ConcatView{SingleView{std::move(e)}, std::move(l)});
     }
     else
     {
@@ -2595,7 +2595,7 @@ public:
 
     constexpr static auto mappend = data::toFunc<>([](Type<Args...> const& lhs, Type<Args...> const& rhs)
     {
-        auto const r = data::ChainView{data::RefView{lhs}, data::RefView{rhs}};
+        auto const r = data::ConcatView{data::RefView{lhs}, data::RefView{rhs}};
         Type<Args...> result;
         for (auto e : r)
         {
@@ -2787,7 +2787,7 @@ public:
 
     constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
     {
-        return data::ownedRange(data::ChainView{lhs, rhs});
+        return data::ownedRange(data::ConcatView{lhs, rhs});
     });
 
     constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
@@ -2796,7 +2796,7 @@ public:
         {
             return std::apply([](auto&&... rngs)
             {
-                return data::ChainView{rngs...};
+                return data::ConcatView{rngs...};
             }
             , nested);
         }

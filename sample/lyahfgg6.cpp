@@ -111,7 +111,7 @@ void someHigherOrderismIsInOrder0()
 
     constexpr auto add = toGFunc<2> | std::plus<>{} ;
     expectEq(applyTwice | (add | 3) | 10, 16);
-    expectEq(applyTwice | (chain | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
+    expectEq(applyTwice | (concat | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
     expectEq(applyTwice | (multThree | 2 | 2) | 9, 144);
     auto result = applyTwice | (cons | 3) | std::vector{1};
     expectEq(result, std::vector{3, 3, 1});
@@ -140,7 +140,7 @@ void someHigherOrderismIsInOrder1()
     auto result1 = zipWith | max | std::vector{6, 3, 2, 1} | std::vector{7, 3, 1, 5};
     expectEq(to<std::vector> | result1, std::vector{7, 3, 2, 5});
 
-    auto result2 = zipWith | chain | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
+    auto result2 = zipWith | concat | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
     expectEq(to<std::vector> | result2, std::vector{"foo fighters"s, "bar hoppers"s, "baz aldrin"s});
 
     auto result3 = zipWith | std::multiplies<>{} | replicate(5U, 2) | enumFrom(1);
@@ -169,6 +169,111 @@ void someHigherOrderismIsInOrder2()
     expectEq(to<std::vector> | result1, std::vector{5, 4, 3, 2, 1});
 }
 
+void mapsAndFilters0()
+{
+#if 0
+    // haskell version
+    ghci> map (+3) [1,5,3,1,6]
+    [4,8,6,4,9]
+    ghci> map (++ "!") ["BIFF", "BANG", "POW"]
+    ["BIFF!","BANG!","POW!"]
+    ghci> map (replicate 3) [3..6]
+    [[3,3,3],[4,4,4],[5,5,5],[6,6,6]]
+    ghci> map (map (^2)) [[1,2],[3,4,5,6],[7,8]]
+    [[1,4],[9,16,25,36],[49,64]]
+    ghci> map fst [(1,2),(3,5),(6,3),(2,6),(2,5)]
+    [1,3,6,2,2]
+#endif // 0
+
+    auto const result0 = map | (toGFunc<2> | std::plus<>{} | 3) | std::vector{1, 5, 3, 1, 6};
+    expectEq(to<std::vector> | result0, std::vector{4, 8, 6, 4, 9});
+
+    auto const result1 = map | (flip | concat | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
+    expectEq(to<std::vector> | result1, std::vector{"BIFF!"s, "BANG!"s, "POW!"s});
+
+    auto const result2 = map | (replicate | 3U) | within(3, 6);
+    expectEq(to<std::vector> || to<std::vector> <fmap> result2, std::vector{std::vector{3, 3, 3}, std::vector{4, 4, 4}, std::vector{5, 5, 5}, std::vector{6, 6, 6}});
+
+    auto const result3 = map | (map | [](auto x){ return x*x; }) | std::vector{std::vector{1, 2}, std::vector{3, 4, 5, 6}, std::vector{7, 8}};
+    expectEq(to<std::vector> || to<std::vector> <fmap> result3, std::vector{std::vector{1, 4}, std::vector{9, 16, 25, 36}, std::vector{49, 64}});
+
+    auto const result4 = map | fst | std::vector{std::tuple{1, 2}, std::tuple{3, 5}, std::tuple{6, 3}, std::tuple{2, 6}, std::tuple{2, 5}};
+    expectEq(to<std::vector> | result4, std::vector{1, 3, 6, 2, 2});
+}
+
+void mapsAndFilters1()
+{
+#if 0
+    // haskell version
+    ghci> filter (>3) [1,5,3,2,1,6,4,3,2,1]
+    [5,6,4]
+    ghci> filter (==3) [1,2,3,4,5]
+    [3]
+    ghci> filter even [1..10]
+    [2,4,6,8,10]
+    ghci> let notNull x = not (null x) in filter notNull [[1,2,3], [], [3,4,5], [2,2], [], [], []]
+    [[1,2,3],[3,4,5],[2,2]]
+    ghci> filter (`elem` ['a'..'z']) "u LaUgH aT mE BeCaUsE I aM diFfeRent"
+    "uagameasadifeent"
+    ghci> filter (`elem` ['A'..'Z']) "i lauGh At You BecAuse u r aLL the Same"
+    "GAYBALLS"
+#endif // 0
+
+    auto const result0 = filter | [](auto x){ return x > 3; } | std::vector{1, 5, 3, 2, 1, 6, 4, 3, 2, 1};
+    expectEq(to<std::vector> | result0, std::vector{5, 6, 4});
+
+    auto const result1 = filter | (equalTo | 3) | within(1, 5);
+    expectEq(to<std::vector> | result1, std::vector{3});
+
+    auto const result2 = filter | even | within(1, 10);
+    expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
+
+    auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
+    expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
+
+    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
+    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
+
+    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
+    expectEq(to<std::basic_string> | result5, "GAYBALLS");
+}
+
+void mapsAndFilters2()
+{
+#if 0
+    // haskell version
+    largestDivisible :: (Integral a) => a
+    largestDivisible = head (filter p [100000,99999..])
+        where p x = x `mod` 3829 == 0
+    ghci> largestDivisible
+    99554
+
+    ghci> sum (takeWhile (<10000) (filter odd (map (^2) [1..])))
+    166650
+
+    ghci> sum (takeWhile (<10000) [n^2 | n <- [1..], odd (n^2)])
+    166650
+#endif // 0
+
+    auto const largestDivisible = head || filter | [](auto x){ return x % 3824 == 0; } | within_(1000000, 99999, 0);
+    expectEq(largestDivisible, 99554);
+
+    // auto const result1 = sum | (takeWhile ());
+    // expectEq(to<std::vector> | result1, std::vector{3});
+
+    // auto const result2 = filter | even | within(1, 10);
+    // expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
+
+    auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
+    expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
+
+    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
+    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
+
+    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
+    expectEq(to<std::basic_string> | result5, "GAYBALLS");
+}
+
 int main()
 {
     curriedFunctions0();
@@ -178,5 +283,7 @@ int main()
     someHigherOrderismIsInOrder0();
     someHigherOrderismIsInOrder1();
     someHigherOrderismIsInOrder2();
+    mapsAndFilters0();
+    mapsAndFilters1();
     return 0;
 }

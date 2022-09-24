@@ -296,7 +296,7 @@ public:
 
     constexpr static auto mappend = data::toFunc<>([](Type<Args...> const& lhs, Type<Args...> const& rhs)
     {
-        auto const r = data::ChainView{data::RefView{lhs}, data::RefView{rhs}};
+        auto const r = data::ConcatView{data::RefView{lhs}, data::RefView{rhs}};
         Type<Args...> result;
         for (auto e : r)
         {
@@ -488,7 +488,7 @@ public:
 
     constexpr static auto mappend = toGFunc<2>([](auto lhs, auto rhs)
     {
-        return data::ownedRange(data::ChainView{lhs, rhs});
+        return data::ownedRange(data::ConcatView{lhs, rhs});
     });
 
     constexpr static auto mconcat = toGFunc<1>([](auto const& nested)
@@ -497,7 +497,7 @@ public:
         {
             return std::apply([](auto&&... rngs)
             {
-                return data::ChainView{rngs...};
+                return data::ConcatView{rngs...};
             }
             , nested);
         }
