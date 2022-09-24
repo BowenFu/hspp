@@ -10,6 +10,7 @@
 #include <limits>
 #include <memory>
 #include <tuple>
+#include <functional>
 
 namespace hspp
 {
@@ -413,6 +414,61 @@ public:
 private:
     Base mBase;
     size_t mLimit;
+};
+
+template <typename Pred, typename Base>
+class TakeWhileView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(TakeWhileView const& takeWhileView)
+        : mView{takeWhileView}
+        , mBaseIter{mView.get().mBase.begin()}
+        , mStop{}
+        {
+        }
+        auto& operator++()
+        {
+            ++mBaseIter;
+            mStop = mStop || !std::invoke(mView.get().mPred, *mBaseIter);
+            return *this;
+        }
+        auto operator*() const
+        {
+            return *mBaseIter;
+        }
+        bool hasValue() const
+        {
+            return mBaseIter != mView.get().mBase.end() && !mStop;
+        }
+    private:
+        std::reference_wrapper<TakeWhileView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+        bool mStop;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr TakeWhileView(Pred pred, Base base)
+    : mPred{std::move(pred)}
+    , mBase{std::move(base)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Pred mPred;
+    Base mBase;
 };
 
 template <typename Base>
@@ -1732,6 +1788,11 @@ constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
     return ownedRange(TakeView{r, num});
 });
 
+constexpr inline auto takeWhile = toGFunc<2>([](auto pred, auto r)
+{
+    return ownedRange(TakeWhileView{pred, r});
+});
+
 constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(DropView{r, num});
@@ -1967,6 +2028,11 @@ constexpr auto init = toGFunc<1> | [](auto v)
     }
 
     return take | static_cast<size_t>((length | v) - 1) | v;
+};
+
+constexpr auto idx = toGFunc<2> | [](auto v, size_t i)
+{
+    return head | (drop | i | v);
 };
 
 } // namespace data

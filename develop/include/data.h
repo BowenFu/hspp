@@ -822,6 +822,11 @@ constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
     return ownedRange(TakeView{r, num});
 });
 
+constexpr inline auto takeWhile = toGFunc<2>([](auto pred, auto r)
+{
+    return ownedRange(TakeWhileView{pred, r});
+});
+
 constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
 {
     return ownedRange(DropView{r, num});
@@ -1057,6 +1062,11 @@ constexpr auto init = toGFunc<1> | [](auto v)
     }
 
     return take | static_cast<size_t>((length | v) - 1) | v;
+};
+
+constexpr auto idx = toGFunc<2> | [](auto v, size_t i)
+{
+    return head | (drop | i | v);
 };
 
 } // namespace data
