@@ -205,32 +205,37 @@ void mapsAndFilters1()
 {
 #if 0
     // haskell version
-    ghci> map (+3) [1,5,3,1,6]
-    [4,8,6,4,9]
-    ghci> map (++ "!") ["BIFF", "BANG", "POW"]
-    ["BIFF!","BANG!","POW!"]
-    ghci> map (replicate 3) [3..6]
-    [[3,3,3],[4,4,4],[5,5,5],[6,6,6]]
-    ghci> map (map (^2)) [[1,2],[3,4,5,6],[7,8]]
-    [[1,4],[9,16,25,36],[49,64]]
-    ghci> map fst [(1,2),(3,5),(6,3),(2,6),(2,5)]
-    [1,3,6,2,2]
+    ghci> filter (>3) [1,5,3,2,1,6,4,3,2,1]
+    [5,6,4]
+    ghci> filter (==3) [1,2,3,4,5]
+    [3]
+    ghci> filter even [1..10]
+    [2,4,6,8,10]
+    ghci> let notNull x = not (null x) in filter notNull [[1,2,3], [], [3,4,5], [2,2], [], [], []]
+    [[1,2,3],[3,4,5],[2,2]]
+    ghci> filter (`elem` ['a'..'z']) "u LaUgH aT mE BeCaUsE I aM diFfeRent"
+    "uagameasadifeent"
+    ghci> filter (`elem` ['A'..'Z']) "i lauGh At You BecAuse u r aLL the Same"
+    "GAYBALLS"
 #endif // 0
 
-    auto const result0 = map | (toGFunc<2> | std::plus<>{} | 3) | std::vector{1, 5, 3, 1, 6};
-    expectEq(to<std::vector> | result0, std::vector{4, 8, 6, 4, 9});
+    auto const result0 = filter | [](auto x){ return x > 3; } | std::vector{1, 5, 3, 2, 1, 6, 4, 3, 2, 1};
+    expectEq(to<std::vector> | result0, std::vector{5, 6, 4});
 
-    auto const result1 = map | (flip | chain | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
-    expectEq(to<std::vector> | result1, std::vector{"BIFF!"s, "BANG!"s, "POW!"s});
+    auto const result1 = filter | (equalTo | 3) | within(1, 5);
+    expectEq(to<std::vector> | result1, std::vector{3});
 
-    auto const result2 = map | (replicate | 3U) | within(3, 6);
-    expectEq(to<std::vector> || to<std::vector> <fmap> result2, std::vector{std::vector{3, 3, 3}, std::vector{4, 4, 4}, std::vector{5, 5, 5}, std::vector{6, 6, 6}});
+    auto const result2 = filter | even | within(1, 10);
+    expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
 
-    auto const result3 = map | (map | [](auto x){ return x*x; }) | std::vector{std::vector{1, 2}, std::vector{3, 4, 5, 6}, std::vector{7, 8}};
-    expectEq(to<std::vector> || to<std::vector> <fmap> result3, std::vector{std::vector{1, 4}, std::vector{9, 16, 25, 36}, std::vector{49, 64}});
+    auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
+    expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
 
-    auto const result4 = map | fst | std::vector{std::tuple{1, 2}, std::tuple{3, 5}, std::tuple{6, 3}, std::tuple{2, 6}, std::tuple{2, 5}};
-    expectEq(to<std::vector> | result4, std::vector{1, 3, 6, 2, 2});
+    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
+    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
+
+    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
+    expectEq(to<std::basic_string> | result5, "GAYBALLS");
 }
 
 int main()
