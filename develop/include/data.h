@@ -837,12 +837,12 @@ constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
     return r;
 });
 
-constexpr inline auto chain = toGFunc<2>([](auto l, auto r)
+constexpr inline auto concat = toGFunc<2>([](auto l, auto r)
 {
     if constexpr(isRangeV<decltype(l)>)
     {
         static_assert(std::is_same_v<decltype(*l.begin()), std::decay_t<decltype(*r.begin())>>);
-        return ownedRange(ChainView{std::move(l), std::move(r)});
+        return ownedRange(ConcatView{std::move(l), std::move(r)});
     }
     else
     {
@@ -856,7 +856,7 @@ constexpr inline auto cons = toGFunc<2>([](auto e, auto l)
     if constexpr(isRangeV<decltype(l)>)
     {
         static_assert(std::is_same_v<decltype(e), std::decay_t<decltype(*l.begin())>>);
-        return ownedRange(ChainView{SingleView{std::move(e)}, std::move(l)});
+        return ownedRange(ConcatView{SingleView{std::move(e)}, std::move(l)});
     }
     else
     {

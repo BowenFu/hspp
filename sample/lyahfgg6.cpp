@@ -111,7 +111,7 @@ void someHigherOrderismIsInOrder0()
 
     constexpr auto add = toGFunc<2> | std::plus<>{} ;
     expectEq(applyTwice | (add | 3) | 10, 16);
-    expectEq(applyTwice | (chain | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
+    expectEq(applyTwice | (concat | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
     expectEq(applyTwice | (multThree | 2 | 2) | 9, 144);
     auto result = applyTwice | (cons | 3) | std::vector{1};
     expectEq(result, std::vector{3, 3, 1});
@@ -140,7 +140,7 @@ void someHigherOrderismIsInOrder1()
     auto result1 = zipWith | max | std::vector{6, 3, 2, 1} | std::vector{7, 3, 1, 5};
     expectEq(to<std::vector> | result1, std::vector{7, 3, 2, 5});
 
-    auto result2 = zipWith | chain | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
+    auto result2 = zipWith | concat | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
     expectEq(to<std::vector> | result2, std::vector{"foo fighters"s, "bar hoppers"s, "baz aldrin"s});
 
     auto result3 = zipWith | std::multiplies<>{} | replicate(5U, 2) | enumFrom(1);
@@ -188,7 +188,7 @@ void mapsAndFilters0()
     auto const result0 = map | (toGFunc<2> | std::plus<>{} | 3) | std::vector{1, 5, 3, 1, 6};
     expectEq(to<std::vector> | result0, std::vector{4, 8, 6, 4, 9});
 
-    auto const result1 = map | (flip | chain | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
+    auto const result1 = map | (flip | concat | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
     expectEq(to<std::vector> | result1, std::vector{"BIFF!"s, "BANG!"s, "POW!"s});
 
     auto const result2 = map | (replicate | 3U) | within(3, 6);
@@ -227,6 +227,42 @@ void mapsAndFilters1()
 
     auto const result2 = filter | even | within(1, 10);
     expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
+
+    auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
+    expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
+
+    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
+    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
+
+    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
+    expectEq(to<std::basic_string> | result5, "GAYBALLS");
+}
+
+void mapsAndFilters2()
+{
+#if 0
+    // haskell version
+    largestDivisible :: (Integral a) => a
+    largestDivisible = head (filter p [100000,99999..])
+        where p x = x `mod` 3829 == 0
+    ghci> largestDivisible
+    99554
+
+    ghci> sum (takeWhile (<10000) (filter odd (map (^2) [1..])))
+    166650
+
+    ghci> sum (takeWhile (<10000) [n^2 | n <- [1..], odd (n^2)])
+    166650
+#endif // 0
+
+    auto const largestDivisible = head || filter | [](auto x){ return x % 3824 == 0; } | within_(1000000, 99999, 0);
+    expectEq(largestDivisible, 99554);
+
+    // auto const result1 = sum | (takeWhile ());
+    // expectEq(to<std::vector> | result1, std::vector{3});
+
+    // auto const result2 = filter | even | within(1, 10);
+    // expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
 
     auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
     expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});

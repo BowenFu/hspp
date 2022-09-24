@@ -205,11 +205,11 @@ TEST(splitAt, 1)
     EXPECT_TRUE(std::equal(result2.begin(), result2.end(), expected2.begin()));
 }
 
-TEST(ChainView, 1)
+TEST(ConcatView, 1)
 {
     auto const a = std::vector{1, 2};
     auto const b = std::vector{3, 4};
-    auto v = ChainView{nonOwnedRange(a), nonOwnedRange(b)};
+    auto v = ConcatView{nonOwnedRange(a), nonOwnedRange(b)};
     auto const result = toVector(v);
     auto const expected = {1, 2, 3, 4};
     EXPECT_TRUE(std::equal(result.begin(), result.end(), expected.begin()));
@@ -536,7 +536,7 @@ TEST(Monad, Range)
         auto const u = {3, -3, 4, -4, 5, -5, 6, -6};
         EXPECT_TRUE(std::equal(result.begin(), result.end(), u.begin()));
     };
-    auto const thisAndNeg = [](int x) { return ownedRange(ChainView{SingleView{x}, SingleView{-x}}); };
+    auto const thisAndNeg = [](int x) { return ownedRange(ConcatView{SingleView{x}, SingleView{-x}}); };
     auto const thisAndNeg2 = toFunc<>(thisAndNeg);
     test(thisAndNeg2);
 }

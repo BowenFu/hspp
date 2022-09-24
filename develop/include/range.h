@@ -778,13 +778,13 @@ private:
 };
 
 template <typename... Bases>
-class ChainView
+class ConcatView
 {
 public:
     class Iter
     {
     public:
-        constexpr Iter(ChainView const& view)
+        constexpr Iter(ConcatView const& view)
         : mView{view}
         , mIters{impl::getBegins(mView.get().mBases)}
         {
@@ -803,7 +803,7 @@ public:
             return hasValueImpl();
         }
     private:
-        std::reference_wrapper<ChainView const> mView;
+        std::reference_wrapper<ConcatView const> mView;
         std::decay_t<decltype(impl::getBegins(mView.get().mBases))> mIters;
 
         template <size_t I = 0>
@@ -859,7 +859,7 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr ChainView(Bases... bases)
+    constexpr ConcatView(Bases... bases)
     : mBases{std::make_tuple(std::move(bases)...)}
     {}
     auto begin() const
