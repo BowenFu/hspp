@@ -662,17 +662,22 @@ namespace impl
     template <size_t nbArgs, typename Repr>
     constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
     {
-        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f | y | x; });
+        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f(y, x); });
     }
     template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
     {
-        return toFunc<>([f=std::move(f)](Arg1 x, Arg2 y){ return f | y | x; });
+        return toFunc<>([f=std::move(f)](Arg1 x, Arg2 y){ return f(y, x); });
     }
     template <typename Repr1, typename Repr2, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr1, Function<Repr2, Ret, Arg2, Rest...>, Arg1> f)
     {
-        return toFunc<>([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
+        return toFunc<>([f=std::move(f)](Arg2 x, Arg1 y){ return f(y, x); });
+    }
+    template <typename Repr>
+    constexpr auto flipImpl(Repr f)
+    {
+        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f(y, x); });
     }
 } // namespace impl
 

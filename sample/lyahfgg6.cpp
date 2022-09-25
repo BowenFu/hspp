@@ -333,6 +333,10 @@ void onlyFoldsAndHorses0()
 
     constexpr auto elem = toGFunc<2> | [](auto y, auto ys) { return foldl | [y](auto acc, auto x) { return x == y ? true : acc; } | false  | ys; };
     expectEq(elem | 3 | std::vector{5, 3, 2}, true);
+
+    // only works for container types, not ranges.
+    constexpr auto map = toGFunc<2> | [](auto f, auto xs) { return foldr | [f](auto x, auto acc) { return f(x) <cons> acc; } | decltype(xs){}  | xs; };
+    expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
 }
 
 void onlyFoldsAndHorses1()
@@ -357,6 +361,7 @@ void onlyFoldsAndHorses1()
     last = foldl1 (\_ x -> x)
 #endif // 0
 
+    constexpr maximum = foldr1 = 
 }
 
 int main()
