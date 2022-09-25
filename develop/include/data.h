@@ -269,7 +269,7 @@ public:
         }
         else if constexpr (sizeof...(Rest) == sizeof...(Ts))
         {
-            static_assert((std::is_same_v<std::decay_t<Rest>, std::decay_t<Ts>> && ...));
+            static_assert((std::is_convertible_v<Ts, std::decay_t<Rest>> && ...));
             return ((*this)(arg) | ... | std::forward<Ts>(ts));
         }
         else
@@ -711,7 +711,7 @@ constexpr auto listFoldr = toGFunc<3>([](auto func, auto init, auto const& list)
 {
     if constexpr (data::hasReverseIteratorsV<decltype(list)>)
     {
-        return accumulate(list.rbegin(), list.rend(), init, unCurry <o> flip | func);
+        return accumulate(list.rbegin(), list.rend(), init, flip | func);
     }
     else
     {
@@ -721,7 +721,7 @@ constexpr auto listFoldr = toGFunc<3>([](auto func, auto init, auto const& list)
 
 constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 {
-    return data::accumulate(list.begin(), list.end(), init, unCurry | func);
+    return data::accumulate(list.begin(), list.end(), init, func);
 });
 
 constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
