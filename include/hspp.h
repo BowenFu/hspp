@@ -1765,9 +1765,9 @@ constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 
 constexpr inline auto foldr1 = toGFunc<2> | [](auto func, auto const& list)
 {
-    auto h = head | list;
-    auto t = tail | list;
-    return listFoldr | func | h | t;
+    auto l = last | list;
+    auto i = init | list;
+    return listFoldr | func | l | i;
 };
 
 constexpr inline auto foldl1 = toGFunc<2> | [](auto func, auto const& list)

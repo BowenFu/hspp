@@ -367,6 +367,18 @@ void onlyFoldsAndHorses1()
 
     constexpr auto reverse = toGFunc<1> | [](auto xs) { return foldl | (toGFunc<2> | [](auto acc, auto x){ return x <cons> acc; }) | decltype(xs){} | xs; };
     expectEq(reverse | std::vector{4, 2, 6}, std::vector{6, 2, 4});
+
+    constexpr auto product = foldr1 || toGFunc<2> | std::multiplies<>{};
+    expectEq(product | std::vector{4, 2, 6}, 48);
+
+    constexpr auto filter = toGFunc<2> | [](auto p, auto xs) { return foldr | (toGFunc<2> | [p](auto x, auto acc) { return p(x) ? x <cons> acc : acc; }) | decltype(xs){} | xs; };
+    expectEq(filter | even | std::vector{4, 5, 2}, std::vector{4, 2});
+
+    constexpr auto head = foldr1 || toGFunc<2> | [](auto x, auto){ return x; };
+    expectEq(head | std::vector{4, 5, 2}, 4);
+
+    constexpr auto last = foldl1 || toGFunc<2> | [](auto, auto x){ return x; };
+    expectEq(last | std::vector{4, 5, 2}, 2);
 }
 
 int main()
