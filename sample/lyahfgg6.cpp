@@ -282,6 +282,90 @@ void mapsAndFilters2()
     expectEq(result6, 20);
 }
 
+void lambdas()
+{
+#if 0
+    // haskell version
+    ghci> zipWith (\a b -> (a * 30 + 3) / b) [5,4,3,2,1] [1,2,3,4,5]
+    [153.0,61.5,31.0,15.75,6.6]
+
+    ghci> map (\(a,b) -> a + b) [(1,2),(3,5),(6,3),(2,6),(2,5)]
+    [3,8,9,8,7]
+
+    addThree :: (Num a) => a -> a -> a -> a
+    addThree x y z = x + y + z
+    addThree :: (Num a) => a -> a -> a -> a
+    addThree = \x -> \y -> \z -> x + y + z
+
+    flip :: (a -> b -> c) -> b -> a -> c
+    flip f = \x y -> f y x
+#endif // 0
+
+    auto const result0 = zipWith | [](auto a, auto b){ return (a * 30. + 3.) / b; } | within_(5, 4, 1) | within(1, 5);
+    expectEq(to<std::vector> | result0, std::vector{153.0, 61.5, 31.0, 15.75, 6.6});
+
+    auto const result1 = map | [](auto ab){ auto [a, b] = ab; return a + b; } | std::vector{std::tuple{1, 2}, std::tuple{3, 5}, std::tuple{6, 3}, std::tuple{2, 6}, std::tuple{2, 5}};
+    expectEq(to<std::vector> | result1, std::vector{3, 8, 9, 8, 7});
+}
+
+void onlyFoldsAndHorses0()
+{
+#if 0
+    // haskell version
+    sum :: (Num a) => [a] -> a
+    sum xs = foldl (\acc x -> acc + x) 0 xs
+
+    ghci> sum [3,5,2,1]
+    11
+
+    sum :: (Num a) => [a] -> a
+    sum = foldl (+) 0
+
+    elem :: (Eq a) => a -> [a] -> Bool
+    elem y ys = foldl (\acc x -> if x == y then True else acc) False ys
+
+    map :: (a -> b) -> [a] -> [b]
+    map f xs = foldr (\x acc -> f x : acc) [] xs
+#endif // 0
+
+    constexpr auto sum = foldl | std::plus<>{} | 0;
+    expectEq(sum | std::vector{5, 3, 2}, 10);
+
+    constexpr auto elem = toGFunc<2> | [](auto y, auto ys) { return foldl | [y](auto acc, auto x) { return x == y ? true : acc; } | false  | ys; };
+    expectEq(elem | 3 | std::vector{5, 3, 2}, true);
+
+    // only works for container types, not ranges.
+    constexpr auto map = toGFunc<2> | [](auto f, auto xs) { return foldr | [f](auto x, auto acc) { return f(x) <cons> acc; } | decltype(xs){}  | xs; };
+    expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
+}
+
+void onlyFoldsAndHorses1()
+{
+#if 0
+    // haskell version
+    maximum :: (Ord a) => [a] -> a
+    maximum = foldr1 (\x acc -> if x > acc then x else acc)
+
+    reverse :: [a] -> [a]
+    reverse = foldl (\acc x -> x : acc) []
+
+    product :: (Num a) => [a] -> a
+    product = foldr1 (*)
+
+    filter :: (a -> Bool) -> [a] -> [a]
+    filter p = foldr (\x acc -> if p x then x : acc else acc) []
+
+    head :: [a] -> a
+    head = foldr1 (\x _ -> x)
+
+    last :: [a] -> a
+    last = foldl1 (\_ x -> x)
+#endif // 0
+
+    constexpr auto maximum = foldr1 | (toGFunc<2> | [](auto x, auto acc){ return x > acc ? x : acc; });
+    expectEq(maximum | std::vector{4, 2, 6}, 6);
+}
+
 int main()
 {
     curriedFunctions0();
@@ -293,5 +377,8 @@ int main()
     someHigherOrderismIsInOrder2();
     mapsAndFilters0();
     mapsAndFilters1();
+    lambdas();
+    onlyFoldsAndHorses0();
+    onlyFoldsAndHorses1();
     return 0;
 }
