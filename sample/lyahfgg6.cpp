@@ -349,7 +349,8 @@ void onlyFoldsAndHorses1()
     reverse :: [a] -> [a]
     reverse = foldl (\acc x -> x : acc) []
 
-    product :: (Num a) => [a] -> a product' = foldr1 (*)
+    product :: (Num a) => [a] -> a
+    product = foldr1 (*)
 
     filter :: (a -> Bool) -> [a] -> [a]
     filter p = foldr (\x acc -> if p x then x : acc else acc) []
@@ -361,7 +362,8 @@ void onlyFoldsAndHorses1()
     last = foldl1 (\_ x -> x)
 #endif // 0
 
-    constexpr maximum = foldr1 = 
+    constexpr auto maximum = foldr1 | (toGFunc<2> | [](auto x, auto acc){ return x > acc ? x : acc; });
+    expectEq(maximum | std::vector{4, 2, 6}, 6);
 }
 
 int main()

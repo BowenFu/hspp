@@ -662,17 +662,17 @@ namespace impl
     template <size_t nbArgs, typename Repr>
     constexpr auto flipImpl(GenericFunction<nbArgs, Repr> f)
     {
-        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f(y, x); });
+        return toGFunc<2>([f=std::move(f)](auto x, auto y){ return f | y | x; });
     }
     template <typename Repr, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr, Ret, Arg1, Arg2, Rest...> f)
     {
-        return toFunc<>([f=std::move(f)](Arg1 x, Arg2 y){ return f(y, x); });
+        return toFunc<>([f=std::move(f)](Arg1 x, Arg2 y){ return f | y | x; });
     }
     template <typename Repr1, typename Repr2, typename Ret, typename Arg1, typename Arg2, typename... Rest>
     constexpr auto flipImpl(Function<Repr1, Function<Repr2, Ret, Arg2, Rest...>, Arg1> f)
     {
-        return toFunc<>([f=std::move(f)](Arg2 x, Arg1 y){ return f(y, x); });
+        return toFunc<>([f=std::move(f)](Arg2 x, Arg1 y){ return f | y | x; });
     }
     template <typename Repr>
     constexpr auto flipImpl(Repr f)
@@ -689,6 +689,74 @@ constexpr auto flip = toGFunc<1>([](auto func)
 {
     return impl::flipImpl(std::move(func));
 });
+
+constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
+{
+    return ownedRange(TakeView{r, num});
+});
+
+constexpr inline auto takeWhile = toGFunc<2>([](auto pred, auto r)
+{
+    return ownedRange(TakeWhileView{pred, r});
+});
+
+constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
+{
+    return ownedRange(DropView{r, num});
+});
+
+constexpr auto head = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    return *v.begin();
+};
+
+constexpr auto tail = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    return data::drop | 1U | v;
+};
+
+constexpr auto last = toGFunc<1> | [](auto v)
+{
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+    auto result = *v.begin();
+    for (auto const& e: v)
+    {
+        result = e;
+    }
+    return result;
+};
+
+constexpr auto init = toGFunc<1> | [](auto v)
+{
+    constexpr auto length = toGFunc<1> | [](auto v)
+    {
+        auto i = 0U;
+        for (auto const& e: v)
+        {
+            static_cast<void>(e);
+            ++i;
+        }
+        return i;
+    };
+
+    if (!(v.begin() != v.end()))
+    {
+        throw std::logic_error{"At least one element is needed!"};
+    }
+
+    return take | static_cast<size_t>((length | v) - 1) | v;
+};
 
 // Note different iterator types for begin and end.
 template <typename Iter1, typename Iter2, typename Init, typename Func>
@@ -728,6 +796,20 @@ constexpr auto foldl = toGFunc<3>([](auto func, auto init, auto const& list)
 {
     return data::accumulate(list.begin(), list.end(), init, func);
 });
+
+constexpr inline auto foldr1 = toGFunc<2> | [](auto func, auto const& list)
+{
+    auto h = head | list;
+    auto t = tail | list;
+    return listFoldr | func | h | t;
+};
+
+constexpr inline auto foldl1 = toGFunc<2> | [](auto func, auto const& list)
+{
+    auto h = head | list;
+    auto t = tail | list;
+    return foldl | func | h | t;
+};
 
 constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
 
@@ -820,21 +902,6 @@ constexpr inline auto within = toGFunc<2>([](auto start, auto end)
 constexpr inline auto within_ = toGFunc<3>([](auto start, auto next, auto end)
 {
     return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end, next - start});
-});
-
-constexpr inline auto take = toGFunc<2>([](size_t num, auto r)
-{
-    return ownedRange(TakeView{r, num});
-});
-
-constexpr inline auto takeWhile = toGFunc<2>([](auto pred, auto r)
-{
-    return ownedRange(TakeWhileView{pred, r});
-});
-
-constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
-{
-    return ownedRange(DropView{r, num});
 });
 
 constexpr inline auto splitAt = toGFunc<2>([](size_t num, auto r)
@@ -1014,59 +1081,6 @@ constexpr auto cast = toGFunc<1> | [](auto v)
 constexpr auto null = toGFunc<1> | [](auto v)
 {
     return !(v.begin() != v.end());
-};
-
-constexpr auto head = toGFunc<1> | [](auto v)
-{
-    if (!(v.begin() != v.end()))
-    {
-        throw std::logic_error{"At least one element is needed!"};
-    }
-    return *v.begin();
-};
-
-constexpr auto tail = toGFunc<1> | [](auto v)
-{
-    if (!(v.begin() != v.end()))
-    {
-        throw std::logic_error{"At least one element is needed!"};
-    }
-    return data::drop | 1U | v;
-};
-
-constexpr auto last = toGFunc<1> | [](auto v)
-{
-    if (!(v.begin() != v.end()))
-    {
-        throw std::logic_error{"At least one element is needed!"};
-    }
-    auto result = *v.begin();
-    for (auto const& e: v)
-    {
-        result = e;
-    }
-    return result;
-};
-
-constexpr auto init = toGFunc<1> | [](auto v)
-{
-    constexpr auto length = toGFunc<1> | [](auto v)
-    {
-        auto i = 0U;
-        for (auto const& e: v)
-        {
-            static_cast<void>(e);
-            ++i;
-        }
-        return i;
-    };
-
-    if (!(v.begin() != v.end()))
-    {
-        throw std::logic_error{"At least one element is needed!"};
-    }
-
-    return take | static_cast<size_t>((length | v) - 1) | v;
 };
 
 constexpr auto idx = toGFunc<2> | [](auto v, size_t i)
