@@ -364,6 +364,9 @@ void onlyFoldsAndHorses1()
 
     constexpr auto maximum = foldr1 | (toGFunc<2> | [](auto x, auto acc){ return x > acc ? x : acc; });
     expectEq(maximum | std::vector{4, 2, 6}, 6);
+
+    constexpr auto reverse = toGFunc<1> | [](auto xs) { return foldl | (toGFunc<2> | [](auto acc, auto x){ return x <cons> acc; }) | decltype(xs){} | xs; };
+    expectEq(reverse | std::vector{4, 2, 6}, std::vector{6, 2, 4});
 }
 
 int main()
