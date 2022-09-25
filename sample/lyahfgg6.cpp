@@ -282,6 +282,32 @@ void mapsAndFilters2()
     expectEq(result6, 20);
 }
 
+void lambdas()
+{
+#if 0
+    // haskell version
+    ghci> zipWith (\a b -> (a * 30 + 3) / b) [5,4,3,2,1] [1,2,3,4,5]
+    [153.0,61.5,31.0,15.75,6.6]
+
+    ghci> map (\(a,b) -> a + b) [(1,2),(3,5),(6,3),(2,6),(2,5)]
+    [3,8,9,8,7]
+
+    addThree :: (Num a) => a -> a -> a -> a
+    addThree x y z = x + y + z
+    addThree :: (Num a) => a -> a -> a -> a
+    addThree = \x -> \y -> \z -> x + y + z
+
+    flip :: (a -> b -> c) -> b -> a -> c
+    flip f = \x y -> f y x
+#endif // 0
+
+    auto const result0 = zipWith | [](auto a, auto b){ return (a * 30. + 3.) / b; } | within_(5, 4, 1) | within(1, 5);
+    expectEq(to<std::vector> | result0, std::vector{153.0, 61.5, 31.0, 15.75, 6.6});
+
+    auto const result1 = map | [](auto ab){ auto [a, b] = ab; return a + b; } | std::vector{std::tuple{1, 2}, std::tuple{3, 5}, std::tuple{6, 3}, std::tuple{2, 6}, std::tuple{2, 5}};
+    expectEq(to<std::vector> | result1, std::vector{3, 8, 9, 8, 7});
+}
+
 int main()
 {
     curriedFunctions0();
@@ -293,5 +319,6 @@ int main()
     someHigherOrderismIsInOrder2();
     mapsAndFilters0();
     mapsAndFilters1();
+    lambdas();
     return 0;
 }
