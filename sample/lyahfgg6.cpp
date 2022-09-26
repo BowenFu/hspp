@@ -381,6 +381,27 @@ void onlyFoldsAndHorses1()
     expectEq(last | std::vector{4, 5, 2}, 2);
 }
 
+void functionApplicationWithS()
+{
+#if 0
+    // haskell version
+    ($) :: (a -> b) -> a -> b
+    f $ x = f x
+
+    ghci> map ($ 3) [(4+), (10*), (^2), sqrt]
+    [7.0,30.0,9.0,1.7320508075688772]
+#endif // 0
+
+    auto const result = map | [](auto f) { return f || 3; } |
+        std::vector<TEFunction<double, double>>{
+            toTEFunc<> | [](double x) { return 4 + x; },
+            toTEFunc<> | [](double x) { return 10 * x; },
+            toTEFunc<> | [](double x) { return x * x; },
+            toTEFunc<> | [](double x) { return std::sqrt(x); }
+        };
+    expectEq(to<std::vector> | result, std::vector{7.0, 30.0, 9.0, 1.7320508075688772});
+}
+
 int main()
 {
     curriedFunctions0();
@@ -395,5 +416,6 @@ int main()
     lambdas();
     onlyFoldsAndHorses0();
     onlyFoldsAndHorses1();
+    functionApplicationWithS();
     return 0;
 }
