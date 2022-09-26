@@ -5,6 +5,7 @@
 #include "hspp.h"
 #include "common.h"
 #include <string>
+#include <cmath>
 
 using namespace hspp;
 using namespace hspp::doN;
@@ -381,6 +382,78 @@ void onlyFoldsAndHorses1()
     expectEq(last | std::vector{4, 5, 2}, 2);
 }
 
+void functionApplicationWithS()
+{
+#if 0
+    // haskell version
+    ($) :: (a -> b) -> a -> b
+    f $ x = f x
+
+    ghci> map ($ 3) [(4+), (10*), (^2), sqrt]
+    [7.0,30.0,9.0,1.7320508075688772]
+#endif // 0
+
+    // FIX ME build failure
+    // auto const result = map | [](auto f) { return f || 3; } |
+    //     std::vector<TEFunction<double, double>>{
+    //         toTEFunc<double, double> | [](double x) { return 4 + x; },
+    //         toTEFunc<double, double> | [](double x) { return 10 * x; },
+    //         toTEFunc<double, double> | [](double x) { return x * x; },
+    //         toTEFunc<double, double> | [](double x) { return std::sqrt(x); }
+    //     };
+    // expectEq(to<std::vector> | result, std::vector{7.0, 30.0, 9.0, 1.7320508075688772});
+}
+
+void functionComposition()
+{
+#if 0
+    // haskell version
+    (.) :: (b -> c) -> (a -> b) -> a -> c
+    f . g = \x -> f (g x)
+
+    ghci> map (\x -> negate (abs x)) [5,-3,-6,7,-3,2,-19,24]
+    [-5,-3,-6,-7,-3,-2,-19,-24]
+
+    ghci> map (negate . abs) [5,-3,-6,7,-3,2,-19,24]
+    [-5,-3,-6,-7,-3,-2,-19,-24]
+
+    ghci> map (\xs -> negate (sum (tail xs))) [[1..5],[3..6],[1..7]]
+    [-14,-15,-27]
+
+    ghci> map (negate . sum . tail) [[1..5],[3..6],[1..7]]
+    [-14,-15,-27]
+
+    oddSquareSum :: Integer
+    oddSquareSum = sum (takeWhile (<10000) (filter odd (map (^2) [1..])))
+
+    oddSquareSum :: Integer
+    oddSquareSum = sum . takeWhile (<10000) . filter odd . map (^2) $ [1..]
+
+    oddSquareSum :: Integer oddSquareSum =
+        let oddSquares = filter odd $ map (^2) [1..]
+            belowLimit = takeWhile (<10000) oddSquares
+        in  sum belowLimit
+#endif
+
+    auto const negate = toGFunc<1> | std::negate<>{};
+    auto const abs = toGFunc<1> | [](auto x) { return std::abs(x); };
+    auto const result0 = map | (negate <o> abs) | std::vector{5, -3, -6, 7, -3, 2, -19, 24};
+    auto const expected0 = std::vector{-5, -3, -6, -7, -3, -2, -19, -24};
+    expectEq(to<std::vector> | result0, expected0);
+
+    auto const result1 = map | (negate <o> sum <o> tail) | std::vector{within(1, 5), within(3, 6), within(1, 7)};
+    auto const expected1 = std::vector{-14, -15, -27};
+    expectEq(to<std::vector> | result1, expected1);
+
+    auto const oddSquareSum = sum <o> (takeWhile | [](auto x){ return x < 10000; }) <o> (filter | odd) <o> (map | [](auto x){ return x*x; }) | enumFrom(1);
+    expectEq(oddSquareSum, 166650);
+
+    auto const oddSquares = filter | odd || map | [](auto x){return x*x; } | enumFrom(1);
+    auto const belowLimit = takeWhile | [](auto x) { return x < 10000; } | oddSquares;
+    auto const oddSquareSum0 = sum | belowLimit;
+    expectEq(oddSquareSum0, 166650);
+}
+
 int main()
 {
     curriedFunctions0();
@@ -395,5 +468,7 @@ int main()
     lambdas();
     onlyFoldsAndHorses0();
     onlyFoldsAndHorses1();
+    functionApplicationWithS();
+    functionComposition();
     return 0;
 }

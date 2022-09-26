@@ -259,6 +259,11 @@ public:
     : mFunc{std::move(func)}
     {
     }
+    template <typename F>
+    constexpr Function(Function<F, Ret, Arg, Rest...> other)
+    : mFunc{std::move(other.mFunc)}
+    {
+    }
     template <typename... Ts>
     constexpr auto operator()(Arg const& arg, Ts&&... ts) const
     {
@@ -281,6 +286,8 @@ public:
     }
 private:
     Repr mFunc;
+    template <typename, typename, typename, typename...>
+    friend class Function;
 };
 
 template <typename... Ts>
