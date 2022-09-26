@@ -395,10 +395,10 @@ void functionApplicationWithS()
 
     auto const result = map | [](auto f) { return f || 3; } |
         std::vector<TEFunction<double, double>>{
-            [](double x) { return 4 + x; },
-            [](double x) { return 10 * x; },
-            [](double x) { return x * x; },
-            [](double x) { return std::sqrt(x); }
+            toTEFunc<double, double> | [](double x) { return 4 + x; },
+            toTEFunc<double, double> | [](double x) { return 10 * x; },
+            toTEFunc<double, double> | [](double x) { return x * x; },
+            toTEFunc<double, double> | [](double x) { return std::sqrt(x); }
         };
     expectEq(to<std::vector> | result, std::vector{7.0, 30.0, 9.0, 1.7320508075688772});
 }
