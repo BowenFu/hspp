@@ -402,6 +402,51 @@ void functionApplicationWithS()
     expectEq(to<std::vector> | result, std::vector{7.0, 30.0, 9.0, 1.7320508075688772});
 }
 
+void functionComposition()
+{
+#if 0
+    // haskell version
+    (.) :: (b -> c) -> (a -> b) -> a -> c
+    f . g = \x -> f (g x)
+
+    ghci> map (\x -> negate (abs x)) [5,-3,-6,7,-3,2,-19,24]
+    [-5,-3,-6,-7,-3,-2,-19,-24]
+
+    ghci> map (negate . abs) [5,-3,-6,7,-3,2,-19,24]
+    [-5,-3,-6,-7,-3,-2,-19,-24]
+
+    ghci> map (\xs -> negate (sum (tail xs))) [[1..5],[3..6],[1..7]]
+    [-14,-15,-27]
+
+    ghci> map (negate . sum . tail) [[1..5],[3..6],[1..7]]
+    [-14,-15,-27]
+
+    fn x = ceiling (negate (tan (cos (max 50 x))))
+    fn = ceiling . negate . tan . cos . max 50
+
+    oddSquareSum :: Integer
+    oddSquareSum = sum (takeWhile (<10000) (filter odd (map (^2) [1..])))
+
+    oddSquareSum :: Integer
+    oddSquareSum = sum . takeWhile (<10000) . filter odd . map (^2) $ [1..]
+
+    oddSquareSum :: Integer oddSquareSum =
+        let oddSquares = filter odd $ map (^2) [1..]
+            belowLimit = takeWhile (<10000) oddSquares
+        in  sum belowLimit
+#endif
+
+    auto const negate = toGFunc<1> | std::negate<>{};
+    auto const abs = toGFunc<1> | [](auto x) { return std::abs(x); };
+    auto const result0 = map | (negate <o> abs) | std::vector{5, -3, -6, 7, -3, 2, -19, 24};
+    auto const expected0 = std::vector{-5, -3, -6, -7, -3, -2, -19, -24};
+    expectEq(to<std::vector> | result0, expected0);
+
+    auto const result1 = map | (negate <o> sum <o> tail) | std::vector{within(1, 5), within(3, 6), within(1, 7)};
+    auto const expected1 = std::vector{-14, -15, -27};
+    expectEq(to<std::vector> | result1, expected1);
+}
+
 int main()
 {
     curriedFunctions0();
@@ -417,5 +462,6 @@ int main()
     onlyFoldsAndHorses0();
     onlyFoldsAndHorses1();
     functionApplicationWithS();
+    functionComposition();
     return 0;
 }
