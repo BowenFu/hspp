@@ -421,9 +421,6 @@ void functionComposition()
     ghci> map (negate . sum . tail) [[1..5],[3..6],[1..7]]
     [-14,-15,-27]
 
-    fn x = ceiling (negate (tan (cos (max 50 x))))
-    fn = ceiling . negate . tan . cos . max 50
-
     oddSquareSum :: Integer
     oddSquareSum = sum (takeWhile (<10000) (filter odd (map (^2) [1..])))
 
@@ -445,6 +442,9 @@ void functionComposition()
     auto const result1 = map | (negate <o> sum <o> tail) | std::vector{within(1, 5), within(3, 6), within(1, 7)};
     auto const expected1 = std::vector{-14, -15, -27};
     expectEq(to<std::vector> | result1, expected1);
+
+    auto const oddSquareSum = sum <o> (takeWhile | [](auto x){ return x < 10000; }) <o> (filter | odd) <o> (map | [](auto x){ return x*x; }) | enumFrom(1);
+    expectEq(oddSquareSum, 166650);
 }
 
 int main()
