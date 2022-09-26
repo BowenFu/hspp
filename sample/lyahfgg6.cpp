@@ -5,6 +5,7 @@
 #include "hspp.h"
 #include "common.h"
 #include <string>
+#include <cmath>
 
 using namespace hspp;
 using namespace hspp::doN;
