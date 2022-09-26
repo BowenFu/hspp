@@ -445,6 +445,11 @@ void functionComposition()
 
     auto const oddSquareSum = sum <o> (takeWhile | [](auto x){ return x < 10000; }) <o> (filter | odd) <o> (map | [](auto x){ return x*x; }) | enumFrom(1);
     expectEq(oddSquareSum, 166650);
+
+    auto const oddSquares = filter | odd || map | [](auto x){return x*x; } | enumFrom(1);
+    auto const belowLimit = takeWhile | [](auto x) { return x < 10000; } | oddSquares;
+    auto const oddSquareSum0 = sum | belowLimit;
+    expectEq(oddSquareSum0, 166650);
 }
 
 int main()
