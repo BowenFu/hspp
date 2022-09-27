@@ -148,6 +148,14 @@ void dataList3()
     ghci> let stock = [(994.4,2008,9,1), (995.2,2008,9,2), (999.2,2008,9,3), (1001.4,2008,9,4), (998.3,2008,9,5)]
     ghci> head (dropWhile (\(val,y,m,d) -> val < 1000) stock)
     (1001.4,2008,9,4)
+
+    ghci> let (fw, rest) = span (/=' ') "This is a sentence" in "First word: " ++ fw ++ ", the rest:" ++ rest
+    "First word: This, the rest: is a sentence"
+
+    ghci> break (==4) [1,2,3,4,5,6,7]
+    ([1,2,3],[4,5,6,7])
+    ghci> span (/=4) [1,2,3,4,5,6,7]
+    ([1,2,3],[4,5,6,7])
 #endif
 
     auto const result0 = takeWhile | [](auto x) { return x > 3; } | std::vector{6, 5, 4, 3, 2, 1 ,2 ,3 ,4 ,5 ,4 ,3 ,2 ,1};
@@ -168,6 +176,18 @@ void dataList3()
     auto const stock = std::vector{std::tuple{994.4,2008, 9, 1}, std::tuple{995.2, 2008, 9, 2}, std::tuple{999.2, 2008, 9, 3}, std::tuple{1001.4, 2008, 9, 4}, std::tuple{998.3, 2008, 9, 5}};
     auto const result5 = head || dropWhile | [](auto t) { return std::get<0>(t) < 1000; } | stock;
     expectEq(result5, std::tuple{1001.4, 2008, 9, 4});
+
+    auto const [fw, rest] = span | [](auto x) { return x != ' '; } | "This is a sentence"s;
+    auto const result6 = "First word: "s + to<std::basic_string>(fw) + ", the rest:" + to<std::basic_string>(rest);
+    expectEq(result6, "First word: This, the rest: is a sentence"s);
+
+    auto const [result7a, result7b] =  break_ | equalTo(4) | within(1, 7);
+    expectEq(to<std::vector> | result7b, std::vector{4, 5, 6, 7});
+    expectEq(to<std::vector> | result7a, std::vector{1, 2, 3});
+
+    auto const [result8a, result8b] =  span | [](auto x){ return x != 4; } | within(1, 7);
+    expectEq(to<std::vector> | result8a, std::vector{1, 2, 3});
+    expectEq(to<std::vector> | result8b, std::vector{4, 5, 6, 7});
 }
 
 int main()

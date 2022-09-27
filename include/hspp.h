@@ -2004,6 +2004,16 @@ constexpr inline auto concat = toGFunc<1>([](auto data)
     return ownedRange(JoinView{std::move(data)});
 });
 
+constexpr inline auto span = toGFunc<2>([](auto pred, auto r)
+{
+    return std::make_pair(ownedRange(TakeWhileView{pred, r}), ownedRange(DropWhileView{pred, r}));
+});
+
+constexpr inline auto break_ = toGFunc<2>([](auto pred, auto r)
+{
+    return span | (std::logical_not<>{} <o> pred) | r;
+});
+
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {
     return r;
