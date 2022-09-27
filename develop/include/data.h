@@ -916,6 +916,11 @@ constexpr inline auto splitAt = toGFunc<2>([](size_t num, auto r)
     return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
 });
 
+constexpr inline auto concat = toGFunc<1>([](auto data)
+{
+    return ownedRange(JoinView{std::move(data)});
+});
+
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {
     return r;
