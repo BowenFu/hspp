@@ -712,6 +712,11 @@ constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
     return ownedRange(DropView{r, num});
 });
 
+constexpr inline auto iterate = toGFunc<2>([](auto unary, auto start)
+{
+    return ownedRange(IterateView{std::move(unary), start});
+});
+
 constexpr auto head = toGFunc<1> | [](auto v)
 {
     if (!(v.begin() != v.end()))
@@ -744,7 +749,7 @@ constexpr auto last = toGFunc<1> | [](auto v)
     return result;
 };
 
-constexpr auto init = toGFunc<1> | [](auto v)
+namespace impl
 {
     constexpr auto length = toGFunc<1> | [](auto v)
     {
@@ -756,13 +761,16 @@ constexpr auto init = toGFunc<1> | [](auto v)
         }
         return i;
     };
+} // namespace impl
 
+constexpr auto init = toGFunc<1> | [](auto v)
+{
     if (!(v.begin() != v.end()))
     {
         throw std::logic_error{"At least one element is needed!"};
     }
 
-    return take | static_cast<size_t>((length | v) - 1) | v;
+    return take | static_cast<size_t>((impl::length | v) - 1) | v;
 };
 
 // Note different iterator types for begin and end.
@@ -915,9 +923,10 @@ constexpr inline auto within_ = toGFunc<3>([](auto start, auto next, auto end)
     return ownedRange(IotaView<decltype(start), /*includeUpperbound*/ true>{start, end, next - start});
 });
 
-constexpr inline auto splitAt = toGFunc<2>([](size_t num, auto r)
+constexpr inline auto splitAt = toGFunc<2>([](int64_t num, auto r)
 {
-    return std::make_pair(ownedRange(TakeView{r, num}), ownedRange(DropView{r, num}));
+    size_t n = num > 0 ? static_cast<size_t>(num) : 0U;
+    return std::make_pair(ownedRange(TakeView{r, n}), ownedRange(DropView{r, n}));
 });
 
 constexpr inline auto concat = toGFunc<1>([](auto data)
