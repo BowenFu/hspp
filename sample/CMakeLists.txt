@@ -5,6 +5,7 @@ walk_the_line
 lyahfgg
 lyahfgg2
 lyahfgg6
+lyahfgg7
 proposal
 )
 

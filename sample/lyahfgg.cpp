@@ -61,7 +61,7 @@ void anIntroToLists1()
     [1,2,3,4,9,10,11,12]
 #endif // 0
 
-    auto const result = concat | within(1, 4) | within(9, 12);
+    auto const result = plus | within(1, 4) | within(9, 12);
     auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
     expectEq(toVector | result, expected);
 }
@@ -74,7 +74,7 @@ void anIntroToLists2()
     "hello world"
 #endif // 0
 
-    auto const result = "hello"s <concat> " "s <concat> "world"s;
+    auto const result = "hello"s <plus> " "s <plus> "world"s;
     auto const expected = "hello world"s;
     expectEq(toString | result, expected);
 }

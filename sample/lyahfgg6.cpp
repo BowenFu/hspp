@@ -112,7 +112,7 @@ void someHigherOrderismIsInOrder0()
 
     constexpr auto add = toGFunc<2> | std::plus<>{} ;
     expectEq(applyTwice | (add | 3) | 10, 16);
-    expectEq(applyTwice | (concat | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
+    expectEq(applyTwice | (plus | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
     expectEq(applyTwice | (multThree | 2 | 2) | 9, 144);
     auto result = applyTwice | (cons | 3) | std::vector{1};
     expectEq(result, std::vector{3, 3, 1});
@@ -141,7 +141,7 @@ void someHigherOrderismIsInOrder1()
     auto result1 = zipWith | max | std::vector{6, 3, 2, 1} | std::vector{7, 3, 1, 5};
     expectEq(to<std::vector> | result1, std::vector{7, 3, 2, 5});
 
-    auto result2 = zipWith | concat | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
+    auto result2 = zipWith | plus | std::vector{"foo "s, "bar "s, "baz "s} | std::vector{"fighters"s, "hoppers"s, "aldrin"s};
     expectEq(to<std::vector> | result2, std::vector{"foo fighters"s, "bar hoppers"s, "baz aldrin"s});
 
     auto result3 = zipWith | std::multiplies<>{} | replicate(5U, 2) | enumFrom(1);
@@ -189,7 +189,7 @@ void mapsAndFilters0()
     auto const result0 = map | (toGFunc<2> | std::plus<>{} | 3) | std::vector{1, 5, 3, 1, 6};
     expectEq(to<std::vector> | result0, std::vector{4, 8, 6, 4, 9});
 
-    auto const result1 = map | (flip | concat | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
+    auto const result1 = map | (flip | plus | "!"s) | std::vector{"BIFF"s, "BANG"s, "POW"s};
     expectEq(to<std::vector> | result1, std::vector{"BIFF!"s, "BANG!"s, "POW!"s});
 
     auto const result2 = map | (replicate | 3U) | within(3, 6);

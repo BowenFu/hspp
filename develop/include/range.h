@@ -930,6 +930,57 @@ private:
     std::tuple<std::decay_t<Bases>...> mBases;
 };
 
+template <typename Unary, typename Value>
+class IterateView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(IterateView const& iterateView)
+        : mUnary{iterateView.mUnary}
+        , mValue{iterateView.mStart}
+        {
+        }
+        auto& operator++()
+        {
+            mValue = mUnary(mValue);
+            return *this;
+        }
+        auto operator*() const
+        {
+            return mValue;
+        }
+        bool hasValue() const
+        {
+            return true;
+        }
+    private:
+        Unary mUnary;
+        Value mValue;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr IterateView(Unary unary, Value start)
+    : mUnary{unary}
+    , mStart{start}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Unary mUnary;
+    Value mStart;
+};
 
 template <typename Data, typename Repr>
 class Range : public Repr
