@@ -818,6 +818,10 @@ constexpr inline auto foldl1 = toGFunc<2> | [](auto func, auto const& list)
     return foldl | func | h | t;
 };
 
+constexpr auto and_ = foldl | [](bool l, bool r) { return l && r; } | true;
+
+constexpr auto or_ = foldl | [](bool l, bool r) { return l || r; } | false;
+
 constexpr auto equalTo = toGFunc<2>(std::equal_to<>{});
 
 template <typename Repr1, typename Ret1, typename Arg1, typename... Rest1, typename Repr2, typename Ret2, typename Arg2, typename... Rest2>
