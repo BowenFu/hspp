@@ -94,6 +94,7 @@ void dataList1()
 void dataList2()
 {
 #if 0
+    // haskell version
     ghci> take 10 $ iterate (*2) 1
     [1,2,4,8,16,32,64,128,256,512]
 
@@ -128,10 +129,72 @@ void dataList2()
     expectEq(to<std::basic_string>(result4.second), "heyman"s);
 }
 
+void dataList3()
+{
+#if 0
+    // haskell version
+    ghci> takeWhile (>3) [6,5,4,3,2,1,2,3,4,5,4,3,2,1]
+    [6,5,4]
+    ghci> takeWhile (/=' ') "This is a sentence"
+    "This"
+    ghci> sum $ takeWhile (<10000) $ map (^3) [1..]
+    53361
+
+    ghci> dropWhile (/=' ') "This is a sentence"
+    " is a sentence"
+    ghci> dropWhile (<3) [1,2,2,2,3,4,5,4,3,2,1]
+    [3,4,5,4,3,2,1]
+
+    ghci> let stock = [(994.4,2008,9,1), (995.2,2008,9,2), (999.2,2008,9,3), (1001.4,2008,9,4), (998.3,2008,9,5)]
+    ghci> head (dropWhile (\(val,y,m,d) -> val < 1000) stock)
+    (1001.4,2008,9,4)
+
+    ghci> let (fw, rest) = span (/=' ') "This is a sentence" in "First word: " ++ fw ++ ", the rest:" ++ rest
+    "First word: This, the rest: is a sentence"
+
+    ghci> break (==4) [1,2,3,4,5,6,7]
+    ([1,2,3],[4,5,6,7])
+    ghci> span (/=4) [1,2,3,4,5,6,7]
+    ([1,2,3],[4,5,6,7])
+#endif
+
+    auto const result0 = takeWhile | [](auto x) { return x > 3; } | std::vector{6, 5, 4, 3, 2, 1 ,2 ,3 ,4 ,5 ,4 ,3 ,2 ,1};
+    expectEq(to<std::vector> | result0, std::vector{6, 5, 4});
+
+    auto const result1 = takeWhile | [](auto x) { return x != ' '; } | "This is a sentence"s;
+    expectEq(to<std::basic_string> | result1, "This"s);
+
+    auto const result2 = sum || (takeWhile | [](auto x) { return x < 10000; }) | (map | [](auto x) { return x*x*x; } | enumFrom(1));
+    expectEq(result2, 53361);
+
+    auto const result3 = dropWhile | [](auto x) { return x != ' '; } | "This is a sentence"s;
+    expectEq(to<std::basic_string> | result3, " is a sentence"s);
+
+    auto const result4 = dropWhile | [](auto x) { return x < 3; } | std::vector{1, 2, 2, 2, 3, 4, 5, 4, 3, 2, 1};
+    expectEq(to<std::vector> | result4, std::vector{3, 4, 5, 4, 3, 2, 1});
+
+    auto const stock = std::vector{std::tuple{994.4,2008, 9, 1}, std::tuple{995.2, 2008, 9, 2}, std::tuple{999.2, 2008, 9, 3}, std::tuple{1001.4, 2008, 9, 4}, std::tuple{998.3, 2008, 9, 5}};
+    auto const result5 = head || dropWhile | [](auto t) { return std::get<0>(t) < 1000; } | stock;
+    expectEq(result5, std::tuple{1001.4, 2008, 9, 4});
+
+    auto const [fw, rest] = span | [](auto x) { return x != ' '; } | "This is a sentence"s;
+    auto const result6 = "First word: "s + to<std::basic_string>(fw) + ", the rest:" + to<std::basic_string>(rest);
+    expectEq(result6, "First word: This, the rest: is a sentence"s);
+
+    auto const [result7a, result7b] =  break_ | equalTo(4) | within(1, 7);
+    expectEq(to<std::vector> | result7b, std::vector{4, 5, 6, 7});
+    expectEq(to<std::vector> | result7a, std::vector{1, 2, 3});
+
+    auto const [result8a, result8b] =  span | [](auto x){ return x != 4; } | within(1, 7);
+    expectEq(to<std::vector> | result8a, std::vector{1, 2, 3});
+    expectEq(to<std::vector> | result8b, std::vector{4, 5, 6, 7});
+}
+
 int main()
 {
     dataList0();
     dataList1();
     dataList2();
+    dataList3();
     return 0;
 }

@@ -712,6 +712,11 @@ constexpr inline auto drop = toGFunc<2>([](size_t num, auto r)
     return ownedRange(DropView{r, num});
 });
 
+constexpr inline auto dropWhile = toGFunc<2>([](auto pred, auto r)
+{
+    return ownedRange(DropWhileView{pred, r});
+});
+
 constexpr inline auto iterate = toGFunc<2>([](auto unary, auto start)
 {
     return ownedRange(IterateView{std::move(unary), start});
@@ -890,14 +895,6 @@ constexpr inline auto cycle = toGFunc<1>([](auto data)
     return ownedRange(CycleView{std::move(data)});
 });
 
-#if 0
-// TODO: implement CycleView when needed.
-constexpr inline auto cycle = toGFunc<1>([](auto data)
-{
-    return ownedRange(CycleView{std::move(data)});
-});
-#endif // 0
-
 constexpr inline auto replicate = toGFunc<2>([](size_t times, auto data)
 {
     return ownedRange(TakeView{RepeatView{std::move(data)}, times});
@@ -932,6 +929,16 @@ constexpr inline auto splitAt = toGFunc<2>([](int64_t num, auto r)
 constexpr inline auto concat = toGFunc<1>([](auto data)
 {
     return ownedRange(JoinView{std::move(data)});
+});
+
+constexpr inline auto span = toGFunc<2>([](auto pred, auto r)
+{
+    return std::make_pair(ownedRange(TakeWhileView{pred, r}), ownedRange(DropWhileView{pred, r}));
+});
+
+constexpr inline auto break_ = toGFunc<2>([](auto pred, auto r)
+{
+    return span | (std::logical_not<>{} <o> pred) | r;
 });
 
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)

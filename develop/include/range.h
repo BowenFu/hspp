@@ -531,6 +531,62 @@ private:
     size_t mNum;
 };
 
+template <typename Pred, typename Base>
+class DropWhileView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(DropWhileView const& takeWhileView)
+        : mView{takeWhileView}
+        , mBaseIter{mView.get().mBase.begin()}
+        {
+            while (hasValue() && mView.get().mPred(*mBaseIter))
+            {
+                ++mBaseIter;
+            }
+        }
+        auto& operator++()
+        {
+            ++mBaseIter;
+            return *this;
+        }
+        auto operator*() const
+        {
+            return *mBaseIter;
+        }
+        bool hasValue() const
+        {
+            return mBaseIter != mView.get().mBase.end();
+        }
+    private:
+        std::reference_wrapper<DropWhileView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr DropWhileView(Pred pred, Base base)
+    : mPred{std::move(pred)}
+    , mBase{std::move(base)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Pred mPred;
+    Base mBase;
+};
+
 template <typename Base>
 class CycleView
 {
