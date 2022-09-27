@@ -921,7 +921,7 @@ constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
     return r;
 });
 
-constexpr inline auto concat = toGFunc<2>([](auto l, auto r)
+constexpr inline auto plus = toGFunc<2>([](auto l, auto r)
 {
     if constexpr(isRangeV<decltype(l)>)
     {
