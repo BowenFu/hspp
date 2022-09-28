@@ -17,6 +17,35 @@ namespace hspp
 namespace data
 {
 
+template <typename Data, typename Repr>
+class Range : public Repr
+{
+};
+
+template <typename... Ts>
+class IsRange : public std::false_type
+{};
+template <typename... Ts>
+class IsRange<Range<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
+
+template <typename Repr>
+constexpr auto ownedRange(Repr&& repr)
+{
+    return Range<std::decay_t<decltype(*repr.begin())>, std::decay_t<Repr>>{std::forward<Repr>(repr)};
+}
+
+template <typename Base>
+class RefView;
+
+template <typename Repr>
+constexpr auto nonOwnedRange(Repr const& repr)
+{
+    return ownedRange(RefView(repr));
+}
+
 template <typename Data>
 class EmptyView
 {
@@ -102,6 +131,9 @@ public:
 private:
     Base mBase;
 };
+
+static_assert(!isRangeV<SingleView<int32_t>>);
+static_assert(isRangeV<Range<int32_t, SingleView<int32_t>>>);
 
 template <typename Base>
 class RepeatView
@@ -1081,7 +1113,7 @@ public:
         }
         auto operator*() const
         {
-            return TakeWhileView{[v = *mBaseIter, bin = mView.get().mBinary](auto x) { return bin(v, x); }, IterRange{mBaseIter, mView.get().mBase.end()}};
+            return ownedRange(TakeWhileView{[v = *mBaseIter, bin = mView.get().mBinary](auto x) { return bin(v, x); }, IterRange{mBaseIter, mView.get().mBase.end()}});
         }
         bool hasValue() const
         {
@@ -1113,35 +1145,6 @@ private:
     Binary mBinary;
     Base mBase;
 };
-
-template <typename Data, typename Repr>
-class Range : public Repr
-{
-};
-
-template <typename... Ts>
-class IsRange : public std::false_type
-{};
-template <typename... Ts>
-class IsRange<Range<Ts...>> : public std::true_type
-{};
-template <typename T>
-constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
-
-static_assert(!isRangeV<SingleView<int32_t>>);
-static_assert(isRangeV<Range<int32_t, SingleView<int32_t>>>);
-
-template <typename Repr>
-constexpr auto ownedRange(Repr&& repr)
-{
-    return Range<std::decay_t<decltype(*repr.begin())>, std::decay_t<Repr>>{std::forward<Repr>(repr)};
-}
-
-template <typename Repr>
-constexpr auto nonOwnedRange(Repr const& repr)
-{
-    return ownedRange(RefView(repr));
-}
 
 } // namespace data
 } // namespace hspp
