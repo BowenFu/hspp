@@ -213,14 +213,14 @@ void dataList4()
 
     // store in a separate variable to prolong its life so that result0 is still valid in expectEq.
     auto const vec = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 5, 6, 7};
-    auto const result0 = group | RefView{vec};
+    auto const result0 = group | nonOwnedRange(vec);
     expectEq(to<std::vector> <fmap> to<std::vector>(result0), std::vector{
             std::vector{1, 1, 1, 1}, std::vector{2, 2, 2, 2},
             std::vector{3, 3}, std::vector{2, 2, 2},
             std::vector{5}, std::vector{6}, std::vector{7}}
         );
     auto const vec2 = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 5, 6, 7};
-    auto const result1 = (map | [](auto l) { return std::make_tuple(head | l, length | l); }) <o> group || vec2;
+    auto const result1 = (map | [](auto l) { return std::make_tuple(head | l, length | l); }) <o> group || nonOwnedRange(vec2);
     expectEq(to<std::vector> | result1, std::vector{std::tuple{1, 4U}, std::tuple{2, 7U}, std::tuple{3, 2U}, std::tuple{5, 1U}, std::tuple{6, 1U}, std::tuple{7, 1U}});
 
     auto const values = std::vector{-4.3, -2.4, -1.2, 0.4, 2.3, 5.9, 10.5, 29.1, 5.3, -2.4, -14.5, 2.9, 2.3};
