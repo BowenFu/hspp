@@ -222,6 +222,19 @@ void dataList4()
     auto const vec2 = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 5, 6, 7};
     auto const result1 = (map | [](auto l) { return std::make_tuple(head | l, length | l); }) <o> group || vec2;
     expectEq(to<std::vector> | result1, std::vector{std::tuple{1, 4U}, std::tuple{2, 7U}, std::tuple{3, 2U}, std::tuple{5, 1U}, std::tuple{6, 1U}, std::tuple{7, 1U}});
+
+    auto const values = std::vector{-4.3, -2.4, -1.2, 0.4, 2.3, 5.9, 10.5, 29.1, 5.3, -2.4, -14.5, 2.9, 2.3};
+    auto const result2 = groupBy | [](auto x, auto y) { return (x > 0) == (y > 0); } | nonOwnedRange(values);
+    expectEq(to<std::vector> <fmap> to<std::vector>(result2), std::vector{
+            std::vector{-4.3, -2.4, -1.2}, std::vector{0.4, 2.3, 5.9, 10.5, 29.1, 5.3},
+            std::vector{-2.4, -14.5}, std::vector{2.9, 2.3}}
+        );
+
+    auto const result3 = groupBy | (equalTo  <on> [](auto x) { return x > 0 ; }) | nonOwnedRange(values);
+    expectEq(to<std::vector> <fmap> to<std::vector>(result3), std::vector{
+            std::vector{-4.3, -2.4, -1.2}, std::vector{0.4, 2.3, 5.9, 10.5, 29.1, 5.3},
+            std::vector{-2.4, -14.5}, std::vector{2.9, 2.3}}
+        );
 }
 
 void dataList5()
