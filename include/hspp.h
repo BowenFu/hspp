@@ -2106,7 +2106,7 @@ constexpr inline auto partition = toGFunc<2>([](auto pred, auto r)
 
 constexpr inline auto groupBy = toGFunc<2>([](auto binary, auto r)
 {
-    return GroupByView{std::move(binary), std::move(r)};
+    return ownedRange(GroupByView{std::move(binary), std::move(r)});
 });
 
 constexpr inline auto group = groupBy | equalTo;
