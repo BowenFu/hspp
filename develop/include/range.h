@@ -538,8 +538,8 @@ public:
     class Iter
     {
     public:
-        constexpr Iter(DropWhileView const& takeWhileView)
-        : mView{takeWhileView}
+        constexpr Iter(DropWhileView const& dropWhileView)
+        : mView{dropWhileView}
         , mBaseIter{mView.get().mBase.begin()}
         {
             while (hasValue() && mView.get().mPred(*mBaseIter))
@@ -1036,6 +1036,82 @@ public:
 private:
     Unary mUnary;
     Value mStart;
+};
+
+template <typename Iter1, typename Iter2>
+class IterRange
+{
+    Iter1 mBegin;
+    Iter2 mEnd;
+public:
+    IterRange(Iter1 begin, Iter2 end)
+    : mBegin{begin}
+    , mEnd{end}
+    {}
+    auto begin() const
+    {
+        return mBegin;
+    }
+    auto end() const
+    {
+        return mEnd;
+    }
+};
+
+template <typename Binary, typename Base>
+class GroupByView
+{
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(GroupByView const& groupByView)
+        : mView{groupByView}
+        , mBaseIter{mView.get().mBase.begin()}
+        {
+        }
+        auto& operator++()
+        {
+            auto last = *mBaseIter;
+            while (++mBaseIter, hasValue() && mView.get().mBinary(*mBaseIter, last))
+            {
+                last = *mBaseIter;
+            }
+            return *this;
+        }
+        auto operator*() const
+        {
+            return TakeWhileView{[v = *mBaseIter, bin = mView.get().mBinary](auto x) { return bin(v, x); }, IterRange{mBaseIter, mView.get().mBase.end()}};
+        }
+        bool hasValue() const
+        {
+            return mBaseIter != mView.get().mBase.end();
+        }
+    private:
+        std::reference_wrapper<GroupByView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr GroupByView(Binary binary, Base base)
+    : mBinary{std::move(binary)}
+    , mBase{std::move(base)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Binary mBinary;
+    Base mBase;
 };
 
 template <typename Data, typename Repr>

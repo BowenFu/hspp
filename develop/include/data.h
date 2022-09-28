@@ -941,6 +941,18 @@ constexpr inline auto break_ = toGFunc<2>([](auto pred, auto r)
     return span | (std::logical_not<>{} <o> pred) | r;
 });
 
+constexpr inline auto partition = toGFunc<2>([](auto pred, auto r)
+{
+    return std::make_pair(ownedRange(FilterView{pred, r}), ownedRange(FilterView{std::logical_not<>{} <o> pred, r}));
+});
+
+constexpr inline auto groupBy = toGFunc<2>([](auto binary, auto r)
+{
+    return GroupByView{binary, r};
+});
+
+constexpr inline auto group = groupBy | equalTo;
+
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {
     return r;
