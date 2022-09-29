@@ -458,13 +458,11 @@ public:
         constexpr Iter(TakeWhileView const& takeWhileView)
         : mView{takeWhileView}
         , mBaseIter{mView.get().mBase.begin()}
-        , mStop{}
         {
         }
         auto& operator++()
         {
             ++mBaseIter;
-            mStop = mStop || !std::invoke(mView.get().mPred, *mBaseIter);
             return *this;
         }
         auto operator*() const
@@ -473,12 +471,11 @@ public:
         }
         bool hasValue() const
         {
-            return mBaseIter != mView.get().mBase.end() && !mStop;
+            return mBaseIter != mView.get().mBase.end() && std::invoke(mView.get().mPred, *mBaseIter);
         }
     private:
         std::reference_wrapper<TakeWhileView const> mView;
         std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
-        bool mStop;
     };
     class Sentinel
     {};
