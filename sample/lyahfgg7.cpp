@@ -215,14 +215,6 @@ void dataList4()
     auto const vec = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 5, 6, 7};
     auto const result0 = group | nonOwnedRange(vec);
     auto const resultIVec = to<std::vector>(result0);
-    for (auto v : resultIVec)
-    {
-        for (auto e : v)
-        {
-            std::cout << e << ' ';
-        }
-        std::cout << std::endl;
-    }
     auto const resultVec = to<std::vector> <fmap>  resultIVec;
     expectEq(resultVec, std::vector{
             std::vector{1, 1, 1, 1}, std::vector{2, 2, 2, 2},
