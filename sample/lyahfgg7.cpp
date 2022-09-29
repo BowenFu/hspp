@@ -214,7 +214,9 @@ void dataList4()
     // store in a separate variable to prolong its life so that result0 is still valid in expectEq.
     auto const vec = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 5, 6, 7};
     auto const result0 = group | nonOwnedRange(vec);
-    expectEq(to<std::vector> <fmap> to<std::vector>(result0), std::vector{
+    auto const resultIVec = to<std::vector>(result0);
+    auto const resultVec = to<std::vector> <fmap>  resultIVec;
+    expectEq(resultVec, std::vector{
             std::vector{1, 1, 1, 1}, std::vector{2, 2, 2, 2},
             std::vector{3, 3}, std::vector{2, 2, 2},
             std::vector{5}, std::vector{6}, std::vector{7}}
