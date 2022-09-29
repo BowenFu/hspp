@@ -17,6 +17,35 @@ namespace hspp
 namespace data
 {
 
+template <typename Data, typename Repr>
+class Range : public Repr
+{
+};
+
+template <typename... Ts>
+class IsRange : public std::false_type
+{};
+template <typename... Ts>
+class IsRange<Range<Ts...>> : public std::true_type
+{};
+template <typename T>
+constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
+
+template <typename Repr>
+constexpr auto ownedRange(Repr&& repr)
+{
+    return Range<std::decay_t<decltype(*repr.begin())>, std::decay_t<Repr>>{std::forward<Repr>(repr)};
+}
+
+template <typename Base>
+class RefView;
+
+template <typename Repr>
+constexpr auto nonOwnedRange(Repr const& repr)
+{
+    return ownedRange(RefView(repr));
+}
+
 template <typename Data>
 class EmptyView
 {
@@ -102,6 +131,9 @@ public:
 private:
     Base mBase;
 };
+
+static_assert(!isRangeV<SingleView<int32_t>>);
+static_assert(isRangeV<Range<int32_t, SingleView<int32_t>>>);
 
 template <typename Base>
 class RepeatView
@@ -426,13 +458,11 @@ public:
         constexpr Iter(TakeWhileView const& takeWhileView)
         : mView{takeWhileView}
         , mBaseIter{mView.get().mBase.begin()}
-        , mStop{}
         {
         }
         auto& operator++()
         {
             ++mBaseIter;
-            mStop = mStop || !std::invoke(mView.get().mPred, *mBaseIter);
             return *this;
         }
         auto operator*() const
@@ -441,12 +471,11 @@ public:
         }
         bool hasValue() const
         {
-            return mBaseIter != mView.get().mBase.end() && !mStop;
+            return mBaseIter != mView.get().mBase.end() && std::invoke(mView.get().mPred, *mBaseIter);
         }
     private:
         std::reference_wrapper<TakeWhileView const> mView;
         std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
-        bool mStop;
     };
     class Sentinel
     {};
@@ -538,8 +567,8 @@ public:
     class Iter
     {
     public:
-        constexpr Iter(DropWhileView const& takeWhileView)
-        : mView{takeWhileView}
+        constexpr Iter(DropWhileView const& dropWhileView)
+        : mView{dropWhileView}
         , mBaseIter{mView.get().mBase.begin()}
         {
             while (hasValue() && mView.get().mPred(*mBaseIter))
@@ -1038,34 +1067,81 @@ private:
     Value mStart;
 };
 
-template <typename Data, typename Repr>
-class Range : public Repr
+template <typename Iter1, typename Iter2>
+class IterRange
 {
+    Iter1 mBegin;
+    Iter2 mEnd;
+public:
+    IterRange(Iter1 begin, Iter2 end)
+    : mBegin{begin}
+    , mEnd{end}
+    {}
+    auto begin() const
+    {
+        return mBegin;
+    }
+    auto end() const
+    {
+        return mEnd;
+    }
 };
 
-template <typename... Ts>
-class IsRange : public std::false_type
-{};
-template <typename... Ts>
-class IsRange<Range<Ts...>> : public std::true_type
-{};
-template <typename T>
-constexpr static auto isRangeV = IsRange<std::decay_t<T>>::value;
-
-static_assert(!isRangeV<SingleView<int32_t>>);
-static_assert(isRangeV<Range<int32_t, SingleView<int32_t>>>);
-
-template <typename Repr>
-constexpr auto ownedRange(Repr&& repr)
+template <typename Binary, typename Base>
+class GroupByView
 {
-    return Range<std::decay_t<decltype(*repr.begin())>, std::decay_t<Repr>>{std::forward<Repr>(repr)};
-}
-
-template <typename Repr>
-constexpr auto nonOwnedRange(Repr const& repr)
-{
-    return ownedRange(RefView(repr));
-}
+public:
+    class Iter
+    {
+    public:
+        constexpr Iter(GroupByView const& groupByView)
+        : mView{groupByView}
+        , mBaseIter{mView.get().mBase.begin()}
+        {
+        }
+        auto& operator++()
+        {
+            auto last = *mBaseIter;
+            while (++mBaseIter, hasValue() && mView.get().mBinary(*mBaseIter, last))
+            {
+                last = *mBaseIter;
+            }
+            return *this;
+        }
+        auto operator*() const
+        {
+            return ownedRange(TakeWhileView{[v = *mBaseIter, bin = mView.get().mBinary](auto x) { return bin(v, x); }, IterRange{mBaseIter, mView.get().mBase.end()}});
+        }
+        bool hasValue() const
+        {
+            return mBaseIter != mView.get().mBase.end();
+        }
+    private:
+        std::reference_wrapper<GroupByView const> mView;
+        std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
+    };
+    class Sentinel
+    {};
+    friend bool operator!=(Iter const& iter, Sentinel const&)
+    {
+        return iter.hasValue();
+    }
+    constexpr GroupByView(Binary binary, Base base)
+    : mBinary{std::move(binary)}
+    , mBase{std::move(base)}
+    {}
+    auto begin() const
+    {
+        return Iter(*this);
+    }
+    auto end() const
+    {
+        return Sentinel{};
+    }
+private:
+    Binary mBinary;
+    Base mBase;
+};
 
 } // namespace data
 } // namespace hspp
@@ -1916,6 +1992,12 @@ constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, R
     return toFunc<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
 }
 
+template <typename Func1, typename Func2>
+constexpr auto onImpl(Func1 f, Func2 g)
+{
+    return toGFunc<2>([f=std::move(f), g=std::move(g)](auto x, auto y) { return f(g(x), g(y)); });
+}
+
 constexpr inline auto on = toGFunc<2>([](auto f, auto g)
 {
     return onImpl(std::move(f), std::move(g));
@@ -2013,6 +2095,18 @@ constexpr inline auto break_ = toGFunc<2>([](auto pred, auto r)
 {
     return span | (std::logical_not<>{} <o> pred) | r;
 });
+
+constexpr inline auto partition = toGFunc<2>([](auto pred, auto r)
+{
+    return std::make_pair(ownedRange(FilterView{pred, r}), ownedRange(FilterView{std::logical_not<>{} <o> pred, r}));
+});
+
+constexpr inline auto groupBy = toGFunc<2>([](auto binary, auto r)
+{
+    return ownedRange(GroupByView{std::move(binary), std::move(r)});
+});
+
+constexpr inline auto group = groupBy | equalTo;
 
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {

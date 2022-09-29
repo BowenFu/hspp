@@ -190,11 +190,180 @@ void dataList3()
     expectEq(to<std::vector> | result8b, std::vector{4, 5, 6, 7});
 }
 
+void dataList4()
+{
+#if 0
+    // haskell version
+    ghci> group [1,1,1,1,2,2,2,2,3,3,2,2,2,5,6,7]
+    [[1,1,1,1],[2,2,2,2],[3,3],[2,2,2],[5],[6],[7]]
+
+    ghci> map (\l@(x:xs) -> (x,length l)) . group . sort $ [1,1,1,1, 2,2,2,2,3,3,2,2,2,5,6,7]
+    [(1,4),(2,7),(3,2),(5,1),(6,1),(7,1)]
+
+    ghci> let values = [-4.3, -2.4, -1.2, 0.4, 2.3, 5.9, 10.5, 29.1, 5.3, -2.4, -14.5, 2.9, 2.3]
+    ghci> groupBy (\x y -> (x > 0) == (y > 0)) values
+    [[-4.3,-2.4,-1.2],[0.4,2.3,5.9,10.5,29.1,5.3],[-2.4,-14.5],[2.9,2.3]]
+
+    on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
+    f `on` g = \x y -> f (g x) (g y)
+
+    ghci> groupBy ((==) `on` (> 0)) values
+    [[-4.3,-2.4,-1.2],[0.4,2.3,5.9,10.5,29.1,5.3],[-2.4,-14.5],[2.9,2.3]]
+#endif
+
+    // store in a separate variable to prolong its life so that result0 is still valid in expectEq.
+    auto const vec = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 5, 6, 7};
+    auto const result0 = group | nonOwnedRange(vec);
+    auto const resultIVec = to<std::vector>(result0);
+    auto const resultVec = to<std::vector> <fmap>  resultIVec;
+    expectEq(resultVec, std::vector{
+            std::vector{1, 1, 1, 1}, std::vector{2, 2, 2, 2},
+            std::vector{3, 3}, std::vector{2, 2, 2},
+            std::vector{5}, std::vector{6}, std::vector{7}}
+        );
+    auto const vec2 = std::vector{1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 5, 6, 7};
+    auto const result1 = (map | [](auto l) { return std::make_tuple(head | l, length | l); }) <o> group || nonOwnedRange(vec2);
+    expectEq(to<std::vector> | result1, std::vector{std::tuple{1, 4U}, std::tuple{2, 7U}, std::tuple{3, 2U}, std::tuple{5, 1U}, std::tuple{6, 1U}, std::tuple{7, 1U}});
+
+    auto const values = std::vector{-4.3, -2.4, -1.2, 0.4, 2.3, 5.9, 10.5, 29.1, 5.3, -2.4, -14.5, 2.9, 2.3};
+    auto const result2 = groupBy | [](auto x, auto y) { return (x > 0) == (y > 0); } | nonOwnedRange(values);
+    expectEq(to<std::vector> <fmap> to<std::vector>(result2), std::vector{
+            std::vector{-4.3, -2.4, -1.2}, std::vector{0.4, 2.3, 5.9, 10.5, 29.1, 5.3},
+            std::vector{-2.4, -14.5}, std::vector{2.9, 2.3}}
+        );
+
+    auto const result3 = groupBy | (equalTo  <on> [](auto x) { return x > 0 ; }) | nonOwnedRange(values);
+    expectEq(to<std::vector> <fmap> to<std::vector>(result3), std::vector{
+            std::vector{-4.3, -2.4, -1.2}, std::vector{0.4, 2.3, 5.9, 10.5, 29.1, 5.3},
+            std::vector{-2.4, -14.5}, std::vector{2.9, 2.3}}
+        );
+}
+
+void dataList5()
+{
+#if 0
+    // haskell version
+    ghci> inits "w00t"
+    ["","w","w0","w00","w00t"]
+    ghci> tails "w00t"
+    ["w00t","00t","0t","t",""]
+    ghci> let w = "w00t" in zip (inits w) (tails w)
+    [("","w00t"),("w","00t"),("w0","0t"),("w00","t"),("w00t","")]
+
+    search :: (Eq a) => [a] -> [a] -> Bool search needle haystack =
+    let nlen = length needle
+        in foldl (\acc x -> if take nlen x == needle then True else acc) False (tails haystack)
+
+    ghci> "cat" `isInfixOf` "im a cat burglar"
+    True
+    ghci> "Cat" `isInfixOf` "im a cat burglar"
+    False
+    ghci> "cats" `isInfixOf` "im a cat burglar"
+    False
+
+    ghci> "hey" `isPrefixOf` "hey there!"
+    True
+    ghci> "hey" `isPrefixOf` "oh hey there!"
+    False
+    ghci "there!" `isSuffixOf` "oh hey there!">
+    True
+    ghci> "there!" `isSuffixOf` "oh hey there"
+    False
+
+    ghci> partition (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
+    ("BOBMORGAN","sidneyeddy")
+    ghci> partition (>3) [1,3,5,6,3,2,1,0,3,7]
+    ([5,6,7],[1,3,3,2,1,0,3])
+
+    ghci> span (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
+    ("BOB","sidneyMORGANeddy")
+
+
+    ghci> find (>4) [1,2,3,4,5,6]
+    Just 5
+    ghci> find (>9) [1,2,3,4,5,6]
+    Nothing
+    ghci> :t find
+    find :: (a -> Bool) -> [a] -> Maybe a
+
+    ghci> :t elemIndex
+    elemIndex :: (Eq a) => a -> [a] -> Maybe Int
+    ghci> 4 `elemIndex` [1,2,3,4,5,6]
+    Just 3
+    ghci> 10 `elemIndex` [1,2,3,4,5,6]
+    Nothing
+
+    ghci> ' ' `elemIndices` "Where are the spaces?"
+    [5,9,13]
+
+    ghci> findIndex (==4) [5,3,2,1,6,4] Just 5
+    ghci> findIndex (==7) [5,3,2,1,6,4] Nothing
+    ghci> findIndices (`elem` ['A'..'Z']) "Where Are The Caps?" [0,6,10,14]
+
+    ghci> zipWith3 (\x y z -> x + y + z) [1,2,3] [4,5,2,2] [2,2,3]
+    [7,9,8]
+    ghci> zip4 [2,3,3] [2,2,2] [5,5,3] [2,2,2]
+    [(2,2,5,2),(3,2,5,2),(3,2,3,2)]
+
+    ghci> lines "first line\nsecond line\nthird line"
+    ["first line","second line","third line"]
+
+    ghci> unlines ["first line", "second line", "third line"]
+    "first line\nsecond line\nthird line\n"
+
+    ghci> words "hey these are the words in this sentence"
+    ["hey","these","are","the","words","in","this","sentence"]
+    ghci> words "hey these           are    the words in this\nsentence"
+    ["hey","these","are","the","words","in","this","sentence"]
+    ghci> unwords ["hey","there","mate"]
+    "hey there mate"
+
+    ghci> nub [1,2,3,4,3,2,1,2,3,4,3,2,1]
+    [1,2,3,4]
+    ghci> nub "Lots of words and stuff"
+    "Lots fwrdanu"
+
+    ghci> delete 'h' "hey there ghang!"
+    "ey there ghang!"
+    ghci> delete 'h' . delete 'h' $ "hey there ghang!"
+    "ey tere ghang!"
+    ghci> delete 'h' . delete 'h' . delete 'h' $ "hey there ghang!" "ey tere gang!"
+
+    ghci> [1..10] \\ [2,5,9] [1,3,4,6,7,8,10]
+    ghci> "Im a big baby" \\ "big" "Im a baby"
+    Doing [1..10] \\ [2,5,9] is like doing delete 2 . delete 5 . delete 9 $ [1..10].
+
+    ghci> "hey man" `union` "man what's up" "hey manwt'sup"
+    ghci> [1..7] `union` [5..10] [1,2,3,4,5,6,7,8,9,10]
+
+    ghci> [1..7] `intersect` [5..10]
+    [5,6,7]
+
+    ghci> insert 4 [3,5,1,2,8,2]
+    [3,4,5,1,2,8,2]
+    ghci> insert 4 [1,3,4,4,1]
+    [1,3,4,4,4,1]
+
+    ghci> insert 4 [1,2,3,5,6,7]
+    [1,2,3,4,5,6,7]
+    ghci> insert 'g' $ ['a'..'f'] ++ ['h'..'z']
+    "abcdefghijklmnopqrstuvwxyz"
+    ghci> insert 3 [1,2,4,3,2,1]
+    [1,2,3,4,3,2,1]
+
+    ghci> let xs = [[5,4,5,4,4],[1,2,3],[3,5,4,3],[],[2],[2,2]]
+    ghci> sortBy (compare `on` length) xs
+    [[],[2],[2,2],[1,2,3],[3,5,4,3],[5,4,5,4,4]]
+#endif
+}
+
 int main()
 {
     dataList0();
     dataList1();
     dataList2();
     dataList3();
+    dataList4();
+    dataList5();
     return 0;
 }

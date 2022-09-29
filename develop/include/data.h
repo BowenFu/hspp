@@ -843,6 +843,12 @@ constexpr auto onImpl(Function<Repr1, Ret1, Arg1, Rest1...> f, Function<Repr2, R
     return toFunc<Ret1, Arg2, Arg2>([f=std::move(f), g=std::move(g)](Arg2 x, Arg2 y) { return f | g(x) | g(y); });
 }
 
+template <typename Func1, typename Func2>
+constexpr auto onImpl(Func1 f, Func2 g)
+{
+    return toGFunc<2>([f=std::move(f), g=std::move(g)](auto x, auto y) { return f(g(x), g(y)); });
+}
+
 constexpr inline auto on = toGFunc<2>([](auto f, auto g)
 {
     return onImpl(std::move(f), std::move(g));
@@ -940,6 +946,18 @@ constexpr inline auto break_ = toGFunc<2>([](auto pred, auto r)
 {
     return span | (std::logical_not<>{} <o> pred) | r;
 });
+
+constexpr inline auto partition = toGFunc<2>([](auto pred, auto r)
+{
+    return std::make_pair(ownedRange(FilterView{pred, r}), ownedRange(FilterView{std::logical_not<>{} <o> pred, r}));
+});
+
+constexpr inline auto groupBy = toGFunc<2>([](auto binary, auto r)
+{
+    return ownedRange(GroupByView{std::move(binary), std::move(r)});
+});
+
+constexpr inline auto group = groupBy | equalTo;
 
 constexpr inline auto const_ = toGFunc<2>([](auto r, auto)
 {
