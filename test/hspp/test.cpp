@@ -1226,7 +1226,7 @@ TEST(Copy, View)
     int const x = true;
     auto const alwaysTrue = [x](auto) { return x;};
     auto const id = [](auto x) { return SingleView{x};};
-    auto const v= JoinView{MapView{FilterView{IotaView{1}, alwaysTrue}, id}};
+    auto const v= JoinView{MapView{FilterView{alwaysTrue, IotaView{1}}, id}};
     auto const y = v;
     (void)y;
 }
