@@ -6,6 +6,7 @@
 #include "common.h"
 #include <string>
 #include <cmath>
+#include <cctype>
 
 using namespace hspp;
 using namespace hspp::doN;
@@ -375,6 +376,45 @@ void dataList6()
     expectEq(to<std::basic_string> | result21, "sidneyMORGANeddy"s);
 }
 
+void dataChar0()
+{
+#if 0
+    // haskell version
+    ghci> all isAlphaNum "bobby283"
+    True
+    ghci> all isAlphaNum "eddy the fish!"
+    False
+
+    ghci> words "hey guys its me"
+    ["hey","guys","its","me"]
+    ghci> groupBy ((==) `on` isSpace) "hey guys its me"
+    ["hey"," ","guys"," ","its"," ","me"]
+
+    ghci> filter (not . any isSpace) . groupBy ((==) `on` isSpace) $ "hey guys its me"
+    ["hey","guys","its","me"]
+#endif
+
+    constexpr auto isAlphaNum = toGFunc<1> | [](auto x) -> bool { return std::isalnum(static_cast<unsigned char>(x)); };
+    constexpr auto isSpace = toGFunc<1> | [](auto x) -> bool { return std::isspace(static_cast<unsigned char>(x)); };
+
+    auto const result0 = all | isAlphaNum | "bobby283"s;
+    expectEq(result0, true);
+
+    auto const result1 = all | isAlphaNum | "eddy the fish!"s;
+    expectEq(result1, false);
+
+    auto const str = "hey guys its me"s;
+    auto const result2 = groupBy | (equalTo <on> isSpace) | nonOwnedRange(str);
+    expectEq(to<std::basic_string> <fmap> to<std::vector>(result2), std::vector{
+        "hey"s, " "s, "guys"s, " "s, "its"s, " "s, "me"s
+    });
+
+    auto const result3 = (filter | std::logical_not<>{} <o> (any | isSpace)) <o> (groupBy | (equalTo <on> isSpace)) || nonOwnedRange(str);
+    expectEq(to<std::basic_string> <fmap> to<std::vector>(result3), std::vector{
+        "hey"s, "guys"s, "its"s, "me"s
+    });
+}
+
 int main()
 {
     dataList0();
@@ -384,5 +424,6 @@ int main()
     dataList4();
     dataList5();
     dataList6();
+    dataChar0();
     return 0;
 }
