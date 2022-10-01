@@ -1515,7 +1515,7 @@ constexpr auto guardImpl(bool b)
 {
     if constexpr (data::isRangeV<ClassT>)
     {
-        return data::ownedRange(data::FilterView{Monad<data::Range>::return_(_o_), [b](auto){ return b; }});
+        return data::ownedRange(data::FilterView{[b](auto){ return b; }, Monad<data::Range>::return_(_o_)});
     }
     else
     {

@@ -270,14 +270,6 @@ void dataList5()
     ghci> "there!" `isSuffixOf` "oh hey there"
     False
 
-    ghci> partition (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
-    ("BOBMORGAN","sidneyeddy")
-    ghci> partition (>3) [1,3,5,6,3,2,1,0,3,7]
-    ([5,6,7],[1,3,3,2,1,0,3])
-
-    ghci> span (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
-    ("BOB","sidneyMORGANeddy")
-
 
     ghci> find (>4) [1,2,3,4,5,6]
     Just 5
@@ -357,6 +349,32 @@ void dataList5()
 #endif
 }
 
+void dataList6()
+{
+#if 0
+    // haskell version
+    ghci> partition (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
+    ("BOBMORGAN","sidneyeddy")
+    ghci> partition (>3) [1,3,5,6,3,2,1,0,3,7]
+    ([5,6,7],[1,3,3,2,1,0,3])
+
+    ghci> span (`elem` ['A'..'Z']) "BOBsidneyMORGANeddy"
+    ("BOB","sidneyMORGANeddy")
+#endif
+
+    auto const [result00, result01] = partition | (flip | elem | within('A', 'Z')) | "BOBsidneyMORGANeddy"s;
+    expectEq(to<std::basic_string> | result00, "BOBMORGAN"s);
+    expectEq(to<std::basic_string> | result01, "sidneyeddy"s);
+
+    auto const [result10, result11] = partition | [](auto x) { return x > 3; } | std::vector{1, 3, 5, 6, 3, 2, 1, 0, 3, 7};
+    expectEq(to<std::vector> | result10, std::vector{5, 6, 7});
+    expectEq(to<std::vector> | result11, std::vector{1, 3, 3, 2, 1, 0, 3});
+
+    auto const [result20, result21] = span | (flip | elem | within('A', 'Z')) | "BOBsidneyMORGANeddy"s;
+    expectEq(to<std::basic_string> | result20, "BOB"s);
+    expectEq(to<std::basic_string> | result21, "sidneyMORGANeddy"s);
+}
+
 int main()
 {
     dataList0();
@@ -365,5 +383,6 @@ int main()
     dataList3();
     dataList4();
     dataList5();
+    dataList6();
     return 0;
 }
