@@ -867,7 +867,7 @@ constexpr auto to = toGFunc<1>([](auto view)
 
 constexpr inline auto filter = toGFunc<2>([](auto pred, auto data)
 {
-    return ownedRange(FilterView{std::move(data), std::move(pred)});
+    return ownedRange(FilterView{std::move(pred), std::move(data)});
 });
 
 constexpr inline auto map = toGFunc<2>([](auto func, auto data)

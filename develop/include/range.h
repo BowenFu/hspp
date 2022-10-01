@@ -331,7 +331,7 @@ private:
     Func mFunc;
 };
 
-template <typename Base, typename Pred>
+template <typename Pred, typename Base>
 class FilterView
 {
 public:
@@ -376,9 +376,9 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr FilterView(Base base, Pred pred)
-    : mBase{std::move(base)}
-    , mPred{std::move(pred)}
+    constexpr FilterView(Pred pred, Base base)
+    : mPred{std::move(pred)}
+    , mBase{std::move(base)}
     {}
     auto begin() const
     {
@@ -389,8 +389,8 @@ public:
         return Sentinel{};
     }
 private:
-    Base mBase;
     Pred mPred;
+    Base mBase;
 };
 
 template <typename Base>
