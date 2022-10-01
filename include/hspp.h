@@ -331,7 +331,7 @@ private:
     Func mFunc;
 };
 
-template <typename Base, typename Pred>
+template <typename Pred, typename Base>
 class FilterView
 {
 public:
@@ -376,9 +376,9 @@ public:
     {
         return iter.hasValue();
     }
-    constexpr FilterView(Base base, Pred pred)
-    : mBase{std::move(base)}
-    , mPred{std::move(pred)}
+    constexpr FilterView(Pred pred, Base base)
+    : mPred{std::move(pred)}
+    , mBase{std::move(base)}
     {}
     auto begin() const
     {
@@ -389,8 +389,8 @@ public:
         return Sentinel{};
     }
 private:
-    Base mBase;
     Pred mPred;
+    Base mBase;
 };
 
 template <typename Base>
@@ -2016,7 +2016,7 @@ constexpr auto to = toGFunc<1>([](auto view)
 
 constexpr inline auto filter = toGFunc<2>([](auto pred, auto data)
 {
-    return ownedRange(FilterView{std::move(data), std::move(pred)});
+    return ownedRange(FilterView{std::move(pred), std::move(data)});
 });
 
 constexpr inline auto map = toGFunc<2>([](auto func, auto data)
@@ -4132,7 +4132,7 @@ constexpr auto guardImpl(bool b)
 {
     if constexpr (data::isRangeV<ClassT>)
     {
-        return data::ownedRange(data::FilterView{Monad<data::Range>::return_(_o_), [b](auto){ return b; }});
+        return data::ownedRange(data::FilterView{[b](auto){ return b; }, Monad<data::Range>::return_(_o_)});
     }
     else
     {
