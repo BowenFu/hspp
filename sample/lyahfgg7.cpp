@@ -365,6 +365,14 @@ void dataList6()
     auto const [result00, result01] = partition | (flip | elem | within('A', 'Z')) | "BOBsidneyMORGANeddy"s;
     expectEq(to<std::basic_string> | result00, "BOBMORGAN"s);
     expectEq(to<std::basic_string> | result01, "sidneyeddy"s);
+
+    auto const [result10, result11] = partition | [](auto x) { return x > 3; } | std::vector{1, 3, 5, 6, 3, 2, 1, 0, 3, 7};
+    expectEq(to<std::vector> | result10, std::vector{5, 6, 7});
+    expectEq(to<std::vector> | result11, std::vector{1, 3, 3, 2, 1, 0, 3});
+
+    auto const [result20, result21] = span | (flip | elem | within('A', 'Z')) | "BOBsidneyMORGANeddy"s;
+    expectEq(to<std::basic_string> | result20, "BOB"s);
+    expectEq(to<std::basic_string> | result21, "sidneyMORGANeddy"s);
 }
 
 int main()
