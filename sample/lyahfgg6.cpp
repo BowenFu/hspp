@@ -110,7 +110,7 @@ void someHigherOrderismIsInOrder0()
     constexpr auto applyTwice = toGFunc<2> | [](auto f, auto x) { return f(f(x)); };
     constexpr auto multThree = toFunc<> | [](int x, int y, int z) { return x * y * z; };
 
-    constexpr auto add = toGFunc<2> | std::plus<>{} ;
+    constexpr auto add = toGFunc<2> | std::plus<>{};
     expectEq(applyTwice | (add | 3) | 10, 16);
     expectEq(applyTwice | (plus | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
     expectEq(applyTwice | (multThree | 2 | 2) | 9, 144);
@@ -166,7 +166,8 @@ void someHigherOrderismIsInOrder2()
     auto const result0 = flip | zip | within(1, 5) | "hello"s;
     expectEq(to<std::vector> | result0, std::vector{std::tuple{'h', 1}, std::tuple{'e', 2}, std::tuple{'l', 3}, std::tuple{'l', 4}, std::tuple{'o', 5}});
 
-    auto const result1 = zipWith | (flip | (toGFunc<2> | std::divides<>{})) | repeat(2) | within_(10, 8, 2);
+    constexpr auto div = (toGFunc<2> | std::divides<>{});
+    auto const result1 = zipWith | (flip | div) | repeat(2) | within_(10, 8, 2);
     expectEq(to<std::vector> | result1, std::vector{5, 4, 3, 2, 1});
 }
 
