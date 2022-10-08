@@ -17,25 +17,37 @@ void babysFirstFunctions()
 #if 0
     // haskell version
     doubleMe x = x + x
+    ghci> doubleMe 9
+    18
+    ghci> doubleMe 8.3
+    16.6
 #endif // 0
 
-    constexpr auto doubleMe = toGFunc<1> | [](auto x)
-    {
-        return x + x;
-    };
-    expectEq(doubleMe | 9, 18);
-    expectEq(doubleMe | 8.3, 16.6);
+constexpr auto doubleMe = toGFunc<1> | [](auto x)
+{
+    return x + x;
+};
+expectEq(doubleMe | 9, 18);
+expectEq(doubleMe | 8.3, 16.6);
 
 #if 0
     // haskell version
     doubleUs x y = doubleMe x + doubleMe y
+
+    ghci> doubleUs 4 9
+    26
+    ghci> doubleUs 2.3 34.2
+    73.0
+    ghci> doubleUs 28 88 + doubleMe 123
+    478
 #endif // 0
 
     constexpr auto doubleUs = toGFunc<2> | [=](auto x, auto y)
     {
         return (doubleMe | x) + (doubleMe | y);
     };
-    expectEq(doubleUs | 3 | 4, 14);
+    expectEq(doubleUs | 4 | 9, 26);
+    expectEq(doubleUs | 2.3 | 34.2, 73.0);
 
 #if 0
     // haskell version
@@ -61,7 +73,7 @@ void anIntroToLists1()
     [1,2,3,4,9,10,11,12]
 #endif // 0
 
-    auto const result = plus | within(1, 4) | within(9, 12);
+    auto const result = within(1, 4) <plus> within(9, 12);
     auto const expected = std::vector{1, 2, 3, 4, 9, 10, 11, 12};
     expectEq(toVector | result, expected);
 }
@@ -70,8 +82,8 @@ void anIntroToLists2()
 {
 #if 0
     // haskell version
-    ghci> "hello" ++ " " ++ "world"
-    "hello world"
+ghci> "hello" ++ " " ++ "world"
+"hello world"
 #endif // 0
 
     auto const result = "hello"s <plus> " "s <plus> "world"s;
