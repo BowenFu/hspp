@@ -268,8 +268,7 @@ void mapsAndFilters2()
     expectEq(result1, 166650);
 
     Id<int> n;
-    auto const view = (takeWhile | [](int x){ return x < 10000; } | _(n*n, n <= enumFrom(1), if_ || odd | (n*n)));
-    auto const result2 = sum | to<std::vector>(view);
+    auto const result2 = sum | (takeWhile | [](int x){ return x < 10000; } | _(n*n, n <= enumFrom(1), if_ || odd | (n*n)));
     expectEq(result2, 166650);
 
     auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
