@@ -267,17 +267,13 @@ void mapsAndFilters2()
     auto const result1 = sum | (takeWhile | [](int x){ return x < 10000; } | (filter | odd | (map | [](auto x){ return x*x; } | enumFrom(1))));
     expectEq(result1, 166650);
 
-    // auto const result2 = filter | even | within(1, 10);
-    // expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
+    Id<int> n;
+    auto const view = (takeWhile | [](int x){ return x < 10000; } | _(n*n, n <= enumFrom(1), if_ || odd | (n*n)));
+    auto const result2 = sum | to<std::vector>(view);
+    expectEq(result2, 166650);
 
     auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
     expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
-
-    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
-    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
-
-    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
-    expectEq(to<std::basic_string> | result5, "GAYBALLS");
 
     auto const listOfFuns = map | (toGFunc<2> | std::multiplies<>{}) | enumFrom(0);
     auto const result6 = (listOfFuns <idx> 4U) | 5;
