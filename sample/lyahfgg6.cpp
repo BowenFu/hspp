@@ -323,17 +323,34 @@ void onlyFoldsAndHorses0()
 
     map :: (a -> b) -> [a] -> [b]
     map f xs = foldr (\x acc -> f x : acc) [] xs
+
+    ghci> map negate [5,3,2]
+    [-5,-3,-2]
 #endif // 0
 
-    constexpr auto sum = foldl | std::plus<>{} | 0;
-    expectEq(sum | std::vector{5, 3, 2}, 10);
+constexpr auto sum = foldl | std::plus<>{} | 0;
+expectEq(sum | std::vector{5, 3, 2}, 10);
 
-    constexpr auto elem = toGFunc<2> | [](auto y, auto ys) { return foldl | [y](auto acc, auto x) { return x == y ? true : acc; } | false  | ys; };
-    expectEq(elem | 3 | std::vector{5, 3, 2}, true);
+constexpr auto elem = toGFunc<2> | [](auto y, auto ys)
+{
+    return foldl | [y](auto acc, auto x)
+    {
+        return x == y ? true : acc;
+    }
+    | false  | ys;
+};
+expectEq(elem | 3 | std::vector{5, 3, 2}, true);
 
-    // only works for container types, not ranges.
-    constexpr auto map = toGFunc<2> | [](auto f, auto xs) { return foldr | [f](auto x, auto acc) { return f(x) <cons> acc; } | decltype(xs){}  | xs; };
-    expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
+// only works for container types, not ranges.
+constexpr auto map = toGFunc<2> | [](auto f, auto xs)
+{
+    return foldr | [f](auto x, auto acc)
+    {
+        return f(x) <cons> acc;
+    }
+    | decltype(xs){}  | xs;
+};
+expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
 }
 
 void onlyFoldsAndHorses1()
@@ -368,7 +385,14 @@ void onlyFoldsAndHorses1()
     constexpr auto product = foldr1 || toGFunc<2> | std::multiplies<>{};
     expectEq(product | std::vector{4, 2, 6}, 48);
 
-    constexpr auto filter = toGFunc<2> | [](auto p, auto xs) { return foldr | (toGFunc<2> | [p](auto x, auto acc) { return p(x) ? x <cons> acc : acc; }) | decltype(xs){} | xs; };
+    constexpr auto filter = toGFunc<2> | [](auto p, auto xs)
+    {
+        return foldr | (toGFunc<2> | [p](auto x, auto acc)
+        {
+            return p(x) ? x <cons> acc : acc;
+        })
+        | decltype(xs){} | xs;
+    };
     expectEq(filter | even | std::vector{4, 5, 2}, std::vector{4, 2});
 
     constexpr auto head = foldr1 || toGFunc<2> | [](auto x, auto){ return x; };

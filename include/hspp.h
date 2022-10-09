@@ -1169,6 +1169,45 @@ private:
 namespace hspp
 {
 
+namespace doN
+{
+template <typename T>
+class Nullary;
+
+template <typename T>
+class Id;
+
+template <typename T>
+class IsNullary : public std::false_type
+{
+};
+
+template <typename T>
+class IsNullary<Nullary<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isNullaryV = IsNullary<std::decay_t<T>>::value;
+
+template <typename T>
+class IsId : public std::false_type
+{
+};
+
+template <typename T>
+class IsId<Id<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isIdV = IsId<std::decay_t<T>>::value;
+
+template <typename T>
+constexpr auto isNullaryOrIdV = isNullaryV<T> || isIdV<T>;
+
+} // namespace doN
+
 template <typename... Ts>
 class Overload : Ts...
 {
@@ -1602,7 +1641,7 @@ public:
     Left left;
 };
 
-template <typename Left, typename Func, typename = std::enable_if_t<(isFunctionV<Func> || isGenericFunctionV<Func>), bool>>
+template <typename Left, typename Func, typename = std::enable_if_t<!doN::isNullaryOrIdV<Left> && (isFunctionV<Func> || isGenericFunctionV<Func>), bool>>
 constexpr auto operator<(Left&& left, Func&& func)
 {
     return LeftClosedFunc<std::decay_t<Func>, std::decay_t<Left>>{std::forward<Func>(func), std::forward<Left>(left)};
@@ -4320,8 +4359,6 @@ namespace hspp
 
 namespace doN
 {
-template <typename T>
-class Nullary;
 
 template <typename F>
 class LetExpr : public F
@@ -4411,38 +4448,12 @@ constexpr auto toTENullary = toGFunc<1> | [](auto const& t)
     return toTENullaryImpl(t);
 };
 
-template <typename T>
-class IsNullary : public std::false_type
-{
-};
-
-template <typename T>
-class IsNullary<Nullary<T>> : public std::true_type
-{
-};
-
-template <typename T>
-constexpr auto isNullaryV = IsNullary<std::decay_t<T>>::value;
-
 template <typename ClassT, typename T , typename = std::enable_if_t<isNullaryV<T>, void>>
 constexpr auto evalDeferredImpl(T&& t)
 {
     static_assert(std::is_same_v<MonadType<ClassT>, MonadType<std::invoke_result_t<T>>>);
     return t();
 }
-
-template <typename T>
-class IsNullaryOrId : public IsNullary<T>
-{
-};
-
-template <typename T>
-class IsNullaryOrId<Id<T>> : public std::true_type
-{
-};
-
-template <typename T>
-constexpr auto isNullaryOrIdV = IsNullaryOrId<std::decay_t<T>>::value;
 
 template <typename M>
 class DeMonad

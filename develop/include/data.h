@@ -20,6 +20,45 @@
 namespace hspp
 {
 
+namespace doN
+{
+template <typename T>
+class Nullary;
+
+template <typename T>
+class Id;
+
+template <typename T>
+class IsNullary : public std::false_type
+{
+};
+
+template <typename T>
+class IsNullary<Nullary<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isNullaryV = IsNullary<std::decay_t<T>>::value;
+
+template <typename T>
+class IsId : public std::false_type
+{
+};
+
+template <typename T>
+class IsId<Id<T>> : public std::true_type
+{
+};
+
+template <typename T>
+constexpr auto isIdV = IsId<std::decay_t<T>>::value;
+
+template <typename T>
+constexpr auto isNullaryOrIdV = isNullaryV<T> || isIdV<T>;
+
+} // namespace doN
+
 template <typename... Ts>
 class Overload : Ts...
 {
@@ -453,7 +492,7 @@ public:
     Left left;
 };
 
-template <typename Left, typename Func, typename = std::enable_if_t<(isFunctionV<Func> || isGenericFunctionV<Func>), bool>>
+template <typename Left, typename Func, typename = std::enable_if_t<!doN::isNullaryOrIdV<Left> && (isFunctionV<Func> || isGenericFunctionV<Func>), bool>>
 constexpr auto operator<(Left&& left, Func&& func)
 {
     return LeftClosedFunc<std::decay_t<Func>, std::decay_t<Left>>{std::forward<Func>(func), std::forward<Left>(left)};
