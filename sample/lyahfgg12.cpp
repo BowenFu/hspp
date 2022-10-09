@@ -42,26 +42,29 @@ void doNotation()
 void doNotation1()
 {
 #if 0
-listOfTuples :: [(Int,Char)]
-listOfTuples = do
-    n <- [1,2]
-    ch <- ['a','b']
-    return (n,ch)
+    listOfTuples :: [(Int,Char)]
+    listOfTuples = do
+        n <- [1,2]
+        ch <- ['a','b']
+        return (n,ch)
 
-ghci> [ (n,ch) | n <- [1,2], ch <- ['a','b'] ]
-[(1,'a'),(1,'b'),(2,'a'),(2,'b')]
+    ghci> [ (n,ch) | n <- [1,2], ch <- ['a','b'] ]
+    [(1,'a'),(1,'b'),(2,'a'),(2,'b')]
 #endif
 
-Id<int> n;
-Id<char> ch;
-auto const listOfTuples0 = do_(
-    n <= std::vector{1, 2},
-    ch <= std::vector{'a', 'b'},
-    return_ | (makeTuple<2> | n | ch)
-);
+    Id<int> n;
+    Id<char> ch;
+    auto const listOfTuples0 = do_(
+        n <= std::vector{1, 2},
+        ch <= std::vector{'a', 'b'},
+        return_ | (makeTuple<2> | n | ch)
+    );
 
-auto const expected = std::vector<std::tuple<int, char>>{{1, 'a'}, {1, 'b'}, {2, 'a'}, {2, 'b'}};
-expectEq(to<std::vector>(listOfTuples0), expected);
+    auto const expected = std::vector<std::tuple<int, char>>{{1, 'a'}, {1, 'b'}, {2, 'a'}, {2, 'b'}};
+    expectEq(to<std::vector>(listOfTuples0), expected);
+
+    auto const listOfTuples1 = _(makeTuple<2> | n | ch, n <= std::vector{1, 2}, ch <= std::vector{'a', 'b'});
+    expectEq(to<std::vector>(listOfTuples1), expected);
 }
 
 int main()
