@@ -1579,3 +1579,4 @@ TEST(liftM, lst)
     auto expected = std::vector{-1, -2, -3};
     EXPECT_EQ(result, expected);
 }
+

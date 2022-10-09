@@ -110,7 +110,7 @@ void someHigherOrderismIsInOrder0()
     constexpr auto applyTwice = toGFunc<2> | [](auto f, auto x) { return f(f(x)); };
     constexpr auto multThree = toFunc<> | [](int x, int y, int z) { return x * y * z; };
 
-    constexpr auto add = toGFunc<2> | std::plus<>{} ;
+    constexpr auto add = toGFunc<2> | std::plus<>{};
     expectEq(applyTwice | (add | 3) | 10, 16);
     expectEq(applyTwice | (plus | "HAHA "s) | "HEY"s, "HAHA HAHA HEY");
     expectEq(applyTwice | (multThree | 2 | 2) | 9, 144);
@@ -166,7 +166,8 @@ void someHigherOrderismIsInOrder2()
     auto const result0 = flip | zip | within(1, 5) | "hello"s;
     expectEq(to<std::vector> | result0, std::vector{std::tuple{'h', 1}, std::tuple{'e', 2}, std::tuple{'l', 3}, std::tuple{'l', 4}, std::tuple{'o', 5}});
 
-    auto const result1 = zipWith | (flip | (toGFunc<2> | std::divides<>{})) | repeat(2) | within_(10, 8, 2);
+    constexpr auto div = (toGFunc<2> | std::divides<>{});
+    auto const result1 = zipWith | (flip | div) | repeat(2) | within_(10, 8, 2);
     expectEq(to<std::vector> | result1, std::vector{5, 4, 3, 2, 1});
 }
 
@@ -266,17 +267,12 @@ void mapsAndFilters2()
     auto const result1 = sum | (takeWhile | [](int x){ return x < 10000; } | (filter | odd | (map | [](auto x){ return x*x; } | enumFrom(1))));
     expectEq(result1, 166650);
 
-    // auto const result2 = filter | even | within(1, 10);
-    // expectEq(to<std::vector> | result2, std::vector{2, 4, 6, 8, 10});
+    Id<int> n;
+    auto const result2 = sum | (takeWhile | [](int x){ return x < 10000; } | _(n*n, n <= enumFrom(1), if_ || odd | (n*n)));
+    expectEq(result2, 166650);
 
     auto const result3 = filter | [](auto const& x){ return !null(x); } | std::vector{std::vector{1, 2, 3}, std::vector<int>{}, std::vector{3, 4, 5}, std::vector{2, 2}, std::vector<int>{}, std::vector<int>{}, std::vector<int>{}};
     expectEq(to<std::vector> | result3, std::vector{std::vector{1, 2, 3}, std::vector{3, 4, 5}, std::vector{2, 2}});
-
-    auto const result4 = filter | (flip | elem | within('a', 'z')) | "u LaUgH aT mE BeCaUsE I aM diFfeRent"s;
-    expectEq(to<std::basic_string> | result4, "uagameasadifeent");
-
-    auto const result5 = filter | (flip | elem | within('A', 'Z')) | "i lauGh At You BecAuse u r aLL the Same"s;
-    expectEq(to<std::basic_string> | result5, "GAYBALLS");
 
     auto const listOfFuns = map | (toGFunc<2> | std::multiplies<>{}) | enumFrom(0);
     auto const result6 = (listOfFuns <idx> 4U) | 5;
@@ -327,17 +323,34 @@ void onlyFoldsAndHorses0()
 
     map :: (a -> b) -> [a] -> [b]
     map f xs = foldr (\x acc -> f x : acc) [] xs
+
+    ghci> map negate [5,3,2]
+    [-5,-3,-2]
 #endif // 0
 
-    constexpr auto sum = foldl | std::plus<>{} | 0;
-    expectEq(sum | std::vector{5, 3, 2}, 10);
+constexpr auto sum = foldl | std::plus<>{} | 0;
+expectEq(sum | std::vector{5, 3, 2}, 10);
 
-    constexpr auto elem = toGFunc<2> | [](auto y, auto ys) { return foldl | [y](auto acc, auto x) { return x == y ? true : acc; } | false  | ys; };
-    expectEq(elem | 3 | std::vector{5, 3, 2}, true);
+constexpr auto elem = toGFunc<2> | [](auto y, auto ys)
+{
+    return foldl | [y](auto acc, auto x)
+    {
+        return x == y ? true : acc;
+    }
+    | false  | ys;
+};
+expectEq(elem | 3 | std::vector{5, 3, 2}, true);
 
-    // only works for container types, not ranges.
-    constexpr auto map = toGFunc<2> | [](auto f, auto xs) { return foldr | [f](auto x, auto acc) { return f(x) <cons> acc; } | decltype(xs){}  | xs; };
-    expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
+// only works for container types, not ranges.
+constexpr auto map = toGFunc<2> | [](auto f, auto xs)
+{
+    return foldr | [f](auto x, auto acc)
+    {
+        return f(x) <cons> acc;
+    }
+    | decltype(xs){}  | xs;
+};
+expectEq(map | std::negate<>{} | std::vector{5, 3, 2}, std::vector{-5, -3, -2});
 }
 
 void onlyFoldsAndHorses1()
@@ -372,7 +385,14 @@ void onlyFoldsAndHorses1()
     constexpr auto product = foldr1 || toGFunc<2> | std::multiplies<>{};
     expectEq(product | std::vector{4, 2, 6}, 48);
 
-    constexpr auto filter = toGFunc<2> | [](auto p, auto xs) { return foldr | (toGFunc<2> | [p](auto x, auto acc) { return p(x) ? x <cons> acc : acc; }) | decltype(xs){} | xs; };
+    constexpr auto filter = toGFunc<2> | [](auto p, auto xs)
+    {
+        return foldr | (toGFunc<2> | [p](auto x, auto acc)
+        {
+            return p(x) ? x <cons> acc : acc;
+        })
+        | decltype(xs){} | xs;
+    };
     expectEq(filter | even | std::vector{4, 5, 2}, std::vector{4, 2});
 
     constexpr auto head = foldr1 || toGFunc<2> | [](auto x, auto){ return x; };

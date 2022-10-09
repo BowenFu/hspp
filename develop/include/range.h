@@ -688,7 +688,7 @@ public:
             if (!mCache)
             {
                 using T = std::decay_t<decltype(*mCache)>;
-                mCache = std::make_unique<T>(std::move(*mBaseIter));
+                mCache = std::make_shared<T>(std::move(*mBaseIter));
             }
             return *mCache;
         }
@@ -738,9 +738,9 @@ public:
         std::reference_wrapper<JoinView const> mView;
         std::decay_t<decltype(mView.get().mBase.begin())> mBaseIter;
         // not thread-safe
-        // have to use std::unique_ptr instead of Maybe, because Maybe requrires copy assignments.
+        // have to use std::shared_ptr instead of Maybe, because Maybe requrires copy assignments.
         // TODO: use placement new to avoid heap memory allocation.
-        mutable std::unique_ptr<std::decay_t<decltype(*mBaseIter)>> mCache;
+        mutable std::shared_ptr<std::decay_t<decltype(*mBaseIter)>> mCache;
         std::decay_t<decltype(mCache->begin())> mInnerIter;
     };
     class Sentinel
