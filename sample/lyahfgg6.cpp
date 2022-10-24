@@ -196,8 +196,8 @@ void mapsAndFilters0()
     auto const result2 = map | (replicate | 3U) | within(3, 6);
     expectEq(to<std::vector> || to<std::vector> <fmap> result2, std::vector{std::vector{3, 3, 3}, std::vector{4, 4, 4}, std::vector{5, 5, 5}, std::vector{6, 6, 6}});
 
-    auto const result3 = map | (map | [](auto x){ return x*x; }) | std::vector{std::vector{1, 2}, std::vector{3, 4, 5, 6}, std::vector{7, 8}};
-    expectEq(to<std::vector> || to<std::vector> <fmap> result3, std::vector{std::vector{1, 4}, std::vector{9, 16, 25, 36}, std::vector{49, 64}});
+    auto const result3 = map | (map | [](auto x){ return x*x; }) | std::vector<std::vector<int>>{{1, 2}, {3, 4, 5, 6}, {7, 8}};
+    expectEq(to<std::vector> || to<std::vector> <fmap> result3, std::vector<std::vector<int>>{{1, 4}, {9, 16, 25, 36}, {49, 64}});
 
     auto const result4 = map | fst | std::vector{std::tuple{1, 2}, std::tuple{3, 5}, std::tuple{6, 3}, std::tuple{2, 6}, std::tuple{2, 5}};
     expectEq(to<std::vector> | result4, std::vector{1, 3, 6, 2, 2});

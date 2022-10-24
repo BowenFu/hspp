@@ -139,7 +139,7 @@ Haskell version
 triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2]
 ```
 
-[godbolt2]: https://godbolt.org/z/nnKozMYzo
+[godbolt2]: https://godbolt.org/z/o7qj6o111
 
 [![Try it on godbolt][badge.godbolt]][godbolt2]
 
@@ -150,8 +150,8 @@ triangles = [(i, j, k) | k <- [1..], i <- [1..k], j <- [i..k] , i^2 + j^2 == k^2
     auto const rng = _(
         makeTuple<3> | i | j | k,
         k <= (enumFrom | 1),
-        i <= (iota | 1 | k),
-        j <= (iota | i | k),
+        i <= (within | 1 | k),
+        j <= (within | i | k),
         if_ || (i*i + j*j == k*k)
     );
 ```
